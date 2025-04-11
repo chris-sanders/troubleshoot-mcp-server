@@ -119,23 +119,23 @@ async def test_bundle_manager_initialize_bundle_nonexistent():
     """Test that the bundle manager raises an error for nonexistent bundles."""
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
-        
+
         # Instead of testing the full initialize_bundle method,
         # directly test the local file check logic
         nonexistent_path = bundle_dir / "nonexistent.tar.gz"
-        
+
         # Ensure file doesn't exist
         if nonexistent_path.exists():
             nonexistent_path.unlink()
-            
+
         # Check if the bundle exists using the same logic as the manager
         assert not nonexistent_path.exists()
-        
+
         # Verify the correct exception is raised for nonexistent file
         with pytest.raises(BundleNotFoundError) as excinfo:
             if not nonexistent_path.exists():
                 raise BundleNotFoundError(f"Bundle not found: {nonexistent_path}")
-                
+
         # Verify the error message contains the path
         assert str(nonexistent_path) in str(excinfo.value)
 
@@ -146,36 +146,36 @@ async def test_bundle_manager_download_bundle():
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
         manager = BundleManager(bundle_dir)
-        
+
         # Create a mock download path
         download_path = bundle_dir / "test_bundle.tar.gz"
         with open(download_path, "w") as f:
             f.write("mock bundle content")
-            
+
         # Create a mock kubeconfig path
         kubeconfig_path = bundle_dir / "test_kubeconfig"
         with open(kubeconfig_path, "w") as f:
             f.write("mock kubeconfig content")
-        
+
         # Mock the _download_bundle method
         async def mock_download(url):
             assert url == "https://example.com/bundle.tar.gz"  # Verify the URL is correct
             return download_path
-            
+
         # Mock the _initialize_with_sbctl method
         async def mock_initialize(bundle_path, output_dir):
             # Verify the parameters
             assert bundle_path == download_path
             # Return the kubeconfig path
             return kubeconfig_path
-            
+
         # Patch both methods needed for initialize_bundle to work
         with patch.object(manager, "_download_bundle", side_effect=mock_download):
             with patch.object(manager, "_initialize_with_sbctl", side_effect=mock_initialize):
                 with patch.object(manager, "_wait_for_initialization", AsyncMock()):
                     # Call the initialize_bundle method with a URL
                     result = await manager.initialize_bundle("https://example.com/bundle.tar.gz")
-                    
+
                     # Verify the result
                     assert isinstance(result, BundleMetadata)
                     assert result.source == "https://example.com/bundle.tar.gz"
@@ -186,7 +186,7 @@ async def test_bundle_manager_download_bundle():
 async def test_bundle_manager_download_bundle_auth():
     """Test that the bundle manager uses auth token for download."""
     # This test verifies that the auth token from env vars is included in requests
-    
+
     # Test the code directly by making a headers dict and applying the same logic
     headers = {}
     with patch.dict(os.environ, {"SBCTL_TOKEN": "test_token"}):
@@ -194,7 +194,7 @@ async def test_bundle_manager_download_bundle_auth():
         token = os.environ.get("SBCTL_TOKEN")
         if token:
             headers["Authorization"] = f"Bearer {token}"
-    
+
     # Verify the headers were set correctly
     assert "Authorization" in headers
     assert headers["Authorization"] == "Bearer test_token"
@@ -210,8 +210,10 @@ async def test_bundle_manager_download_bundle_error():
         # Create an alternative implementation with proper async context handling
         async def mock_download_with_error(*args, **kwargs):
             # Simulate a 404 error directly
-            raise BundleDownloadError("Failed to download bundle from https://example.com/bundle.tar.gz: HTTP 404")
-        
+            raise BundleDownloadError(
+                "Failed to download bundle from https://example.com/bundle.tar.gz: HTTP 404"
+            )
+
         # Instead of mocking aiohttp, which is complex for async testing,
         # directly mock the manager's download method
         with patch.object(manager, "_download_bundle", side_effect=mock_download_with_error):
@@ -234,16 +236,16 @@ async def test_bundle_manager_initialize_with_sbctl():
                 self.returncode = None
                 self.terminated = False
                 self.killed = False
-                
+
             def terminate(self):
                 self.terminated = True
-                
+
             def kill(self):
                 self.killed = True
-                
+
             async def wait(self):
                 return 0
-                
+
         class MockStreamReader:
             async def read(self, n):
                 return b"mock output"
@@ -261,10 +263,10 @@ async def test_bundle_manager_initialize_with_sbctl():
 
         # Mock the create_subprocess_exec function
         mock_process = MockProcess()
-        
+
         async def mock_create_subprocess(*args, **kwargs):
             return mock_process
-            
+
         # Mock wait_for_initialization to avoid actual waiting
         async def mock_wait(*args, **kwargs):
             pass

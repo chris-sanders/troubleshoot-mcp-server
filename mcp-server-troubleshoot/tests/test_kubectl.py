@@ -40,7 +40,17 @@ def test_kubectl_command_args_validation_invalid():
         KubectlCommandArgs(command="")
 
     # Dangerous operations
-    dangerous_operations = ["delete", "edit", "exec", "cp", "patch", "port-forward", "attach", "replace", "apply"]
+    dangerous_operations = [
+        "delete",
+        "edit",
+        "exec",
+        "cp",
+        "patch",
+        "port-forward",
+        "attach",
+        "replace",
+        "apply",
+    ]
     for op in dangerous_operations:
         with pytest.raises(ValidationError):
             KubectlCommandArgs(command=f"{op} something")
@@ -78,14 +88,14 @@ async def test_kubectl_executor_execute_success():
         source="test",
         path=Path("/test"),
         kubeconfig_path=Path("/test/kubeconfig"),
-        initialized=True
+        initialized=True,
     )
     bundle_manager.get_active_bundle.return_value = bundle
 
     # Mock subprocess
     mock_process = AsyncMock()
     mock_process.returncode = 0
-    mock_process.communicate = AsyncMock(return_value=(b'{"items": []}', b''))
+    mock_process.communicate = AsyncMock(return_value=(b'{"items": []}', b""))
 
     # Create the executor
     executor = KubectlExecutor(bundle_manager)
@@ -98,7 +108,7 @@ async def test_kubectl_executor_execute_success():
         stderr="",
         output={"items": []},
         is_json=True,
-        duration_ms=100
+        duration_ms=100,
     )
     executor._run_kubectl_command = AsyncMock(return_value=mock_result)
 
@@ -120,14 +130,14 @@ async def test_kubectl_executor_run_kubectl_command():
         source="test",
         path=Path("/test"),
         kubeconfig_path=Path("/test/kubeconfig"),
-        initialized=True
+        initialized=True,
     )
     bundle_manager.get_active_bundle.return_value = bundle
 
     # Mock subprocess
     mock_process = AsyncMock()
     mock_process.returncode = 0
-    mock_process.communicate = AsyncMock(return_value=(b'{"items": []}', b''))
+    mock_process.communicate = AsyncMock(return_value=(b'{"items": []}', b""))
 
     # Create the executor
     executor = KubectlExecutor(bundle_manager)
@@ -169,14 +179,16 @@ async def test_kubectl_executor_run_kubectl_command_no_json():
         source="test",
         path=Path("/test"),
         kubeconfig_path=Path("/test/kubeconfig"),
-        initialized=True
+        initialized=True,
     )
     bundle_manager.get_active_bundle.return_value = bundle
 
     # Mock subprocess
     mock_process = AsyncMock()
     mock_process.returncode = 0
-    mock_process.communicate = AsyncMock(return_value=(b"NAME    READY   STATUS\npod1    1/1     Running", b''))
+    mock_process.communicate = AsyncMock(
+        return_value=(b"NAME    READY   STATUS\npod1    1/1     Running", b"")
+    )
 
     # Create the executor
     executor = KubectlExecutor(bundle_manager)
@@ -201,7 +213,7 @@ async def test_kubectl_executor_run_kubectl_command_no_json():
         assert cmd_args[0] == "kubectl"
         assert cmd_args[1] == "get"
         assert cmd_args[2] == "pods"
-        
+
         # Should not have -o json
         assert "-o" not in cmd_args
         assert "json" not in cmd_args
@@ -217,14 +229,14 @@ async def test_kubectl_executor_run_kubectl_command_explicit_format():
         source="test",
         path=Path("/test"),
         kubeconfig_path=Path("/test/kubeconfig"),
-        initialized=True
+        initialized=True,
     )
     bundle_manager.get_active_bundle.return_value = bundle
 
     # Mock subprocess
     mock_process = AsyncMock()
     mock_process.returncode = 0
-    mock_process.communicate = AsyncMock(return_value=(b"name: pod1\nstatus: Running", b''))
+    mock_process.communicate = AsyncMock(return_value=(b"name: pod1\nstatus: Running", b""))
 
     # Create the executor
     executor = KubectlExecutor(bundle_manager)
@@ -263,14 +275,14 @@ async def test_kubectl_executor_run_kubectl_command_error():
         source="test",
         path=Path("/test"),
         kubeconfig_path=Path("/test/kubeconfig"),
-        initialized=True
+        initialized=True,
     )
     bundle_manager.get_active_bundle.return_value = bundle
 
     # Mock subprocess
     mock_process = AsyncMock()
     mock_process.returncode = 1
-    mock_process.communicate = AsyncMock(return_value=(b'', b'Error: resource "pods" not found'))
+    mock_process.communicate = AsyncMock(return_value=(b"", b'Error: resource "pods" not found'))
 
     # Create the executor
     executor = KubectlExecutor(bundle_manager)
@@ -284,7 +296,7 @@ async def test_kubectl_executor_run_kubectl_command_error():
         # Verify the error
         assert "kubectl command failed" in str(excinfo.value)
         assert excinfo.value.exit_code == 1
-        assert "resource \"pods\" not found" in excinfo.value.stderr
+        assert 'resource "pods" not found' in excinfo.value.stderr
 
 
 @pytest.mark.asyncio
@@ -297,19 +309,19 @@ async def test_kubectl_executor_run_kubectl_command_timeout():
         source="test",
         path=Path("/test"),
         kubeconfig_path=Path("/test/kubeconfig"),
-        initialized=True
+        initialized=True,
     )
     bundle_manager.get_active_bundle.return_value = bundle
 
     # Mock subprocess
     mock_process = AsyncMock()
     mock_process.returncode = 0
-    
+
     # Make communicate hang until timeout
     async def hang_until_timeout():
         await asyncio.sleep(10)  # This should exceed the timeout
-        return (b'', b'')
-        
+        return (b"", b"")
+
     mock_process.communicate = AsyncMock(side_effect=hang_until_timeout)
     mock_process.kill = Mock()
 
@@ -325,7 +337,7 @@ async def test_kubectl_executor_run_kubectl_command_timeout():
         # Verify the error
         assert "kubectl command timed out" in str(excinfo.value)
         assert excinfo.value.exit_code == 124
-        
+
         # Verify that kill was called
         mock_process.kill.assert_called_once()
 
@@ -333,10 +345,10 @@ async def test_kubectl_executor_run_kubectl_command_timeout():
 def test_process_output_json():
     """Test that the _process_output method handles JSON output correctly."""
     executor = KubectlExecutor(Mock(spec=BundleManager))
-    
+
     output = '{"items": []}'
     processed, is_json = executor._process_output(output, True)
-    
+
     assert processed == {"items": []}
     assert is_json is True
 
@@ -344,13 +356,13 @@ def test_process_output_json():
 def test_process_output_text():
     """Test that the _process_output method handles text output correctly."""
     executor = KubectlExecutor(Mock(spec=BundleManager))
-    
+
     output = "NAME    READY   STATUS\npod1    1/1     Running"
     processed, is_json = executor._process_output(output, True)
-    
+
     assert processed == output
     assert is_json is False
-    
+
     # If try_json is False, it should return the text directly
     processed, is_json = executor._process_output(output, False)
     assert processed == output

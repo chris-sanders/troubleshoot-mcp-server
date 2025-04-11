@@ -11,7 +11,13 @@ import pytest
 
 from mcp_server_troubleshoot.bundle import BundleMetadata
 from mcp_server_troubleshoot.kubectl import KubectlResult
-from mcp_server_troubleshoot.files import FileListResult, FileContentResult, GrepResult, FileInfo, GrepMatch
+from mcp_server_troubleshoot.files import (
+    FileListResult,
+    FileContentResult,
+    GrepResult,
+    FileInfo,
+    GrepMatch,
+)
 from mcp_server_troubleshoot.server import TroubleshootMCPServer
 
 
@@ -101,7 +107,9 @@ async def test_call_tool_initialize_bundle():
         server.bundle_manager.initialize_bundle = AsyncMock(return_value=mock_metadata)
 
         # Call the handler directly with a real file path
-        response = await server._handle_initialize_bundle({"source": temp_file.name, "force": False})
+        response = await server._handle_initialize_bundle(
+            {"source": temp_file.name, "force": False}
+        )
 
         # Verify that the bundle manager was called
         server.bundle_manager.initialize_bundle.assert_awaited_once_with(temp_file.name, False)
@@ -117,7 +125,7 @@ async def test_call_tool_initialize_bundle():
 async def test_call_tool_kubectl():
     """Test that the server can handle the kubectl tool."""
     server = TroubleshootMCPServer()
-    
+
     # Mock the KubectlExecutor.execute method
     mock_result = KubectlResult(
         command="get pods",
@@ -126,20 +134,18 @@ async def test_call_tool_kubectl():
         stderr="",
         output={"items": []},
         is_json=True,
-        duration_ms=100
+        duration_ms=100,
     )
     server.kubectl_executor.execute = AsyncMock(return_value=mock_result)
-    
+
     # Call the handler directly
-    response = await server._handle_kubectl({
-        "command": "get pods",
-        "timeout": 30,
-        "json_output": True
-    })
-    
+    response = await server._handle_kubectl(
+        {"command": "get pods", "timeout": 30, "json_output": True}
+    )
+
     # Verify that the kubectl executor was called
     server.kubectl_executor.execute.assert_awaited_once_with("get pods", 30, True)
-    
+
     # Verify the response
     assert len(response) == 1
     assert response[0].type == "text"
@@ -152,9 +158,9 @@ async def test_call_tool_kubectl():
 async def test_server_file_operations():
     """Test that the server can handle file operations."""
     server = TroubleshootMCPServer()
-    
+
     # Mock the FileExplorer methods
-    
+
     # 1. Test list_files
     mock_file_info = FileInfo(
         name="file1.txt",
@@ -163,34 +169,27 @@ async def test_server_file_operations():
         size=100,
         access_time=123456789.0,
         modify_time=123456789.0,
-        is_binary=False
+        is_binary=False,
     )
-    
+
     mock_list_result = FileListResult(
-        path="dir1",
-        entries=[mock_file_info],
-        recursive=False,
-        total_files=1,
-        total_dirs=0
+        path="dir1", entries=[mock_file_info], recursive=False, total_files=1, total_dirs=0
     )
-    
+
     server.file_explorer.list_files = AsyncMock(return_value=mock_list_result)
-    
+
     # Call the handler directly
-    list_response = await server._handle_list_files({
-        "path": "dir1",
-        "recursive": False
-    })
-    
+    list_response = await server._handle_list_files({"path": "dir1", "recursive": False})
+
     # Verify that the file explorer was called
     server.file_explorer.list_files.assert_awaited_once_with("dir1", False)
-    
+
     # Verify the response
     assert len(list_response) == 1
     assert list_response[0].type == "text"
     assert "Listed files" in list_response[0].text
     assert "file1.txt" in list_response[0].text
-    
+
     # 2. Test read_file
     mock_content_result = FileContentResult(
         path="dir1/file1.txt",
@@ -198,36 +197,34 @@ async def test_server_file_operations():
         start_line=0,
         end_line=0,
         total_lines=1,
-        binary=False
+        binary=False,
     )
-    
+
     server.file_explorer.read_file = AsyncMock(return_value=mock_content_result)
-    
+
     # Call the handler directly
-    read_response = await server._handle_read_file({
-        "path": "dir1/file1.txt",
-        "start_line": 0,
-        "end_line": 0
-    })
-    
+    read_response = await server._handle_read_file(
+        {"path": "dir1/file1.txt", "start_line": 0, "end_line": 0}
+    )
+
     # Verify that the file explorer was called
     server.file_explorer.read_file.assert_awaited_once_with("dir1/file1.txt", 0, 0)
-    
+
     # Verify the response
     assert len(read_response) == 1
     assert read_response[0].type == "text"
     assert "Read text file" in read_response[0].text
     assert "This is the file content" in read_response[0].text
-    
+
     # 3. Test grep_files
     mock_grep_match = GrepMatch(
         path="dir1/file1.txt",
         line_number=0,
         line="This contains pattern",
         match="pattern",
-        offset=13
+        offset=13,
     )
-    
+
     mock_grep_result = GrepResult(
         pattern="pattern",
         path="dir1",
@@ -236,26 +233,28 @@ async def test_server_file_operations():
         total_matches=1,
         files_searched=1,
         case_sensitive=False,
-        truncated=False
+        truncated=False,
     )
-    
+
     server.file_explorer.grep_files = AsyncMock(return_value=mock_grep_result)
-    
+
     # Call the handler directly
-    grep_response = await server._handle_grep_files({
-        "pattern": "pattern",
-        "path": "dir1",
-        "recursive": True,
-        "glob_pattern": "*.txt",
-        "case_sensitive": False,
-        "max_results": 100
-    })
-    
+    grep_response = await server._handle_grep_files(
+        {
+            "pattern": "pattern",
+            "path": "dir1",
+            "recursive": True,
+            "glob_pattern": "*.txt",
+            "case_sensitive": False,
+            "max_results": 100,
+        }
+    )
+
     # Verify that the file explorer was called
     server.file_explorer.grep_files.assert_awaited_once_with(
         "pattern", "dir1", True, "*.txt", False, 100
     )
-    
+
     # Verify the response
     assert len(grep_response) == 1
     assert grep_response[0].type == "text"
@@ -280,7 +279,7 @@ async def test_serve():
 
     # Mock the connect_read_pipe method which fails in tests
     mock_loop = AsyncMock()
-    
+
     # Call serve with the mock streams
     with patch("asyncio.get_event_loop", return_value=mock_loop):
         await server.serve(input_stream, output_stream)

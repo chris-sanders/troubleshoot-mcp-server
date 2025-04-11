@@ -219,14 +219,14 @@ class BundleManager:
 
             # Set a timeout for the download to prevent hanging
             timeout = aiohttp.ClientTimeout(total=MAX_DOWNLOAD_TIMEOUT)
-            
+
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(url, headers=headers) as response:
                     if response.status != 200:
                         raise BundleDownloadError(
                             f"Failed to download bundle from {url}: HTTP {response.status}"
                         )
-                    
+
                     # Check content length if available
                     content_length = response.content_length
                     if content_length and content_length > MAX_DOWNLOAD_SIZE:
@@ -240,7 +240,7 @@ class BundleManager:
                     with download_path.open("wb") as f:
                         async for chunk in response.content.iter_chunked(8192):
                             total_size += len(chunk)
-                            
+
                             # Check size limit during download
                             if total_size > MAX_DOWNLOAD_SIZE:
                                 # Close and remove the partial file
@@ -250,9 +250,9 @@ class BundleManager:
                                     f"Bundle download exceeded maximum allowed size "
                                     f"({MAX_DOWNLOAD_SIZE / 1024 / 1024:.1f} MB)"
                                 )
-                                
+
                             f.write(chunk)
-                    
+
                     logger.info(f"Downloaded {total_size / 1024 / 1024:.1f} MB from {url}")
 
             logger.info(f"Bundle downloaded to: {download_path}")
@@ -291,14 +291,15 @@ class BundleManager:
             # Start sbctl in serve mode with the bundle
             # Since sbctl may create files in the current directory, we'll start it from our output directory
             os.chdir(output_dir)
-            
+
             # Use the serve command to start the API server
             cmd = [
                 "sbctl",
                 "serve",
-                "--support-bundle-location", str(bundle_path),
+                "--support-bundle-location",
+                str(bundle_path),
             ]
-            
+
             # sbctl will write a kubeconfig file in the current working directory
             # The default name is 'kubeconfig'
 
@@ -323,29 +324,35 @@ class BundleManager:
         except Exception as e:
             error_message = str(e)
             stderr_output = ""
-            
+
             # Try to capture any stderr output from the process for better diagnostics
             if self.sbctl_process and self.sbctl_process.stderr:
                 try:
-                    stderr_data = await asyncio.wait_for(self.sbctl_process.stderr.read(4096), timeout=1.0)
+                    stderr_data = await asyncio.wait_for(
+                        self.sbctl_process.stderr.read(4096), timeout=1.0
+                    )
                     if stderr_data:
-                        stderr_output = stderr_data.decode('utf-8', errors='replace')
+                        stderr_output = stderr_data.decode("utf-8", errors="replace")
                         logger.error(f"sbctl stderr output: {stderr_output}")
                 except Exception as stderr_err:
                     logger.debug(f"Could not read stderr: {stderr_err}")
-                    
+
             # Add stderr to the error message if available
             if stderr_output:
                 error_message = f"{error_message} - Process stderr: {stderr_output}"
-                
+
             logger.exception(f"Error initializing bundle with sbctl: {error_message}")
-            
+
             # Terminate the process
             await self._terminate_sbctl_process()
-            
-            raise BundleInitializationError(f"Failed to initialize bundle with sbctl: {error_message}")
 
-    async def _wait_for_initialization(self, kubeconfig_path: Path, timeout: float = MAX_INITIALIZATION_TIMEOUT) -> None:
+            raise BundleInitializationError(
+                f"Failed to initialize bundle with sbctl: {error_message}"
+            )
+
+    async def _wait_for_initialization(
+        self, kubeconfig_path: Path, timeout: float = MAX_INITIALIZATION_TIMEOUT
+    ) -> None:
         """
         Wait for sbctl initialization to complete.
 
@@ -363,17 +370,21 @@ class BundleManager:
         if self.sbctl_process and self.sbctl_process.stdout and self.sbctl_process.stderr:
             stdout_data = ""
             stderr_data = ""
-            
+
             try:
                 # Try to read without blocking the entire process
-                stdout_data = await asyncio.wait_for(self.sbctl_process.stdout.read(1024), timeout=1.0)
-                stderr_data = await asyncio.wait_for(self.sbctl_process.stderr.read(1024), timeout=1.0)
-                
+                stdout_data = await asyncio.wait_for(
+                    self.sbctl_process.stdout.read(1024), timeout=1.0
+                )
+                stderr_data = await asyncio.wait_for(
+                    self.sbctl_process.stderr.read(1024), timeout=1.0
+                )
+
                 if stdout_data:
                     logger.debug(f"sbctl stdout: {stdout_data.decode('utf-8', errors='replace')}")
                 if stderr_data:
                     logger.debug(f"sbctl stderr: {stderr_data.decode('utf-8', errors='replace')}")
-                    error_message = stderr_data.decode('utf-8', errors='replace')
+                    error_message = stderr_data.decode("utf-8", errors="replace")
             except (asyncio.TimeoutError, Exception) as e:
                 logger.debug(f"Error reading process output: {str(e)}")
 
@@ -382,18 +393,20 @@ class BundleManager:
             if kubeconfig_path.exists():
                 logger.info(f"Kubeconfig found at: {kubeconfig_path}")
                 return
-                
+
             # Check if the process is still running
             if self.sbctl_process and self.sbctl_process.returncode is not None:
                 # Process exited before kubeconfig was created
                 error_message = f"sbctl process exited with code {self.sbctl_process.returncode} before initialization completed"
                 break
-                
+
             # Look for any files created in the directory to debug
             dir_contents = list(kubeconfig_path.parent.glob("*"))
             if dir_contents:
-                logger.debug(f"Files in {kubeconfig_path.parent}: {[file.name for file in dir_contents]}")
-                
+                logger.debug(
+                    f"Files in {kubeconfig_path.parent}: {[file.name for file in dir_contents]}"
+                )
+
             await asyncio.sleep(0.5)
 
         # If we got here, the timeout occurred
@@ -405,7 +418,7 @@ class BundleManager:
     async def _terminate_sbctl_process(self) -> None:
         """
         Terminate the sbctl process if it's running.
-        
+
         This helper method centralizes process termination logic to avoid duplication.
         """
         if self.sbctl_process:
@@ -446,28 +459,28 @@ class BundleManager:
             A unique ID for the bundle
         """
         # Extract just the filename component from the path/URL
-        filename = os.path.basename(source.rstrip('/'))
-        
+        filename = os.path.basename(source.rstrip("/"))
+
         # If empty (e.g., from a URL without a path component), use a default
         if not filename:
             filename = "bundle"
-            
+
         # Strictly sanitize by only allowing alphanumeric chars, underscore, and hyphen
         # Replace any other characters with underscore
         sanitized = re.sub(r"[^a-zA-Z0-9_-]", "_", filename)
-        
+
         # Ensure the ID starts with a letter or underscore (not a number or hyphen)
         # This prevents issues with some file systems and tools
-        if sanitized and sanitized[0].isdigit() or sanitized and sanitized[0] == '-':
+        if sanitized and sanitized[0].isdigit() or sanitized and sanitized[0] == "-":
             sanitized = f"b_{sanitized}"
-            
+
         # If sanitization resulted in an empty string, use a default name
         if not sanitized:
             sanitized = "bundle"
-            
+
         # Add randomness to ensure uniqueness
         random_suffix = os.urandom(8).hex()  # Increased from 4 to 8 bytes for more entropy
-        
+
         return f"{sanitized}_{random_suffix}"
 
     def is_initialized(self) -> bool:

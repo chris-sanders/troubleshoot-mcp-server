@@ -10,7 +10,7 @@ from pathlib import Path
 def fixtures_dir() -> Path:
     """
     Returns the path to the test fixtures directory.
-    
+
     This is a standardized location for test data files.
     """
     return Path(__file__).parent / "fixtures"
@@ -20,7 +20,7 @@ def fixtures_dir() -> Path:
 def test_support_bundle(fixtures_dir) -> Path:
     """
     Returns the path to the test support bundle file.
-    
+
     This fixture ensures the support bundle exists before returning it.
     """
     bundle_path = fixtures_dir / "support-bundle-2025-04-11T14_05_31.tar.gz"

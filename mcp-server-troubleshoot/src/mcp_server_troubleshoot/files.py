@@ -21,26 +21,31 @@ logger = logging.getLogger(__name__)
 
 class FileSystemError(Exception):
     """Base exception for file system errors."""
+
     pass
 
 
 class PathNotFoundError(FileSystemError):
     """Exception raised when a path cannot be found."""
+
     pass
 
 
 class InvalidPathError(FileSystemError):
     """Exception raised when a path is invalid or outside the bundle."""
+
     pass
 
 
 class ReadFileError(FileSystemError):
     """Exception raised when a file cannot be read."""
+
     pass
 
 
 class SearchError(FileSystemError):
     """Exception raised when a file search fails."""
+
     pass
 
 
@@ -48,40 +53,41 @@ class ListFilesArgs(BaseModel):
     """
     Arguments for listing files and directories.
     """
+
     path: str = Field(description="The path within the bundle to list")
     recursive: bool = Field(False, description="Whether to list recursively")
 
-    @field_validator('path')
+    @field_validator("path")
     def validate_path(cls, v: str) -> str:
         """
         Validate the path.
-        
+
         Args:
             v: The path string to validate
-            
+
         Returns:
             The validated path string
-            
+
         Raises:
             ValueError: If the path is invalid
         """
         if not v:
             raise ValueError("Path cannot be empty")
-            
+
         # Remove leading/trailing whitespace
         v = v.strip()
-        
+
         # Normalize path to avoid directory traversal
         path = os.path.normpath(v)
-        
+
         # Ensure the path doesn't try to escape the bundle
-        if path.startswith('..') or '/../' in path:
+        if path.startswith("..") or "/../" in path:
             raise ValueError("Path cannot contain directory traversal")
-            
+
         # Remove leading slashes
-        while path.startswith('/'):
+        while path.startswith("/"):
             path = path[1:]
-            
+
         return path
 
 
@@ -89,40 +95,43 @@ class ReadFileArgs(BaseModel):
     """
     Arguments for reading a file.
     """
+
     path: str = Field(description="The path to the file within the bundle")
     start_line: int = Field(0, description="The line number to start reading from (0-indexed)")
-    end_line: Optional[int] = Field(None, description="The line number to end reading at (0-indexed, inclusive)")
+    end_line: Optional[int] = Field(
+        None, description="The line number to end reading at (0-indexed, inclusive)"
+    )
 
-    @field_validator('path')
+    @field_validator("path")
     def validate_path(cls, v: str) -> str:
         """Validate the path."""
         if not v:
             raise ValueError("Path cannot be empty")
-            
+
         # Remove leading/trailing whitespace
         v = v.strip()
-        
+
         # Normalize path to avoid directory traversal
         path = os.path.normpath(v)
-        
+
         # Ensure the path doesn't try to escape the bundle
-        if path.startswith('..') or '/../' in path:
+        if path.startswith("..") or "/../" in path:
             raise ValueError("Path cannot contain directory traversal")
-            
+
         # Remove leading slashes
-        while path.startswith('/'):
+        while path.startswith("/"):
             path = path[1:]
-            
+
         return path
-        
-    @field_validator('start_line')
+
+    @field_validator("start_line")
     def validate_start_line(cls, v: int) -> int:
         """Validate the start line."""
         if v < 0:
             raise ValueError("start_line must be non-negative")
         return v
-        
-    @field_validator('end_line')
+
+    @field_validator("end_line")
     def validate_end_line(cls, v: Optional[int]) -> Optional[int]:
         """Validate the end line."""
         if v is not None and v < 0:
@@ -134,6 +143,7 @@ class GrepFilesArgs(BaseModel):
     """
     Arguments for searching files for a pattern.
     """
+
     pattern: str = Field(description="The pattern to search for")
     path: str = Field(description="The path within the bundle to search")
     recursive: bool = Field(True, description="Whether to search recursively")
@@ -141,36 +151,36 @@ class GrepFilesArgs(BaseModel):
     case_sensitive: bool = Field(False, description="Whether the search is case-sensitive")
     max_results: int = Field(1000, description="Maximum number of results to return")
 
-    @field_validator('path')
+    @field_validator("path")
     def validate_path(cls, v: str) -> str:
         """Validate the path."""
         if not v:
             raise ValueError("Path cannot be empty")
-            
+
         # Remove leading/trailing whitespace
         v = v.strip()
-        
+
         # Normalize path to avoid directory traversal
         path = os.path.normpath(v)
-        
+
         # Ensure the path doesn't try to escape the bundle
-        if path.startswith('..') or '/../' in path:
+        if path.startswith("..") or "/../" in path:
             raise ValueError("Path cannot contain directory traversal")
-            
+
         # Remove leading slashes
-        while path.startswith('/'):
+        while path.startswith("/"):
             path = path[1:]
-            
+
         return path
-        
-    @field_validator('pattern')
+
+    @field_validator("pattern")
     def validate_pattern(cls, v: str) -> str:
         """Validate the pattern."""
         if not v:
             raise ValueError("Pattern cannot be empty")
         return v
-        
-    @field_validator('max_results')
+
+    @field_validator("max_results")
     def validate_max_results(cls, v: int) -> int:
         """Validate max_results."""
         if v <= 0:
@@ -182,12 +192,15 @@ class FileInfo(BaseModel):
     """
     Information about a file or directory.
     """
+
     name: str = Field(description="The name of the file or directory")
     path: str = Field(description="The path of the file or directory relative to the bundle root")
     type: str = Field(description="The type of the entry ('file' or 'dir')")
     size: int = Field(description="The size of the file in bytes (0 for directories)")
     access_time: float = Field(description="The time of most recent access (seconds since epoch)")
-    modify_time: float = Field(description="The time of most recent content modification (seconds since epoch)")
+    modify_time: float = Field(
+        description="The time of most recent content modification (seconds since epoch)"
+    )
     is_binary: bool = Field(description="Whether the file appears to be binary (for files)")
 
 
@@ -195,6 +208,7 @@ class FileListResult(BaseModel):
     """
     Result of a file listing operation.
     """
+
     path: str = Field(description="The path that was listed")
     entries: List[FileInfo] = Field(description="The entries in the directory")
     recursive: bool = Field(description="Whether the listing was recursive")
@@ -206,6 +220,7 @@ class FileContentResult(BaseModel):
     """
     Result of a file read operation.
     """
+
     path: str = Field(description="The path of the file that was read")
     content: str = Field(description="The content of the file")
     start_line: int = Field(description="The line number that was started from (0-indexed)")
@@ -218,6 +233,7 @@ class GrepMatch(BaseModel):
     """
     A match from a grep operation.
     """
+
     path: str = Field(description="The path of the file containing the match")
     line_number: int = Field(description="The line number of the match (0-indexed)")
     line: str = Field(description="The line containing the match")
@@ -229,6 +245,7 @@ class GrepResult(BaseModel):
     """
     Result of a grep operation.
     """
+
     pattern: str = Field(description="The pattern that was searched for")
     path: str = Field(description="The path that was searched")
     glob_pattern: Optional[str] = Field(description="The glob pattern that was used, if any")
@@ -242,27 +259,27 @@ class GrepResult(BaseModel):
 class FileExplorer:
     """
     Provides file system operations for exploring support bundles.
-    
+
     This class is responsible for listing directories, reading files, and searching
     for patterns within the bundle files.
     """
-    
+
     def __init__(self, bundle_manager: BundleManager) -> None:
         """
         Initialize the File Explorer.
-        
+
         Args:
             bundle_manager: The bundle manager that provides the bundle path
         """
         self.bundle_manager = bundle_manager
-        
+
     def _get_bundle_path(self) -> Path:
         """
         Get the path to the active bundle.
-        
+
         Returns:
             The path to the active bundle
-            
+
         Raises:
             FileSystemError: If no bundle is active
         """
@@ -270,109 +287,109 @@ class FileExplorer:
         if bundle is None:
             raise FileSystemError("No bundle is active")
         return bundle.path
-        
+
     def _normalize_path(self, path: str) -> Path:
         """
         Normalize a path within the bundle.
-        
+
         Args:
             path: The path to normalize
-            
+
         Returns:
             The normalized path
-            
+
         Raises:
             InvalidPathError: If the path is invalid or outside the bundle
         """
         bundle_path = self._get_bundle_path()
-        
+
         # Remove leading/trailing whitespace and slashes
         path = path.strip()
-        while path.startswith('/'):
+        while path.startswith("/"):
             path = path[1:]
-            
+
         # Normalize path to avoid directory traversal
         normalized_path = os.path.normpath(path)
-        
+
         # Ensure the path doesn't try to escape the bundle
-        if normalized_path.startswith('..') or '/../' in normalized_path:
+        if normalized_path.startswith("..") or "/../" in normalized_path:
             raise InvalidPathError("Path cannot contain directory traversal")
-            
+
         # Combine with bundle path
         full_path = bundle_path / normalized_path
-        
+
         # Ensure the path is within the bundle
         if not str(full_path).startswith(str(bundle_path)):
             raise InvalidPathError("Path must be within the bundle")
-            
+
         return full_path
-            
+
     def _is_binary(self, path: Path) -> bool:
         """
         Check if a file is binary.
-        
+
         Args:
             path: The path to the file
-            
+
         Returns:
             True if the file is binary, False otherwise
         """
         # Read the first 8KB of the file
         try:
-            with open(path, 'rb') as f:
+            with open(path, "rb") as f:
                 chunk = f.read(8192)
-                
+
             # Check for null bytes, which indicate a binary file
-            if b'\x00' in chunk:
+            if b"\x00" in chunk:
                 return True
-                
+
             # Check for non-text bytes
-            text_chars = bytes(range(32, 127)) + b'\n\r\t\f\b'
+            text_chars = bytes(range(32, 127)) + b"\n\r\t\f\b"
             return bool(chunk.translate(None, text_chars))
         except Exception:
             # If we can't read the file, assume it's not binary
             return False
-            
+
     def _get_file_info(self, path: Path, relative_to: Path) -> FileInfo:
         """
         Get information about a file or directory.
-        
+
         Args:
             path: The path to the file or directory
             relative_to: The path to make the result path relative to
-            
+
         Returns:
             Information about the file or directory
         """
         stat_result = path.stat()
-        
+
         is_dir = path.is_dir()
         is_binary = False if is_dir else self._is_binary(path)
-        
+
         # Make the path relative to the bundle
         rel_path = str(path.relative_to(relative_to))
-        
+
         return FileInfo(
             name=path.name,
             path=rel_path,
-            type='dir' if is_dir else 'file',
+            type="dir" if is_dir else "file",
             size=0 if is_dir else stat_result.st_size,
             access_time=stat_result.st_atime,
             modify_time=stat_result.st_mtime,
-            is_binary=is_binary
+            is_binary=is_binary,
         )
-        
+
     async def list_files(self, path: str, recursive: bool = False) -> FileListResult:
         """
         List files and directories within the bundle.
-        
+
         Args:
             path: The path within the bundle to list
             recursive: Whether to list recursively
-            
+
         Returns:
             The result of the listing operation
-            
+
         Raises:
             FileSystemError: If there is an error listing the files
             PathNotFoundError: If the path does not exist
@@ -381,17 +398,17 @@ class FileExplorer:
         try:
             bundle_path = self._get_bundle_path()
             full_path = self._normalize_path(path)
-            
+
             if not full_path.exists():
                 raise PathNotFoundError(f"Path not found: {path}")
-                
+
             if not full_path.is_dir():
                 raise FileSystemError(f"Path is not a directory: {path}")
-                
+
             entries = []
             total_files = 0
             total_dirs = 0
-            
+
             if recursive:
                 # Walk the directory recursively
                 for root, dirs, files in os.walk(full_path):
@@ -400,7 +417,7 @@ class FileExplorer:
                         dir_path = Path(root) / dir_name
                         entries.append(self._get_file_info(dir_path, bundle_path))
                         total_dirs += 1
-                        
+
                     # Add files
                     for file_name in files:
                         file_path = Path(root) / file_name
@@ -414,21 +431,21 @@ class FileExplorer:
                         total_dirs += 1
                     else:
                         total_files += 1
-                        
+
             # Sort entries by name
             entries.sort(key=lambda e: e.name)
-            
+
             # Create the result
             result = FileListResult(
                 path=path,
                 entries=entries,
                 recursive=recursive,
                 total_files=total_files,
-                total_dirs=total_dirs
+                total_dirs=total_dirs,
             )
-            
+
             return result
-            
+
         except (PathNotFoundError, InvalidPathError, FileSystemError) as e:
             # Re-raise known errors
             logger.error(f"Error listing files: {str(e)}")
@@ -437,19 +454,21 @@ class FileExplorer:
             # Wrap unknown errors
             logger.exception(f"Unexpected error listing files: {str(e)}")
             raise FileSystemError(f"Failed to list files: {str(e)}")
-            
-    async def read_file(self, path: str, start_line: int = 0, end_line: Optional[int] = None) -> FileContentResult:
+
+    async def read_file(
+        self, path: str, start_line: int = 0, end_line: Optional[int] = None
+    ) -> FileContentResult:
         """
         Read a file within the bundle.
-        
+
         Args:
             path: The path to the file within the bundle
             start_line: The line number to start reading from (0-indexed)
             end_line: The line number to end reading at (0-indexed, inclusive)
-            
+
         Returns:
             The result of the read operation
-            
+
         Raises:
             FileSystemError: If there is an error reading the file
             PathNotFoundError: If the file does not exist
@@ -458,18 +477,18 @@ class FileExplorer:
         """
         try:
             full_path = self._normalize_path(path)
-            
+
             if not full_path.exists():
                 raise PathNotFoundError(f"Path not found: {path}")
-                
+
             if not full_path.is_file():
                 raise ReadFileError(f"Path is not a file: {path}")
-                
+
             # Check if the file is binary
             is_binary = self._is_binary(full_path)
-            
+
             # Read the file
-            with open(full_path, 'rb' if is_binary else 'r') as f:
+            with open(full_path, "rb" if is_binary else "r") as f:
                 # For binary files, just read the whole file
                 if is_binary:
                     if start_line > 0 or end_line is not None:
@@ -477,7 +496,7 @@ class FileExplorer:
                     content = f.read()
                     if isinstance(content, bytes):
                         # For binary, return a hex dump
-                        content_str = content.hex(' ', 16)
+                        content_str = content.hex(" ", 16)
                     else:
                         content_str = str(content)
                     return FileContentResult(
@@ -486,13 +505,13 @@ class FileExplorer:
                         start_line=0,
                         end_line=0,
                         total_lines=1,
-                        binary=True
+                        binary=True,
                     )
-                
+
                 # For text files, handle line ranges
                 lines = f.readlines()
                 total_lines = len(lines)
-                
+
                 # Validate line ranges
                 if start_line >= total_lines:
                     start_line = max(0, total_lines - 1)
@@ -500,24 +519,24 @@ class FileExplorer:
                     end_line = total_lines - 1
                 elif end_line >= total_lines:
                     end_line = total_lines - 1
-                    
+
                 # Ensure start_line <= end_line
                 if start_line > end_line:
                     start_line, end_line = end_line, start_line
-                    
+
                 # Get the requested lines
-                selected_lines = lines[start_line:end_line + 1]
-                
+                selected_lines = lines[start_line : end_line + 1]
+
                 # Join the lines and create the result
                 return FileContentResult(
                     path=path,
-                    content=''.join(selected_lines),
+                    content="".join(selected_lines),
                     start_line=start_line,
                     end_line=end_line,
                     total_lines=total_lines,
-                    binary=is_binary
+                    binary=is_binary,
                 )
-                
+
         except (PathNotFoundError, InvalidPathError, ReadFileError, FileSystemError) as e:
             # Re-raise known errors
             logger.error(f"Error reading file: {str(e)}")
@@ -526,19 +545,19 @@ class FileExplorer:
             # Wrap unknown errors
             logger.exception(f"Unexpected error reading file: {str(e)}")
             raise FileSystemError(f"Failed to read file: {str(e)}")
-            
+
     async def grep_files(
-        self, 
-        pattern: str, 
-        path: str, 
+        self,
+        pattern: str,
+        path: str,
         recursive: bool = True,
         glob_pattern: Optional[str] = None,
         case_sensitive: bool = False,
-        max_results: int = 1000
+        max_results: int = 1000,
     ) -> GrepResult:
         """
         Search for a pattern in files within the bundle.
-        
+
         Args:
             pattern: The pattern to search for
             path: The path within the bundle to search
@@ -546,10 +565,10 @@ class FileExplorer:
             glob_pattern: The glob pattern to match files against
             case_sensitive: Whether the search is case-sensitive
             max_results: Maximum number of results to return
-            
+
         Returns:
             The result of the search operation
-            
+
         Raises:
             FileSystemError: If there is an error searching the files
             PathNotFoundError: If the path does not exist
@@ -559,35 +578,35 @@ class FileExplorer:
         try:
             bundle_path = self._get_bundle_path()
             full_path = self._normalize_path(path)
-            
+
             if not full_path.exists():
                 raise PathNotFoundError(f"Path not found: {path}")
-                
+
             if not full_path.is_dir():
                 # If the path is a file, use it directly
                 files_to_search = [full_path]
             else:
                 # Otherwise, search for matching files
                 files_to_search = []
-                
+
                 for root, _, files in os.walk(full_path):
                     # If not recursive, skip subdirectories
                     if not recursive and root != str(full_path):
                         continue
-                        
+
                     for filename in files:
                         file_path = Path(root) / filename
-                        
+
                         # Skip binary files
                         if self._is_binary(file_path):
                             continue
-                            
+
                         # If a glob pattern is provided, check if the file matches
                         if glob_pattern and not fnmatch.fnmatch(filename, glob_pattern):
                             continue
-                            
+
                         files_to_search.append(file_path)
-                        
+
             # Compile the pattern
             try:
                 if case_sensitive:
@@ -596,40 +615,42 @@ class FileExplorer:
                     regex = re.compile(pattern, re.IGNORECASE)
             except re.error as e:
                 raise SearchError(f"Invalid regular expression: {str(e)}")
-                
+
             # Search the files
             matches = []
             total_matches = 0
             truncated = False
-            
+
             for file_path in files_to_search:
                 # Skip if we've hit the max results
                 if total_matches >= max_results:
                     truncated = True
                     break
-                    
+
                 try:
-                    with open(file_path, 'r') as f:
+                    with open(file_path, "r") as f:
                         for i, line in enumerate(f):
                             # Skip if we've hit the max results
                             if total_matches >= max_results:
                                 truncated = True
                                 break
-                                
+
                             for match in regex.finditer(line):
                                 # Get the match information
                                 rel_path = str(file_path.relative_to(bundle_path))
-                                
-                                matches.append(GrepMatch(
-                                    path=rel_path,
-                                    line_number=i,
-                                    line=line.rstrip(),
-                                    match=match.group(0),
-                                    offset=match.start()
-                                ))
-                                
+
+                                matches.append(
+                                    GrepMatch(
+                                        path=rel_path,
+                                        line_number=i,
+                                        line=line.rstrip(),
+                                        match=match.group(0),
+                                        offset=match.start(),
+                                    )
+                                )
+
                                 total_matches += 1
-                                
+
                                 # Stop if we've hit the max results
                                 if total_matches >= max_results:
                                     truncated = True
@@ -637,7 +658,7 @@ class FileExplorer:
                 except (UnicodeDecodeError, IOError):
                     # Skip files that can't be read
                     continue
-                    
+
             # Create the result
             result = GrepResult(
                 pattern=pattern,
@@ -647,11 +668,11 @@ class FileExplorer:
                 total_matches=total_matches,
                 files_searched=len(files_to_search),
                 case_sensitive=case_sensitive,
-                truncated=truncated
+                truncated=truncated,
             )
-            
+
             return result
-            
+
         except (PathNotFoundError, InvalidPathError, SearchError, FileSystemError) as e:
             # Re-raise known errors
             logger.error(f"Error searching files: {str(e)}")
