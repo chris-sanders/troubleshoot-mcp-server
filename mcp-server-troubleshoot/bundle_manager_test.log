@@ -1,0 +1,11 @@
+Testing BundleManager with real bundle: /Users/chris/src/troubleshoot-mcp-server/main/support-bundle-2025-04-11T14_05_31.tar.gz
+
+Bundle directory: /var/folders/lj/0fpgqrkd7fzgmhlvq189_7h80000gp/T/bundle_test_djxjpez1
+Initializing bundle, this might take a while...
+Bundle initialization timed out after 20 seconds
+
+Files created during initialization:
+  support-bundle-2025-04-11T14_05_31_tar_gz_9ade4f21
+
+Cleaning up resources...
+Cleanup completed successfully

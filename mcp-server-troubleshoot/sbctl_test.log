@@ -1,0 +1,72 @@
+Testing sbctl with bundle: /Users/chris/src/troubleshoot-mcp-server/main/support-bundle-2025-04-11T14_05_31.tar.gz
+
+sbctl location: /Users/chris/go/bin/sbctl
+
+sbctl help: Run commands against a support bundle
+
+Usage:
+  sbctl [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  download    Download bundle from Vendor Portal url
+  help        Help about any command
+  serve       Start API server
+  shell       Start interractive shell
+
+Flags:
+  -h, --help   help for sbctl
+
+Use "sbctl [command] --help" for more information about a command.
+
+Working directory: /var/folders/lj/0fpgqrkd7fzgmhlvq189_7h80000gp/T/tmpsga9hhvw
+
+Checking sbctl shell command options...
+shell help output:
+Start interractive shell
+
+Usage:
+  sbctl shell [flags]
+
+Flags:
+      --cd-bundle                        Change directory to the support bundle path after starting the shell
+      --debug                            enable debug logging. This will include HTTP response bodies in logs.
+  -h, --help                             help for shell
+  -s, --support-bundle-location string   path to support bundle archive, directory, or URL
+  -t, --token string                     API token for authentication when fetching on-line bundles
+
+
+Running sbctl serve command...
+Command: sbctl serve --support-bundle-location /Users/chris/src/troubleshoot-mcp-server/main/support-bundle-2025-04-11T14_05_31.tar.gz
+Serve command timed out (expected for continuously running server)
+
+Running sbctl shell command...
+Command: sbctl shell --support-bundle-location /Users/chris/src/troubleshoot-mcp-server/main/support-bundle-2025-04-11T14_05_31.tar.gz
+Return code: 2
+STDOUT:
+SBCTL logs will be written to /var/folders/lj/0fpgqrkd7fzgmhlvq189_7h80000gp/T/sbctl-server-420474401.log
+Starting new shell with KUBECONFIG. Press Ctl-D when done to exit from the shell and stop sbctl server
+
+STDERR:
+panic: operation not supported by device
+
+goroutine 1 [running]:
+github.com/replicatedhq/sbctl/cli.startShellAndWait({0x1400073dbf0, 0x1, 0x1})
+	/Users/chris/src/sbctl/cli/shell.go:184 +0x3a0
+github.com/replicatedhq/sbctl/cli.ShellCmd.func2(0x14000438400?, {0x14000570b40, 0x0, 0x101fa5d37?})
+	/Users/chris/src/sbctl/cli/shell.go:144 +0x708
+github.com/spf13/cobra.(*Command).execute(0x1400044a908, {0x14000570b20, 0x2, 0x2})
+	/Users/chris/go/pkg/mod/github.com/spf13/cobra@v1.8.1/command.go:985 +0x834
+github.com/spf13/cobra.(*Command).ExecuteC(0x1400044a308)
+	/Users/chris/go/pkg/mod/github.com/spf13/cobra@v1.8.1/command.go:1117 +0x344
+github.com/spf13/cobra.(*Command).Execute(...)
+	/Users/chris/go/pkg/mod/github.com/spf13/cobra@v1.8.1/command.go:1041
+github.com/replicatedhq/sbctl/cli.InitAndExecute()
+	/Users/chris/src/sbctl/cli/root.go:37 +0x20
+main.main()
+	/Users/chris/src/sbctl/sbctl.go:9 +0x1c
+
+
+Files created in /var/folders/lj/0fpgqrkd7fzgmhlvq189_7h80000gp/T/tmpsga9hhvw:
+
+No kubeconfig file found!
