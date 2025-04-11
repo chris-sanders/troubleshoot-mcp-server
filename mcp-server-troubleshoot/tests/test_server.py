@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from mcp_server_troubleshoot.bundle import BundleMetadata
+from mcp_server_troubleshoot.kubectl import KubectlResult
 from mcp_server_troubleshoot.server import TroubleshootMCPServer
 
 
@@ -20,6 +21,7 @@ async def test_server_initialization():
     assert server is not None
     assert server.server is not None
     assert server.bundle_manager is not None
+    assert server.kubectl_executor is not None
 
 
 @pytest.mark.asyncio
@@ -44,8 +46,10 @@ async def test_list_tools():
 
     # Verify that the expected tools are returned
     assert isinstance(tools, list)
-    assert len(tools) == 1
-    assert tools[0].name == "initialize_bundle"
+    assert len(tools) == 2
+    tool_names = [tool.name for tool in tools]
+    assert "initialize_bundle" in tool_names
+    assert "kubectl" in tool_names
 
 
 @pytest.mark.asyncio
@@ -102,6 +106,41 @@ async def test_call_tool_initialize_bundle():
     assert response[0].type == "text"
     assert "Bundle initialized successfully" in response[0].text
     assert "test_bundle" in response[0].text
+
+
+@pytest.mark.asyncio
+async def test_call_tool_kubectl():
+    """Test that the server can handle the kubectl tool."""
+    server = TroubleshootMCPServer()
+    
+    # Mock the KubectlExecutor.execute method
+    mock_result = KubectlResult(
+        command="get pods",
+        exit_code=0,
+        stdout='{"items": []}',
+        stderr="",
+        output={"items": []},
+        is_json=True,
+        duration_ms=100
+    )
+    server.kubectl_executor.execute = AsyncMock(return_value=mock_result)
+    
+    # Call the handler directly
+    response = await server._handle_kubectl({
+        "command": "get pods",
+        "timeout": 30,
+        "json_output": True
+    })
+    
+    # Verify that the kubectl executor was called
+    server.kubectl_executor.execute.assert_awaited_once_with("get pods", 30, True)
+    
+    # Verify the response
+    assert len(response) == 1
+    assert response[0].type == "text"
+    assert "kubectl command executed successfully" in response[0].text
+    assert "items" in response[0].text
+    assert "Command metadata" in response[0].text
 
 
 @pytest.mark.asyncio

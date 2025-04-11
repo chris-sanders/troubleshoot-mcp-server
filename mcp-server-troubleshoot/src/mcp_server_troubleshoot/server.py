@@ -14,6 +14,7 @@ from mcp import Tool
 from mcp.types import TextContent
 
 from .bundle import BundleManager, BundleManagerError, InitializeBundleArgs
+from .kubectl import KubectlError, KubectlExecutor, KubectlCommandArgs
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ class TroubleshootMCPServer:
         """
         self.server = Server(name="troubleshoot-mcp-server")
         self.bundle_manager = BundleManager(bundle_dir)
+        self.kubectl_executor = KubectlExecutor(self.bundle_manager)
         self._register_handlers()
 
     def _register_handlers(self) -> None:
@@ -49,6 +51,11 @@ class TroubleshootMCPServer:
                     name="initialize_bundle",
                     description="Initialize a Kubernetes support bundle for analysis",
                     inputSchema=InitializeBundleArgs.model_json_schema(),
+                ),
+                Tool(
+                    name="kubectl",
+                    description="Execute kubectl commands against the initialized bundle's API server",
+                    inputSchema=KubectlCommandArgs.model_json_schema(),
                 )
             ]
 
@@ -66,7 +73,8 @@ class TroubleshootMCPServer:
             """
             if name == "initialize_bundle":
                 return await self._handle_initialize_bundle(arguments)
-
+            elif name == "kubectl":
+                return await self._handle_kubectl(arguments)
             error_message = f"Tool '{name}' is not implemented yet."
             logger.error(error_message)
             return [TextContent(type="text", text=error_message)]
@@ -103,7 +111,60 @@ class TroubleshootMCPServer:
             error_message = f"Unexpected error initializing bundle: {str(e)}"
             logger.exception(error_message)
             return [TextContent(type="text", text=error_message)]
-
+            
+    async def _handle_kubectl(self, arguments: Dict[str, Any]) -> List[TextContent]:
+        """
+        Handle the kubectl tool call.
+        
+        Args:
+            arguments: The arguments for the tool call
+            
+        Returns:
+            A list of content items to return to the model
+        """
+        try:
+            args = KubectlCommandArgs(**arguments)
+            result = await self.kubectl_executor.execute(
+                args.command, 
+                args.timeout, 
+                args.json_output
+            )
+            
+            # Format the response based on the result
+            if result.is_json:
+                # Convert objects to JSON with nice formatting
+                output_str = json.dumps(result.output, indent=2)
+                response = f"kubectl command executed successfully:\n```json\n{output_str}\n```"
+            else:
+                # Use plain text for non-JSON output
+                output_str = result.stdout
+                response = f"kubectl command executed successfully:\n```\n{output_str}\n```"
+                
+            # Add metadata about the command execution
+            metadata = {
+                "command": result.command,
+                "exit_code": result.exit_code,
+                "duration_ms": result.duration_ms
+            }
+            
+            metadata_str = json.dumps(metadata, indent=2)
+            response += f"\nCommand metadata:\n```json\n{metadata_str}\n```"
+            
+            return [TextContent(type="text", text=response)]
+            
+        except KubectlError as e:
+            error_message = f"kubectl command failed: {str(e)}"
+            logger.error(error_message)
+            return [TextContent(type="text", text=error_message)]
+        except BundleManagerError as e:
+            error_message = f"Bundle error: {str(e)}"
+            logger.error(error_message)
+            return [TextContent(type="text", text=error_message)]
+        except Exception as e:
+            error_message = f"Unexpected error executing kubectl command: {str(e)}"
+            logger.exception(error_message)
+            return [TextContent(type="text", text=error_message)]
+    
     async def serve(
         self,
         input_stream: Optional[asyncio.StreamReader] = None,

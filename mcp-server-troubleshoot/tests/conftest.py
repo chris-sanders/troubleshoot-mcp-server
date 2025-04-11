@@ -2,7 +2,6 @@
 Test configuration and fixtures for pytest.
 """
 
-import os
 import pytest
 from pathlib import Path
 
