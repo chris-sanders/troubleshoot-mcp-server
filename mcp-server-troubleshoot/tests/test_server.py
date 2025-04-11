@@ -11,6 +11,7 @@ import pytest
 
 from mcp_server_troubleshoot.bundle import BundleMetadata
 from mcp_server_troubleshoot.kubectl import KubectlResult
+from mcp_server_troubleshoot.files import FileListResult, FileContentResult, GrepResult, FileInfo, GrepMatch
 from mcp_server_troubleshoot.server import TroubleshootMCPServer
 
 
@@ -22,6 +23,7 @@ async def test_server_initialization():
     assert server.server is not None
     assert server.bundle_manager is not None
     assert server.kubectl_executor is not None
+    assert server.file_explorer is not None
 
 
 @pytest.mark.asyncio
@@ -46,10 +48,13 @@ async def test_list_tools():
 
     # Verify that the expected tools are returned
     assert isinstance(tools, list)
-    assert len(tools) == 2
+    assert len(tools) == 5  # Should include file operation tools now
     tool_names = [tool.name for tool in tools]
     assert "initialize_bundle" in tool_names
     assert "kubectl" in tool_names
+    assert "list_files" in tool_names
+    assert "read_file" in tool_names
+    assert "grep_files" in tool_names
 
 
 @pytest.mark.asyncio
@@ -141,6 +146,121 @@ async def test_call_tool_kubectl():
     assert "kubectl command executed successfully" in response[0].text
     assert "items" in response[0].text
     assert "Command metadata" in response[0].text
+
+
+@pytest.mark.asyncio
+async def test_server_file_operations():
+    """Test that the server can handle file operations."""
+    server = TroubleshootMCPServer()
+    
+    # Mock the FileExplorer methods
+    
+    # 1. Test list_files
+    mock_file_info = FileInfo(
+        name="file1.txt",
+        path="dir1/file1.txt",
+        type="file",
+        size=100,
+        access_time=123456789.0,
+        modify_time=123456789.0,
+        is_binary=False
+    )
+    
+    mock_list_result = FileListResult(
+        path="dir1",
+        entries=[mock_file_info],
+        recursive=False,
+        total_files=1,
+        total_dirs=0
+    )
+    
+    server.file_explorer.list_files = AsyncMock(return_value=mock_list_result)
+    
+    # Call the handler directly
+    list_response = await server._handle_list_files({
+        "path": "dir1",
+        "recursive": False
+    })
+    
+    # Verify that the file explorer was called
+    server.file_explorer.list_files.assert_awaited_once_with("dir1", False)
+    
+    # Verify the response
+    assert len(list_response) == 1
+    assert list_response[0].type == "text"
+    assert "Listed files" in list_response[0].text
+    assert "file1.txt" in list_response[0].text
+    
+    # 2. Test read_file
+    mock_content_result = FileContentResult(
+        path="dir1/file1.txt",
+        content="This is the file content",
+        start_line=0,
+        end_line=0,
+        total_lines=1,
+        binary=False
+    )
+    
+    server.file_explorer.read_file = AsyncMock(return_value=mock_content_result)
+    
+    # Call the handler directly
+    read_response = await server._handle_read_file({
+        "path": "dir1/file1.txt",
+        "start_line": 0,
+        "end_line": 0
+    })
+    
+    # Verify that the file explorer was called
+    server.file_explorer.read_file.assert_awaited_once_with("dir1/file1.txt", 0, 0)
+    
+    # Verify the response
+    assert len(read_response) == 1
+    assert read_response[0].type == "text"
+    assert "Read text file" in read_response[0].text
+    assert "This is the file content" in read_response[0].text
+    
+    # 3. Test grep_files
+    mock_grep_match = GrepMatch(
+        path="dir1/file1.txt",
+        line_number=0,
+        line="This contains pattern",
+        match="pattern",
+        offset=13
+    )
+    
+    mock_grep_result = GrepResult(
+        pattern="pattern",
+        path="dir1",
+        glob_pattern="*.txt",
+        matches=[mock_grep_match],
+        total_matches=1,
+        files_searched=1,
+        case_sensitive=False,
+        truncated=False
+    )
+    
+    server.file_explorer.grep_files = AsyncMock(return_value=mock_grep_result)
+    
+    # Call the handler directly
+    grep_response = await server._handle_grep_files({
+        "pattern": "pattern",
+        "path": "dir1",
+        "recursive": True,
+        "glob_pattern": "*.txt",
+        "case_sensitive": False,
+        "max_results": 100
+    })
+    
+    # Verify that the file explorer was called
+    server.file_explorer.grep_files.assert_awaited_once_with(
+        "pattern", "dir1", True, "*.txt", False, 100
+    )
+    
+    # Verify the response
+    assert len(grep_response) == 1
+    assert grep_response[0].type == "text"
+    assert "Found 1 matches" in grep_response[0].text
+    assert "This contains pattern" in grep_response[0].text
 
 
 @pytest.mark.asyncio
