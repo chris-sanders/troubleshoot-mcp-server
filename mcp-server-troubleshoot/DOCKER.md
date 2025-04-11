@@ -62,6 +62,48 @@ The container can be configured using the following:
 
 - `SBCTL_TOKEN`: Authentication token for accessing protected bundles.
 
+## Configuration with MCP Clients
+
+To use the Docker container with MCP clients (such as Claude or other AI models), add the server configuration to your client's settings:
+
+### Claude/Anthropic MCP Configuration
+
+In the `.mcpconfig.json` file (or corresponding environment variables):
+
+```json
+{
+  "mcpServers": {
+    "troubleshoot": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-v", 
+        "${LOCAL_BUNDLE_DIRECTORY}:/data/bundles",
+        "-e",
+        "SBCTL_TOKEN",
+        "ghcr.io/user/mcp-server-troubleshoot:latest",
+        "mcp-server-troubleshoot-serve"
+      ],
+      "env": {}
+    }
+  }
+}
+```
+
+Replace `${LOCAL_BUNDLE_DIRECTORY}` with the actual path to your bundles directory. Make sure the `SBCTL_TOKEN` environment variable is set in your environment if needed.
+
+### Other MCP Clients
+
+For other MCP clients, the configuration will follow a similar pattern:
+
+1. Set the server type to `stdio`
+2. Use `docker run -i --rm` as the command
+3. Mount your bundles directory to `/data/bundles` in the container
+4. Pass required environment variables like `SBCTL_TOKEN`
+
 ## Usage Examples
 
 ### Initialize a Bundle
