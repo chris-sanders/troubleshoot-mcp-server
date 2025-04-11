@@ -17,7 +17,7 @@ from typing import Optional
 from urllib.parse import urlparse
 
 import aiohttp
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,8 @@ class InitializeBundleArgs(BaseModel):
         False, description="Whether to force re-initialization if a bundle is already active"
     )
 
-    @validator("source")
+    @field_validator("source")
+    @classmethod
     def validate_source(cls, v: str) -> str:
         """
         Validate the bundle source.
@@ -246,7 +247,9 @@ class BundleManager:
         """
         logger.info(f"Initializing bundle with sbctl: {bundle_path}")
 
-        # Generate a unique kubeconfig path
+        # sbctl creates the kubeconfig in the current directory with a fixed name
+        # Change our working directory to the output directory and look for 'kubeconfig' there
+        os.chdir(output_dir)
         kubeconfig_path = output_dir / "kubeconfig"
 
         try:
@@ -261,14 +264,18 @@ class BundleManager:
                 self.sbctl_process = None
 
             # Start sbctl in serve mode with the bundle
+            # Since sbctl may create files in the current directory, we'll start it from our output directory
+            os.chdir(output_dir)
+            
+            # Use the serve command to start the API server
             cmd = [
                 "sbctl",
                 "serve",
-                str(bundle_path),
-                "--kubeconfig",
-                str(kubeconfig_path),
-                "--no-browser",
+                "--support-bundle-location", str(bundle_path),
             ]
+            
+            # sbctl will write a kubeconfig file in the current working directory
+            # The default name is 'kubeconfig'
 
             logger.debug(f"Running command: {' '.join(cmd)}")
 
@@ -295,7 +302,7 @@ class BundleManager:
                 self.sbctl_process = None
             raise BundleInitializationError(f"Failed to initialize bundle with sbctl: {str(e)}")
 
-    async def _wait_for_initialization(self, kubeconfig_path: Path, timeout: float = 30.0) -> None:
+    async def _wait_for_initialization(self, kubeconfig_path: Path, timeout: float = 60.0) -> None:
         """
         Wait for sbctl initialization to complete.
 
@@ -307,14 +314,49 @@ class BundleManager:
             BundleInitializationError: If initialization times out
         """
         start_time = asyncio.get_event_loop().time()
+        error_message = ""
 
+        # Attempt to read process output for diagnostic purposes
+        if self.sbctl_process and self.sbctl_process.stdout and self.sbctl_process.stderr:
+            stdout_data = ""
+            stderr_data = ""
+            
+            try:
+                # Try to read without blocking the entire process
+                stdout_data = await asyncio.wait_for(self.sbctl_process.stdout.read(1024), timeout=1.0)
+                stderr_data = await asyncio.wait_for(self.sbctl_process.stderr.read(1024), timeout=1.0)
+                
+                if stdout_data:
+                    logger.debug(f"sbctl stdout: {stdout_data.decode('utf-8', errors='replace')}")
+                if stderr_data:
+                    logger.debug(f"sbctl stderr: {stderr_data.decode('utf-8', errors='replace')}")
+                    error_message = stderr_data.decode('utf-8', errors='replace')
+            except (asyncio.TimeoutError, Exception) as e:
+                logger.debug(f"Error reading process output: {str(e)}")
+
+        # Wait for the kubeconfig file to appear
         while asyncio.get_event_loop().time() - start_time < timeout:
             if kubeconfig_path.exists():
+                logger.info(f"Kubeconfig found at: {kubeconfig_path}")
                 return
+                
+            # Check if the process is still running
+            if self.sbctl_process and self.sbctl_process.returncode is not None:
+                # Process exited before kubeconfig was created
+                error_message = f"sbctl process exited with code {self.sbctl_process.returncode} before initialization completed"
+                break
+                
+            # Look for any files created in the directory to debug
+            dir_contents = list(kubeconfig_path.parent.glob("*"))
+            if dir_contents:
+                logger.debug(f"Files in {kubeconfig_path.parent}: {[file.name for file in dir_contents]}")
+                
             await asyncio.sleep(0.5)
 
+        # If we got here, the timeout occurred
+        error_details = f" Error details: {error_message}" if error_message else ""
         raise BundleInitializationError(
-            f"Timeout waiting for bundle initialization after {timeout} seconds"
+            f"Timeout waiting for bundle initialization after {timeout} seconds.{error_details}"
         )
 
     async def _cleanup_active_bundle(self) -> None:
