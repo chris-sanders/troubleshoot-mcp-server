@@ -20,21 +20,24 @@ def test_sbctl_direct():
     real_bundle_path = Path("/Users/chris/src/troubleshoot-mcp-server/main/support-bundle-2025-04-11T14_05_31.tar.gz")
     assert real_bundle_path.exists(), f"Support bundle not found at {real_bundle_path}"
     
-    # Create a log file we can examine
-    test_log_path = Path("sbctl_test.log")
-    with open(test_log_path, "w") as log_file:
-        log_file.write(f"Testing sbctl with bundle: {real_bundle_path}\n\n")
+    # Create a log file in a temporary directory
+    with tempfile.TemporaryDirectory() as temp_dir:
+        test_log_path = Path(temp_dir) / "sbctl_test.log"
+        with open(test_log_path, "w") as log_file:
+            log_file.write(f"Testing sbctl with bundle: {real_bundle_path}\n\n")
+            
+            # Log what sbctl is and where it is
+            result = subprocess.run(["which", "sbctl"], capture_output=True, text=True)
+            log_file.write(f"sbctl location: {result.stdout}\n")
         
-        # Log what sbctl is and where it is
-        result = subprocess.run(["which", "sbctl"], capture_output=True, text=True)
-        log_file.write(f"sbctl location: {result.stdout}\n")
-        
-        # Log version or help
-        result = subprocess.run(["sbctl", "--help"], capture_output=True, text=True)
-        log_file.write(f"sbctl help: {result.stdout}\n")
-        
-        with tempfile.TemporaryDirectory() as temp_dir:
-            work_dir = Path(temp_dir)
+            # Log version or help
+            result = subprocess.run(["sbctl", "--help"], capture_output=True, text=True)
+            log_file.write(f"sbctl help: {result.stdout}\n")
+            
+            # Create a work directory for running sbctl
+            work_dir_name = os.path.join(temp_dir, "work")
+            os.makedirs(work_dir_name, exist_ok=True)
+            work_dir = Path(work_dir_name)
             log_file.write(f"Working directory: {work_dir}\n")
             
             # Make sure we have write permission
@@ -140,9 +143,9 @@ def test_sbctl_direct():
             except Exception as e:
                 log_file.write(f"\nUnexpected error: {str(e)}\n")
                 
-    # Assert that we created the log file successfully
-    assert test_log_path.exists()
-    print(f"\nTest log created at: {test_log_path.absolute()}\n")
+        # Assert that we created the log file successfully
+        assert test_log_path.exists()
+        print(f"\nTest log created at: {test_log_path.absolute()}\n")
 
 
 @pytest.mark.asyncio
