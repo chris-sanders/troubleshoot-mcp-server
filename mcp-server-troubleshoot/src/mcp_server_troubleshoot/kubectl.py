@@ -11,13 +11,11 @@ import json
 import logging
 import os
 import re
-import subprocess
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Tuple
 
 from pydantic import BaseModel, Field, field_validator
 
-from .bundle import BundleManager, BundleManagerError, BundleMetadata
+from .bundle import BundleManager, BundleMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +224,7 @@ class KubectlExecutor:
             else:
                 logger.error(f"kubectl command failed with exit code {process.returncode}: {stderr_str}")
                 raise KubectlError(
-                    f"kubectl command failed", 
+                    "kubectl command failed", 
                     process.returncode, 
                     stderr_str
                 )

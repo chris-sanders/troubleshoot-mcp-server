@@ -4,10 +4,10 @@
 **Status**: review
 **Created**: 2025-04-11
 **Started**: 2025-04-11
-**Completed**: 
+**Completed**: 2025-04-11
 **Branch**: task/task-3-command-executor
-**PR**: #4
-**PR URL**: https://github.com/chris-sanders/troubleshoot-mcp-server/pull/4
+**PR**: 4
+**PR URL**: https://github.com/replicatedhq/troubleshoot-mcp-server/pull/4
 **PR Status**: Open
 
 ## Objective
@@ -71,7 +71,6 @@ Related documentation:
 2025-04-11: Integrated with MCP server and implemented the "kubectl" tool
 2025-04-11: Added comprehensive unit tests for all functionality
 2025-04-11: Task implementation completed, ready for review
-2025-04-11: Created pull request #4 for review
 
 ## Evidence of Completion
 - [x] Implementation of KubectlExecutor with all required functionality

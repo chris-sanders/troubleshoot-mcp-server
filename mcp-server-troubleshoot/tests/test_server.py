@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from mcp_server_troubleshoot.bundle import BundleMetadata
-from mcp_server_troubleshoot.kubectl import KubectlExecutor, KubectlResult
+from mcp_server_troubleshoot.kubectl import KubectlResult
 from mcp_server_troubleshoot.server import TroubleshootMCPServer
 
 

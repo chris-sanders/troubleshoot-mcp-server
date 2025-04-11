@@ -4,12 +4,13 @@ Tests with a real support bundle.
 
 import os
 import asyncio
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 import pytest
 
-from mcp_server_troubleshoot.bundle import BundleManager, BundleMetadata, BundleManagerError
+from mcp_server_troubleshoot.bundle import BundleManager, BundleManagerError
 
 
 def test_sbctl_direct(test_support_bundle):
@@ -181,7 +182,7 @@ async def test_bundle_manager_simple(test_support_bundle):
                 manager.initialize_bundle(str(real_bundle_path)), 
                 timeout=15.0
             )
-            print(f"Bundle initialized successfully!")
+            print("Bundle initialized successfully!")
             print(f"Bundle ID: {result.id}")
             print(f"Bundle path: {result.path}")
             print(f"Kubeconfig path: {result.kubeconfig_path}")
@@ -193,7 +194,7 @@ async def test_bundle_manager_simple(test_support_bundle):
             
             # List any files created
             files = list(bundle_dir.glob("**/*"))
-            print(f"\nFiles created during initialization:")
+            print("\nFiles created during initialization:")
             for file in files:
                 print(f"  {file.relative_to(bundle_dir)}")
                 

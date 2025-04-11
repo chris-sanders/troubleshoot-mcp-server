@@ -3,11 +3,8 @@ Tests for the Command Executor.
 """
 
 import asyncio
-import json
-import os
 from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from pydantic import ValidationError
@@ -279,7 +276,7 @@ async def test_kubectl_executor_run_kubectl_command_error():
     executor = KubectlExecutor(bundle_manager)
 
     # Mock create_subprocess_exec
-    with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+    with patch("asyncio.create_subprocess_exec", return_value=mock_process):
         # Execute a command
         with pytest.raises(KubectlError) as excinfo:
             await executor._run_kubectl_command("get pods", bundle, 30, True)
@@ -320,7 +317,7 @@ async def test_kubectl_executor_run_kubectl_command_timeout():
     executor = KubectlExecutor(bundle_manager)
 
     # Mock create_subprocess_exec
-    with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+    with patch("asyncio.create_subprocess_exec", return_value=mock_process):
         # Execute a command with a short timeout
         with pytest.raises(KubectlError) as excinfo:
             await executor._run_kubectl_command("get pods", bundle, 0.1, True)  # 0.1 second timeout

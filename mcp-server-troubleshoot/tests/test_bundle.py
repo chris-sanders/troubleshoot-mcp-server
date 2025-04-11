@@ -119,7 +119,6 @@ async def test_bundle_manager_initialize_bundle_nonexistent():
     """Test that the bundle manager raises an error for nonexistent bundles."""
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
-        manager = BundleManager(bundle_dir)
         
         # Instead of testing the full initialize_bundle method,
         # directly test the local file check logic
