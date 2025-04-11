@@ -12,13 +12,15 @@ import pytest
 from mcp_server_troubleshoot.bundle import BundleManager, BundleMetadata, BundleManagerError
 
 
-def test_sbctl_direct():
+def test_sbctl_direct(test_support_bundle):
     """
     Direct test of sbctl with the real bundle.
     This is a non-async test to check if sbctl can access the bundle directly.
+    
+    Args:
+        test_support_bundle: Path to the test support bundle (pytest fixture)
     """
-    real_bundle_path = Path("/Users/chris/src/troubleshoot-mcp-server/main/support-bundle-2025-04-11T14_05_31.tar.gz")
-    assert real_bundle_path.exists(), f"Support bundle not found at {real_bundle_path}"
+    real_bundle_path = test_support_bundle
     
     # Create a log file in a temporary directory
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -149,14 +151,15 @@ def test_sbctl_direct():
 
 
 @pytest.mark.asyncio
-async def test_bundle_manager_simple():
+async def test_bundle_manager_simple(test_support_bundle):
     """
     Simple test of the bundle manager with a real support bundle.
     This test just prints results to stdout.
+    
+    Args:
+        test_support_bundle: Path to the test support bundle (pytest fixture)
     """
-    # Path to the real support bundle
-    real_bundle_path = Path("/Users/chris/src/troubleshoot-mcp-server/main/support-bundle-2025-04-11T14_05_31.tar.gz")
-    assert real_bundle_path.exists(), f"Support bundle not found at {real_bundle_path}"
+    real_bundle_path = test_support_bundle
     
     print(f"\nTesting BundleManager with real bundle: {real_bundle_path}\n")
     
