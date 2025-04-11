@@ -146,14 +146,19 @@ After merging:
 Always include AI attribution in comments to distinguish between human and AI responses:
 
 ```
-# Format
+# Format - IMPORTANT: Use create_pull_request_review for PR comments, NOT add_issue_comment
 mcp__github__create_pull_request_review:
   owner: [repository-owner]
   repo: [repository-name]
-  pullNumber: [PR-number]
+  pullNumber: [PR-number]  # Use pullNumber (not issue_number) for PRs
   event: "COMMENT"  # or "APPROVE" or "REQUEST_CHANGES"
   body: "🤖 Comment text\n\n---\n[Comment by AI Assistant]"
 ```
+
+> ⚠️ **IMPORTANT**: PRs and Issues are different in the GitHub API:
+> - For Issues: Use `mcp__github__add_issue_comment` with `issue_number`
+> - For PRs: Use `mcp__github__create_pull_request_review` with `pullNumber`
+> - Never use `add_issue_comment` for PR comments, even though PRs and Issues share numbering
 
 ### Comment Attribution Format
 
