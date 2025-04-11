@@ -22,6 +22,20 @@ cd mcp-server-troubleshoot
 uv pip install -e ".[dev]"
 ```
 
+### Docker Installation
+
+The MCP server can also be run as a Docker container:
+
+```bash
+# Build the Docker image
+./build.sh
+
+# Run the container
+./run.sh
+```
+
+For detailed Docker usage instructions, see [DOCKER.md](DOCKER.md).
+
 ## Usage
 
 ### Command Line
@@ -62,11 +76,21 @@ mcp-server-troubleshoot/
 │   └── mcp_server_troubleshoot/
 │       ├── __init__.py
 │       ├── __main__.py
-│       └── server.py
+│       ├── server.py
+│       ├── bundle.py
+│       ├── kubectl.py
+│       └── files.py
 ├── tests/
 │   ├── __init__.py
-│   └── test_server.py
+│   ├── test_server.py
+│   ├── test_bundle.py
+│   ├── test_kubectl.py
+│   └── test_files.py
+├── Dockerfile
+├── build.sh
+├── run.sh
 ├── pyproject.toml
+├── DOCKER.md
 └── README.md
 ```
 
