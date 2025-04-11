@@ -1,14 +1,14 @@
 # Task: Repository Setup and Documentation
 
 ## Metadata
-**Status**: started
+**Status**: review
 **Created**: 2025-04-11
 **Started**: 2025-04-11
 **Completed**: 
 **Branch**: task/repository-setup
-**PR**: 
-**PR URL**: 
-**PR Status**: 
+**PR**: #1
+**PR URL**: https://github.com/chris-sanders/troubleshoot-mcp-server/pull/1
+**PR Status**: Open
 
 ## Objective
 Set up the repository structure with proper documentation and task organization based on project kickoff materials.
@@ -61,11 +61,8 @@ None (initial repository setup)
 2025-04-11: Removed project kickoff materials
 2025-04-11: Set up upstream repository and created branch
 2025-04-11: Pushed branch to remote repository
-2025-04-11: Attempted to create PR through API but encountered a branch history issue. PR needs to be created manually using:
-https://github.com/chris-sanders/troubleshoot-mcp-server/pull/new/task/repository-setup
-
-PR should have the following details:
-Title: Repository Setup and Documentation
+2025-04-11: Rebased branch on main and force pushed to resolve history issues
+2025-04-11: Created PR #1: https://github.com/chris-sanders/troubleshoot-mcp-server/pull/1
 
 Body:
 ## Summary
