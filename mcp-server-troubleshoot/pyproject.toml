@@ -35,8 +35,10 @@ mcp_server_troubleshoot = ["py.typed"]
 [project.scripts]
 mcp-server-troubleshoot = "mcp_server_troubleshoot.__main__:main"
 
-[tool.pytest]
+[tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
 line-length = 100
