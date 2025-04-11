@@ -3,6 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Important
+- ALWAYS read both READMEs in the root directory and in the mcp-server-troubleshoot folder to understand the project
 - ALWAYS read `docs/agentic/ai-readme.md` first to understand the task workflow
 - Follow the structured workflow in `/docs/` for tasks, PRs, and code reviews
 - Understand system architecture from `docs/architecture.md` before coding
