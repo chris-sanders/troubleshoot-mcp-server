@@ -61,7 +61,7 @@ def test_docker_build():
     project_dir = Path(__file__).parents[1]
     
     # Use a unique tag for testing
-    test_tag = f"mcp-server-troubleshoot:test"
+    test_tag = "mcp-server-troubleshoot:test"
     
     try:
         # First, verify Dockerfile exists
@@ -105,7 +105,7 @@ def test_docker_run():
     project_dir = Path(__file__).parents[1]
     
     # Use a unique tag for testing
-    test_tag = f"mcp-server-troubleshoot:test-run"
+    test_tag = "mcp-server-troubleshoot:test-run"
     
     try:
         # Build the image
@@ -146,7 +146,7 @@ def test_sbctl_installed():
     project_dir = Path(__file__).parents[1]
     
     # Use a unique tag for testing
-    test_tag = f"mcp-server-troubleshoot:test-sbctl"
+    test_tag = "mcp-server-troubleshoot:test-sbctl"
     
     try:
         # Build the image
@@ -178,7 +178,7 @@ def test_kubectl_installed():
     project_dir = Path(__file__).parents[1]
     
     # Use a unique tag for testing
-    test_tag = f"mcp-server-troubleshoot:test-kubectl"
+    test_tag = "mcp-server-troubleshoot:test-kubectl"
     
     try:
         # Build the image
