@@ -1,0 +1,360 @@
+"""
+Tests for the Bundle Manager.
+"""
+
+import asyncio
+import os
+import tempfile
+from pathlib import Path
+from typing import Any, Dict, List
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import pytest
+from pydantic import ValidationError
+
+from mcp_server_troubleshoot.bundle import (
+    BundleDownloadError,
+    BundleInitializationError,
+    BundleManager,
+    BundleMetadata,
+    BundleNotFoundError,
+    InitializeBundleArgs,
+)
+
+
+def test_initialize_bundle_args_validation_url():
+    """Test that InitializeBundleArgs validates URLs correctly."""
+    # Valid URL
+    args = InitializeBundleArgs(source="https://example.com/bundle.tar.gz")
+    assert args.source == "https://example.com/bundle.tar.gz"
+    assert args.force is False  # Default value
+
+
+def test_initialize_bundle_args_validation_invalid():
+    """Test that InitializeBundleArgs validates invalid sources correctly."""
+    # Non-existent local file
+    with pytest.raises(ValidationError):
+        InitializeBundleArgs(source="/path/to/nonexistent/bundle.tar.gz")
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_initialization():
+    """Test that the bundle manager can be initialized."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+        assert manager.bundle_dir == bundle_dir
+        assert manager.active_bundle is None
+        assert manager.sbctl_process is None
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_initialize_bundle_url():
+    """Test that the bundle manager can initialize a bundle from a URL."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+        
+        # Mock the download method
+        download_path = bundle_dir / "test_bundle.tar.gz"
+        with open(download_path, "w") as f:
+            f.write("mock bundle content")
+            
+        manager._download_bundle = AsyncMock(return_value=download_path)
+        
+        # Mock the sbctl initialization
+        kubeconfig_path = bundle_dir / "test_kubeconfig"
+        with open(kubeconfig_path, "w") as f:
+            f.write("mock kubeconfig content")
+            
+        manager._initialize_with_sbctl = AsyncMock(return_value=kubeconfig_path)
+        manager._wait_for_initialization = AsyncMock()
+        
+        # Test initializing from a URL
+        result = await manager.initialize_bundle("https://example.com/bundle.tar.gz")
+        
+        # Verify the result
+        assert isinstance(result, BundleMetadata)
+        assert result.source == "https://example.com/bundle.tar.gz"
+        assert result.kubeconfig_path == kubeconfig_path
+        assert result.initialized is True
+        
+        # Verify the mocks were called
+        manager._download_bundle.assert_awaited_once_with("https://example.com/bundle.tar.gz")
+        manager._initialize_with_sbctl.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_initialize_bundle_local():
+    """Test that the bundle manager can initialize a bundle from a local file."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+        
+        # Create a mock bundle file
+        bundle_path = bundle_dir / "local_bundle.tar.gz"
+        with open(bundle_path, "w") as f:
+            f.write("mock bundle content")
+            
+        # Mock the sbctl initialization
+        kubeconfig_path = bundle_dir / "test_kubeconfig"
+        with open(kubeconfig_path, "w") as f:
+            f.write("mock kubeconfig content")
+            
+        manager._initialize_with_sbctl = AsyncMock(return_value=kubeconfig_path)
+        manager._wait_for_initialization = AsyncMock()
+        
+        # Test initializing from a local file
+        result = await manager.initialize_bundle(str(bundle_path))
+        
+        # Verify the result
+        assert isinstance(result, BundleMetadata)
+        assert result.source == str(bundle_path)
+        assert result.kubeconfig_path == kubeconfig_path
+        assert result.initialized is True
+        
+        # Verify the sbctl initialization was called
+        manager._initialize_with_sbctl.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_initialize_bundle_nonexistent():
+    """Test that the bundle manager raises an error for nonexistent bundles."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+        
+        # Test initializing from a nonexistent file
+        with pytest.raises(BundleNotFoundError):
+            await manager.initialize_bundle(str(bundle_dir / "nonexistent.tar.gz"))
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_download_bundle():
+    """Test that the bundle manager can download a bundle."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+        
+        # Mock aiohttp.ClientSession to return a mock response
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_content = MagicMock()
+        mock_content.iter_chunked = MagicMock()
+        mock_content.iter_chunked.return_value = [b"mock bundle content"]
+        mock_response.content = mock_content
+        
+        mock_session = MagicMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.get = AsyncMock(return_value=mock_response)
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
+        
+        with patch("aiohttp.ClientSession", return_value=mock_session):
+            result = await manager._download_bundle("https://example.com/bundle.tar.gz")
+            
+            # Verify the result
+            assert isinstance(result, Path)
+            assert result.exists()
+            
+            # Verify the session was called
+            mock_session.get.assert_awaited_once_with(
+                "https://example.com/bundle.tar.gz", headers={}
+            )
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_download_bundle_auth():
+    """Test that the bundle manager uses auth token for download."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+        
+        # Mock aiohttp.ClientSession to return a mock response
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_content = MagicMock()
+        mock_content.iter_chunked = MagicMock()
+        mock_content.iter_chunked.return_value = [b"mock bundle content"]
+        mock_response.content = mock_content
+        
+        mock_session = MagicMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.get = AsyncMock(return_value=mock_response)
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
+        
+        # Set the environment variable for authentication
+        with patch.dict(os.environ, {"SBCTL_TOKEN": "test_token"}):
+            with patch("aiohttp.ClientSession", return_value=mock_session):
+                result = await manager._download_bundle("https://example.com/bundle.tar.gz")
+                
+                # Verify the result
+                assert isinstance(result, Path)
+                assert result.exists()
+                
+                # Verify the session was called with auth headers
+                mock_session.get.assert_awaited_once_with(
+                    "https://example.com/bundle.tar.gz",
+                    headers={"Authorization": "Bearer test_token"}
+                )
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_download_bundle_error():
+    """Test that the bundle manager handles download errors."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+        
+        # Mock aiohttp.ClientSession to return an error response
+        mock_response = MagicMock()
+        mock_response.status = 404
+        
+        mock_session = MagicMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        mock_session.get = AsyncMock(return_value=mock_response)
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
+        
+        with patch("aiohttp.ClientSession", return_value=mock_session):
+            with pytest.raises(BundleDownloadError):
+                await manager._download_bundle("https://example.com/bundle.tar.gz")
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_initialize_with_sbctl():
+    """Test that the bundle manager can initialize a bundle with sbctl."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+        
+        # Mock asyncio.create_subprocess_exec
+        mock_process = AsyncMock()
+        mock_process.stdout = AsyncMock()
+        mock_process.stderr = AsyncMock()
+        
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+            with patch.object(manager, "_wait_for_initialization") as mock_wait:
+                # Create a mock bundle file
+                bundle_path = bundle_dir / "test_bundle.tar.gz"
+                with open(bundle_path, "w") as f:
+                    f.write("mock bundle content")
+                    
+                # Create a mock kubeconfig file
+                kubeconfig_path = bundle_dir / "test_kubeconfig"
+                with open(kubeconfig_path, "w") as f:
+                    f.write("mock kubeconfig content")
+                    
+                result = await manager._initialize_with_sbctl(bundle_path, bundle_dir)
+                
+                # Verify the result
+                assert result == bundle_dir / "kubeconfig"
+                
+                # Verify the subprocess was called
+                assert mock_exec.called
+                assert "sbctl" in mock_exec.call_args[0]
+                assert str(bundle_path) in mock_exec.call_args[0]
+                
+                # Verify wait_for_initialization was called
+                assert mock_wait.called
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_is_initialized():
+    """Test that the bundle manager correctly reports its initialization state."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+        
+        # Initially, no bundle is initialized
+        assert not manager.is_initialized()
+        
+        # Set an active bundle
+        manager.active_bundle = BundleMetadata(
+            id="test",
+            source="test",
+            path=bundle_dir,
+            kubeconfig_path=bundle_dir / "kubeconfig",
+            initialized=True
+        )
+        
+        # Now the bundle should be reported as initialized
+        assert manager.is_initialized()
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_get_active_bundle():
+    """Test that the bundle manager returns the active bundle."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+        
+        # Initially, no bundle is active
+        assert manager.get_active_bundle() is None
+        
+        # Set an active bundle
+        bundle = BundleMetadata(
+            id="test",
+            source="test",
+            path=bundle_dir,
+            kubeconfig_path=bundle_dir / "kubeconfig",
+            initialized=True
+        )
+        manager.active_bundle = bundle
+        
+        # Now the active bundle should be returned
+        assert manager.get_active_bundle() == bundle
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_cleanup():
+    """Test that the bundle manager cleans up resources."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+        
+        # Mock the _cleanup_active_bundle method
+        manager._cleanup_active_bundle = AsyncMock()
+        
+        # Call cleanup
+        await manager.cleanup()
+        
+        # Verify _cleanup_active_bundle was called
+        manager._cleanup_active_bundle.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_cleanup_active_bundle():
+    """Test that the bundle manager cleans up the active bundle."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+        
+        # Set an active bundle
+        manager.active_bundle = BundleMetadata(
+            id="test",
+            source="test",
+            path=bundle_dir,
+            kubeconfig_path=bundle_dir / "kubeconfig",
+            initialized=True
+        )
+        
+        # Mock the sbctl process
+        mock_process = AsyncMock()
+        mock_process.terminate = MagicMock()
+        mock_process.wait = AsyncMock()
+        manager.sbctl_process = mock_process
+        
+        # Call _cleanup_active_bundle
+        await manager._cleanup_active_bundle()
+        
+        # Verify the sbctl process was terminated
+        mock_process.terminate.assert_called_once()
+        
+        # Verify the active bundle was reset
+        assert manager.active_bundle is None
+        assert manager.sbctl_process is None
