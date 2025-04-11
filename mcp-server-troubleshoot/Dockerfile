@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv for Python package management
-RUN curl -sSf https://astral.sh/uv/install.sh | sh
+RUN pip install --no-cache-dir uv
 
 # Set up working directory
 WORKDIR /app
@@ -18,7 +18,7 @@ WORKDIR /app
 COPY . .
 
 # Install Python dependencies
-RUN ~/.cargo/bin/uv pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir -e .
 
 # Second stage for runtime
 FROM python:3.11-slim
@@ -44,10 +44,10 @@ RUN curl -LO "https://dl.k8s.io/release/stable.txt" && \
     mv kubectl /usr/local/bin/ && \
     rm stable.txt
 
-# Install sbctl (this is a placeholder, replace with actual installation instructions)
-# For now, we're simulating sbctl with a script
+# Install sbctl (using direct binary download)
+ARG SBCTL_VERSION=0.2.1
 RUN mkdir -p /usr/local/bin && \
-    echo '#!/bin/bash\necho "Simulating sbctl with kubeconfig at $2"\nmkdir -p $(dirname $2)\ntouch $2\n' > /usr/local/bin/sbctl && \
+    curl -L "https://github.com/replicatedhq/sbctl/releases/download/v${SBCTL_VERSION}/sbctl_linux_amd64" -o /usr/local/bin/sbctl && \
     chmod +x /usr/local/bin/sbctl
 
 # Create data directory for bundles

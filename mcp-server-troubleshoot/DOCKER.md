@@ -1,6 +1,6 @@
 # Docker Usage Instructions
 
-This document provides instructions for building and running the MCP server for Kubernetes support bundles in a Docker container.
+This document provides instructions for building and running the MCP server for Kubernetes support bundles in a Docker container. The container includes all required dependencies, including Python, `kubectl`, and `sbctl` (from replicatedhq/sbctl).
 
 ## Building the Container
 
