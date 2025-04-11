@@ -6,9 +6,9 @@
 **Started**: 2025-04-11
 **Completed**: 2025-04-11
 **Branch**: task/task-6-integration-testing
-**PR**: 
-**PR URL**: 
-**PR Status**: 
+**PR**: 7
+**PR URL**: https://github.com/chris-sanders/troubleshoot-mcp-server/pull/7
+**PR Status**: Open
 
 ## Objective
 Conduct comprehensive integration testing of the MCP server and create complete documentation for users and developers.
