@@ -60,7 +60,8 @@ None (initial repository setup)
 2025-04-11: Created README.md and CLAUDE.md
 2025-04-11: Removed project kickoff materials
 2025-04-11: Set up upstream repository and created branch
-2025-04-11: Pushed branch to remote repository. PR needs to be created manually using the following URL:
+2025-04-11: Pushed branch to remote repository
+2025-04-11: Attempted to create PR through API but encountered a branch history issue. PR needs to be created manually using:
 https://github.com/chris-sanders/troubleshoot-mcp-server/pull/new/task/repository-setup
 
 PR should have the following details:
