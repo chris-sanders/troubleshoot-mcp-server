@@ -45,7 +45,7 @@ RUN curl -LO "https://dl.k8s.io/release/stable.txt" && \
     rm stable.txt
 
 # Install sbctl (using direct binary download)
-ARG SBCTL_VERSION=0.2.1
+ARG SBCTL_VERSION=0.17.1
 RUN mkdir -p /usr/local/bin && \
     curl -L "https://github.com/replicatedhq/sbctl/releases/download/v${SBCTL_VERSION}/sbctl_linux_amd64" -o /usr/local/bin/sbctl && \
     chmod +x /usr/local/bin/sbctl
