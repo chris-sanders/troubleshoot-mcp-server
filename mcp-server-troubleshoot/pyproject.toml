@@ -39,6 +39,9 @@ mcp-server-troubleshoot = "mcp_server_troubleshoot.__main__:main"
 testpaths = ["tests"]
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "docker: tests that involve building Docker containers (slow and require Docker daemon)",
+]
 
 [tool.ruff]
 line-length = 100
