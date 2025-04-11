@@ -1,5 +1,15 @@
 # Task: Project Setup and Basic MCP Server
 
+## Metadata
+**Status**: ready
+**Created**: 2025-04-11
+**Started**: 
+**Completed**: 
+**Branch**: 
+**PR**: 
+**PR URL**: 
+**PR Status**: 
+
 ## Objective
 Create the project structure, set up dependencies, and implement a basic MCP server with stdio communication that can respond to tool listing requests.
 
@@ -61,6 +71,8 @@ None (this is the first task)
 - Manually test the server with the MCP inspector tool
 - Verify that the server starts up without errors
 - Verify that the server responds to tool listing requests with an empty list
+
+## Progress Updates
 
 ## Evidence of Completion
 - [ ] Screenshot of successful test execution

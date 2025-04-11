@@ -1,5 +1,15 @@
 # Task: Implement Bundle Manager
 
+## Metadata
+**Status**: ready
+**Created**: 2025-04-11
+**Started**: 
+**Completed**: 
+**Branch**: 
+**PR**: 
+**PR URL**: 
+**PR Status**: 
+
 ## Objective
 Implement the Bundle Manager component that can download, extract, and initialize support bundles using sbctl.
 
@@ -7,8 +17,8 @@ Implement the Bundle Manager component that can download, extract, and initializ
 After setting up the basic MCP server structure, we need to implement the Bundle Manager component that will handle support bundles. This component is responsible for downloading bundles from remote sources, initializing them with sbctl, and providing the necessary information for kubectl commands and file operations.
 
 Related documentation:
-- [Component: Bundle Manager](docs/components/bundle-manager.md)
-- [System Architecture](docs/architecture.md)
+- [Component: Bundle Manager](/docs/components/bundle-manager.md)
+- [System Architecture](/docs/architecture.md)
 
 ## Success Criteria
 - [ ] Bundle Manager implementation that can:
@@ -53,6 +63,8 @@ Related documentation:
 - Manually test bundle initialization with remote URLs
 - Verify that sbctl is properly called to initialize bundles
 - Verify proper error handling for invalid bundle sources
+
+## Progress Updates
 
 ## Evidence of Completion
 - [ ] Screenshot of successful test execution

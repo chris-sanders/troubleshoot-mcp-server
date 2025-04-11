@@ -1,5 +1,15 @@
 # Task: Create Dockerfile and Build Process
 
+## Metadata
+**Status**: ready
+**Created**: 2025-04-11
+**Started**: 
+**Completed**: 
+**Branch**: 
+**PR**: 
+**PR URL**: 
+**PR Status**: 
+
 ## Objective
 Create a Dockerfile and build process for packaging the MCP server as an OCI container using Podman.
 
@@ -7,7 +17,7 @@ Create a Dockerfile and build process for packaging the MCP server as an OCI con
 With the core functionality implemented, we need to package the MCP server as an OCI container for easy deployment. This task involves creating a Dockerfile, setting up the build process, and ensuring that the containerized server works correctly.
 
 Related documentation:
-- [System Architecture](docs/architecture.md)
+- [System Architecture](/docs/architecture.md)
 
 ## Success Criteria
 - [ ] Dockerfile that:
@@ -62,6 +72,8 @@ Related documentation:
 - Test tool functionality within the container
 - Verify that volume mounts work correctly
 - Verify that environment variables are properly handled
+
+## Progress Updates
 
 ## Evidence of Completion
 - [ ] Screenshot of successful container build

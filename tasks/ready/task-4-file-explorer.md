@@ -1,5 +1,15 @@
 # Task: Implement File Explorer
 
+## Metadata
+**Status**: ready
+**Created**: 2025-04-11
+**Started**: 
+**Completed**: 
+**Branch**: 
+**PR**: 
+**PR URL**: 
+**PR Status**: 
+
 ## Objective
 Implement the File Explorer component that can list, read, and search files within the support bundle.
 
@@ -7,8 +17,8 @@ Implement the File Explorer component that can list, read, and search files with
 After implementing the Bundle Manager and Command Executor, we need to add the File Explorer component to provide access to the files within the support bundle. This will allow AI models to explore log files and other artifacts contained in the bundle without requiring the entire bundle to be loaded into context.
 
 Related documentation:
-- [Component: File Explorer](docs/components/file-explorer.md)
-- [System Architecture](docs/architecture.md)
+- [Component: File Explorer](/docs/components/file-explorer.md)
+- [System Architecture](/docs/architecture.md)
 
 ## Success Criteria
 - [ ] File Explorer implementation that can:
@@ -57,6 +67,8 @@ Related documentation:
 - Manually test pattern searching with different patterns
 - Verify that security measures prevent access outside the bundle
 - Verify proper error handling for invalid paths
+
+## Progress Updates
 
 ## Evidence of Completion
 - [ ] Screenshot of successful test execution
