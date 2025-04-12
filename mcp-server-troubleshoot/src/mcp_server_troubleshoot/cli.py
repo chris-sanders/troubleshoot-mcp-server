@@ -22,7 +22,22 @@ def setup_logging(verbose: bool = False, mcp_mode: bool = False) -> None:
         verbose: Whether to enable verbose logging
         mcp_mode: Whether the server is running in MCP mode
     """
-    log_level = logging.DEBUG if verbose else logging.INFO
+    # Set log level based on environment, verbose flag, and mode
+    if mcp_mode and not verbose:
+        # In MCP mode, use ERROR or the level from env var
+        env_log_level = os.environ.get("MCP_LOG_LEVEL", "ERROR").upper()
+        log_levels = {
+            "DEBUG": logging.DEBUG,
+            "INFO": logging.INFO, 
+            "WARNING": logging.WARNING,
+            "ERROR": logging.ERROR,
+            "CRITICAL": logging.CRITICAL
+        }
+        log_level = log_levels.get(env_log_level, logging.ERROR)
+    else:
+        # In normal mode or verbose mode, use normal levels
+        log_level = logging.DEBUG if verbose else logging.INFO
+    
     logging.basicConfig(
         level=log_level,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",

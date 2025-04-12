@@ -201,6 +201,58 @@ async def test_list_tools(mcp_server):
 
 
 @pytest.mark.asyncio
+async def test_mcp_stdout_is_clean_json():
+    """Test that stdout only contains valid JSON when in MCP mode with no logging output."""
+    # Skip if running in CI environment
+    if os.environ.get("CI") == "true":
+        pytest.skip("Skipping clean stdout test in CI environment")
+        
+    # Start the server process directly with environment variable to control logging
+    env = os.environ.copy()
+    env["MCP_LOG_LEVEL"] = "ERROR"  # Set log level to ERROR
+        
+    process = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        "mcp_server_troubleshoot.cli",
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=env,
+    )
+    
+    try:
+        # Send a simple request
+        request = {"jsonrpc": "2.0", "id": "test-clean-stdout", "method": "get_tool_definitions"}
+        request_str = json.dumps(request) + "\n"
+        process.stdin.write(request_str.encode("utf-8"))
+        await process.stdin.drain()
+        
+        # Read the response with timeout
+        response_line = await asyncio.wait_for(process.stdout.readline(), timeout=5.0)
+        response_str = response_line.decode("utf-8").strip()
+        
+        # Try to parse as JSON
+        try:
+            response = json.loads(response_str)
+            assert "jsonrpc" in response
+            assert response["id"] == "test-clean-stdout"
+            assert "result" in response
+        except json.JSONDecodeError:
+            # If we get here, the output wasn't clean JSON
+            pytest.fail(f"Stdout contains non-JSON content: {response_str}")
+            
+    finally:
+        # Clean up
+        process.terminate()
+        try:
+            await asyncio.wait_for(process.wait(), timeout=2.0)
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
+
+
+@pytest.mark.asyncio
 async def test_call_tool_list_files(mcp_server):
     """Test calling the list_files tool."""
     # First, we need a bundle to be initialized

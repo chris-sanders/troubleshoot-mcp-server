@@ -56,13 +56,14 @@ fi
 
 # Run the container
 if [ "$MCP_MODE" = true ]; then
-  # Run in MCP server mode with direct stdio streaming
+  # Run in MCP server mode with stdout and stderr separated
   docker run ${INTERACTIVE} --rm \
     -v "${BUNDLE_DIR}:/data/bundles" \
     -e SBCTL_TOKEN="${SBCTL_TOKEN:-}" \
     -e MCP_BUNDLE_STORAGE="/data/bundles" \
+    -e MCP_LOG_LEVEL="ERROR" \
     --entrypoint python \
-    "${IMAGE_NAME}:${IMAGE_TAG}" -m mcp_server_troubleshoot.cli ${VERBOSE} ${ARGS}
+    "${IMAGE_NAME}:${IMAGE_TAG}" -m mcp_server_troubleshoot.cli ${VERBOSE} ${ARGS} 2>/dev/null
 else
   # Run in regular mode
   docker run ${INTERACTIVE} --rm \
