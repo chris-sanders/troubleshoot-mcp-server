@@ -385,19 +385,137 @@ class TroubleshootMCPServer:
             input_stream: The input stream to read from (defaults to stdin)
             output_stream: The output stream to write to (defaults to stdout)
         """
-        input_stream = input_stream or asyncio.StreamReader()
-        await asyncio.get_event_loop().connect_read_pipe(
-            lambda: asyncio.StreamReaderProtocol(input_stream), sys.stdin
-        )
-
+        logger.debug("Starting MCP server")
+        
+        # Create streams if not provided
+        if input_stream is None:
+            input_stream = asyncio.StreamReader()
+            protocol = asyncio.StreamReaderProtocol(input_stream)
+            loop = asyncio.get_event_loop()
+            await loop.connect_read_pipe(lambda: protocol, sys.stdin)
+            logger.debug("Created input stream from stdin")
+            
         if output_stream is None:
-            output_stream = asyncio.StreamWriter(sys.stdout.buffer, None, None, None)
-
+            # Get the transport for stdout
+            loop = asyncio.get_event_loop()
+            transport, protocol = await loop.connect_write_pipe(
+                asyncio.streams.FlowControlMixin, sys.stdout
+            )
+            output_stream = asyncio.StreamWriter(transport, protocol, None, loop)
+            logger.debug("Created output stream to stdout")
+        
         try:
-            await self.server.serve(input_stream, output_stream)
+            # Process JSON-RPC requests in a loop
+            while True:
+                # Read a line from the input stream
+                line = await input_stream.readline()
+                if not line:
+                    logger.debug("End of input stream")
+                    break
+                
+                try:
+                    # Parse the request
+                    request_str = line.decode('utf-8').strip()
+                    logger.debug(f"Received request: {request_str}")
+                    request = json.loads(request_str)
+                    
+                    # Process the request using a helper method
+                    response = await self._process_jsonrpc(request)
+                    
+                    # Format and write the response
+                    response_str = json.dumps(response) + '\n'
+                    output_stream.write(response_str.encode('utf-8'))
+                    await output_stream.drain()
+                    logger.debug(f"Sent response: {response_str.strip()}")
+                    
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse JSON request: {e}")
+                    error_response = {
+                        "jsonrpc": "2.0",
+                        "error": {"code": -32700, "message": "Parse error"},
+                        "id": None
+                    }
+                    output_stream.write((json.dumps(error_response) + '\n').encode('utf-8'))
+                    await output_stream.drain()
+                
+                except Exception as e:
+                    logger.exception(f"Error processing request: {e}")
+                    error_response = {
+                        "jsonrpc": "2.0", 
+                        "error": {"code": -32603, "message": f"Internal error: {str(e)}"},
+                        "id": None
+                    }
+                    output_stream.write((json.dumps(error_response) + '\n').encode('utf-8'))
+                    await output_stream.drain()
+        
+        except asyncio.CancelledError:
+            logger.info("Server task cancelled")
         except Exception as e:
-            logger.exception(f"Error while serving: {e}")
-            raise
+            logger.exception(f"Unexpected error in serve loop: {e}")
         finally:
-            # Clean up resources when the server shuts down
+            # Clean up resources
+            logger.debug("Cleaning up resources")
+            if output_stream:
+                output_stream.close()
+                
             await self.bundle_manager.cleanup()
+    
+    async def _process_jsonrpc(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process a JSON-RPC request.
+        
+        Args:
+            request: The JSON-RPC request object
+            
+        Returns:
+            A JSON-RPC response object
+        """
+        # Extract request details
+        request_id = request.get("id")
+        method = request.get("method")
+        params = request.get("params", {})
+        
+        if method == "get_tool_definitions":
+            # Get list of available tools
+            tools = await self.server.list_tools_handler()
+            return {
+                "jsonrpc": "2.0",
+                "result": tools,
+                "id": request_id
+            }
+        
+        elif method == "call_tool":
+            # Extract tool name and arguments
+            tool_name = params.get("name")
+            arguments = params.get("arguments", {})
+            
+            if not tool_name:
+                return {
+                    "jsonrpc": "2.0",
+                    "error": {"code": -32602, "message": "Missing required parameter 'name'"},
+                    "id": request_id
+                }
+            
+            # Call the tool and get the result
+            try:
+                result = await self.server.call_tool_handler(tool_name, arguments)
+                return {
+                    "jsonrpc": "2.0",
+                    "result": result,
+                    "id": request_id
+                }
+            except Exception as e:
+                logger.exception(f"Error calling tool '{tool_name}': {e}")
+                return {
+                    "jsonrpc": "2.0",
+                    "error": {"code": -32603, "message": f"Error calling tool: {str(e)}"},
+                    "id": request_id
+                }
+        
+        else:
+            # Unknown method
+            return {
+                "jsonrpc": "2.0",
+                "error": {"code": -32601, "message": f"Method '{method}' not found"},
+                "id": request_id
+            }

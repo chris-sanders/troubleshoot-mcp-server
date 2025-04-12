@@ -17,8 +17,9 @@ WORKDIR /app
 # Copy project files
 COPY . .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -e .
+# Install Python dependencies and make sure entry points are installed
+RUN pip install --no-cache-dir -e . && \
+    pip install --no-cache-dir -e .
 
 # Second stage for runtime
 FROM python:3.11-slim
@@ -67,6 +68,7 @@ RUN useradd -m mcp-user && \
 
 USER mcp-user
 
-# Command to run
-ENTRYPOINT ["python", "-m", "mcp_server_troubleshoot"]
-CMD []
+# Command to run - use ENTRYPOINT + CMD pattern for flexibility
+# This allows overriding the command while keeping the entrypoint
+ENTRYPOINT ["python"]
+CMD ["-m", "mcp_server_troubleshoot"]
