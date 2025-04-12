@@ -4,7 +4,8 @@ set -e
 # Configuration
 IMAGE_NAME="mcp-server-troubleshoot"
 IMAGE_TAG="latest"
-BUNDLE_DIR="$(pwd)/bundles"
+#BUNDLE_DIR="$(pwd)/bundles"
+BUNDLE_DIR="$(pwd)/tests/fixtures"
 MCP_MODE=false
 INTERACTIVE="-it"
 VERBOSE=""

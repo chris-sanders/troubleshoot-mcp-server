@@ -15,6 +15,7 @@ To run tests, use one of the following commands:
 # - tests/integration/
 # - tests/e2e/
 
+
 def test_documentation():
     """This is a placeholder test to explain test organization."""
     assert True, "This test always passes. The real tests are in the respective directories."

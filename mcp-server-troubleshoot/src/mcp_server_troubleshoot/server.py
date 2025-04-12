@@ -386,16 +386,21 @@ class TroubleshootMCPServer:
             output_stream: The output stream to write to (defaults to stdout)
         """
         logger.debug("Starting MCP server")
-        
+
+        # Flag to track if we created streams internally
+        created_streams = False
+
         # Create streams if not provided
         if input_stream is None:
+            created_streams = True
             input_stream = asyncio.StreamReader()
             protocol = asyncio.StreamReaderProtocol(input_stream)
             loop = asyncio.get_event_loop()
             await loop.connect_read_pipe(lambda: protocol, sys.stdin)
             logger.debug("Created input stream from stdin")
-            
+
         if output_stream is None:
+            created_streams = True
             # Get the transport for stdout
             loop = asyncio.get_event_loop()
             transport, protocol = await loop.connect_write_pipe(
@@ -403,51 +408,60 @@ class TroubleshootMCPServer:
             )
             output_stream = asyncio.StreamWriter(transport, protocol, None, loop)
             logger.debug("Created output stream to stdout")
-        
+
         try:
             # Process JSON-RPC requests in a loop
             while True:
-                # Read a line from the input stream
-                line = await input_stream.readline()
-                if not line:
-                    logger.debug("End of input stream")
-                    break
-                
+                # Read a line from the input stream with a timeout
+                try:
+                    line = await asyncio.wait_for(input_stream.readline(), timeout=30.0)
+                    if not line:
+                        logger.debug("End of input stream")
+                        break
+                except asyncio.TimeoutError:
+                    # No input for 30 seconds, continue waiting
+                    logger.debug("No input received for 30 seconds, continuing to wait")
+                    if not created_streams:
+                        # In tests with provided streams, we don't want to hang indefinitely
+                        logger.debug("Timeout in test environment, breaking")
+                        break
+                    continue
+
                 try:
                     # Parse the request
-                    request_str = line.decode('utf-8').strip()
+                    request_str = line.decode("utf-8").strip()
                     logger.debug(f"Received request: {request_str}")
                     request = json.loads(request_str)
-                    
+
                     # Process the request using a helper method
                     response = await self._process_jsonrpc(request)
-                    
+
                     # Format and write the response
-                    response_str = json.dumps(response) + '\n'
-                    output_stream.write(response_str.encode('utf-8'))
+                    response_str = json.dumps(response) + "\n"
+                    output_stream.write(response_str.encode("utf-8"))
                     await output_stream.drain()
                     logger.debug(f"Sent response: {response_str.strip()}")
-                    
+
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse JSON request: {e}")
                     error_response = {
                         "jsonrpc": "2.0",
                         "error": {"code": -32700, "message": "Parse error"},
-                        "id": None
+                        "id": None,
                     }
-                    output_stream.write((json.dumps(error_response) + '\n').encode('utf-8'))
+                    output_stream.write((json.dumps(error_response) + "\n").encode("utf-8"))
                     await output_stream.drain()
-                
+
                 except Exception as e:
                     logger.exception(f"Error processing request: {e}")
                     error_response = {
-                        "jsonrpc": "2.0", 
+                        "jsonrpc": "2.0",
                         "error": {"code": -32603, "message": f"Internal error: {str(e)}"},
-                        "id": None
+                        "id": None,
                     }
-                    output_stream.write((json.dumps(error_response) + '\n').encode('utf-8'))
+                    output_stream.write((json.dumps(error_response) + "\n").encode("utf-8"))
                     await output_stream.drain()
-        
+
         except asyncio.CancelledError:
             logger.info("Server task cancelled")
         except Exception as e:
@@ -456,17 +470,33 @@ class TroubleshootMCPServer:
             # Clean up resources
             logger.debug("Cleaning up resources")
             if output_stream:
-                output_stream.close()
-                
-            await self.bundle_manager.cleanup()
-    
+                try:
+                    output_stream.close()
+                    # If this is a test environment with provided streams,
+                    # let's make sure the writer is properly closed
+                    if hasattr(output_stream, "wait_closed"):
+                        try:
+                            # Use a timeout to avoid hanging
+                            await asyncio.wait_for(output_stream.wait_closed(), timeout=1.0)
+                        except (asyncio.TimeoutError, Exception) as e:
+                            logger.debug(f"Error waiting for output stream to close: {e}")
+                except Exception as e:
+                    logger.debug(f"Error closing output stream: {e}")
+
+            try:
+                await asyncio.wait_for(self.bundle_manager.cleanup(), timeout=5.0)
+            except asyncio.TimeoutError:
+                logger.warning("Timeout waiting for bundle manager cleanup")
+            except Exception as e:
+                logger.exception(f"Error during bundle manager cleanup: {e}")
+
     async def _process_jsonrpc(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """
         Process a JSON-RPC request.
-        
+
         Args:
             request: The JSON-RPC request object
-            
+
         Returns:
             A JSON-RPC response object
         """
@@ -474,62 +504,64 @@ class TroubleshootMCPServer:
         request_id = request.get("id")
         method = request.get("method")
         params = request.get("params", {})
-        
+
         if method == "get_tool_definitions":
             # Get list of available tools manually since we can't directly access
             # the tools decorator in the server object
             tools = [
                 {
                     "name": "initialize_bundle",
-                    "description": "Initialize a Kubernetes support bundle for analysis"
+                    "description": "Initialize a Kubernetes support bundle for analysis",
                 },
                 {
                     "name": "kubectl",
-                    "description": "Execute kubectl commands against the initialized bundle's API server"
+                    "description": "Execute kubectl commands against the initialized bundle's API server",
                 },
                 {
                     "name": "list_files",
-                    "description": "List files and directories within the support bundle"
+                    "description": "List files and directories within the support bundle",
                 },
                 {
                     "name": "read_file",
-                    "description": "Read a file within the support bundle with optional line range filtering"
+                    "description": "Read a file within the support bundle with optional line range filtering",
                 },
                 {
                     "name": "grep_files",
-                    "description": "Search for patterns in files within the support bundle"
-                }
+                    "description": "Search for patterns in files within the support bundle",
+                },
             ]
-            
-            return {
-                "jsonrpc": "2.0",
-                "result": tools,
-                "id": request_id
-            }
-        
+
+            return {"jsonrpc": "2.0", "result": tools, "id": request_id}
+
         elif method == "call_tool":
             # Extract tool name and arguments
             tool_name = params.get("name")
             arguments = params.get("arguments", {})
-            
+
             if not tool_name:
                 return {
                     "jsonrpc": "2.0",
                     "error": {"code": -32602, "message": "Missing required parameter 'name'"},
-                    "id": request_id
+                    "id": request_id,
                 }
-            
+
             # Call the tool and get the result
             try:
                 # Check if the tool name is valid
-                valid_tools = ["initialize_bundle", "kubectl", "list_files", "read_file", "grep_files"]
+                valid_tools = [
+                    "initialize_bundle",
+                    "kubectl",
+                    "list_files",
+                    "read_file",
+                    "grep_files",
+                ]
                 if tool_name not in valid_tools:
                     return {
                         "jsonrpc": "2.0",
                         "error": {"code": -32601, "message": f"Tool '{tool_name}' not found"},
-                        "id": request_id
+                        "id": request_id,
                     }
-                
+
                 # Forward to the actual implementation based on tool name
                 if tool_name == "initialize_bundle":
                     result = await self._handle_initialize_bundle(arguments)
@@ -544,49 +576,45 @@ class TroubleshootMCPServer:
                 else:
                     return {
                         "jsonrpc": "2.0",
-                        "error": {"code": -32601, "message": f"Tool '{tool_name}' handler not implemented"},
-                        "id": request_id
+                        "error": {
+                            "code": -32601,
+                            "message": f"Tool '{tool_name}' handler not implemented",
+                        },
+                        "id": request_id,
                     }
-                
+
                 # Convert TextContent objects to a serializable format
                 serializable_result = []
                 for item in result:
                     # Handle TextContent objects directly
-                    if hasattr(item, 'type') and hasattr(item, 'text'):
-                        serializable_result.append({
-                            "type": item.type,
-                            "text": item.text
-                        })
-                    elif hasattr(item, 'model_dump'):
+                    if hasattr(item, "type") and hasattr(item, "text"):
+                        serializable_result.append({"type": item.type, "text": item.text})
+                    elif hasattr(item, "model_dump"):
                         # For Pydantic models
                         serializable_result.append(item.model_dump())
-                    elif hasattr(item, 'to_dict'):
+                    elif hasattr(item, "to_dict"):
                         # For objects with to_dict method
                         serializable_result.append(item.to_dict())
-                    elif hasattr(item, '__dict__'):
+                    elif hasattr(item, "__dict__"):
                         # For generic objects
                         serializable_result.append(vars(item))
                     else:
                         # For primitive types
                         serializable_result.append(str(item))
-                
-                return {
-                    "jsonrpc": "2.0",
-                    "result": serializable_result,
-                    "id": request_id
-                }
+
+                return {"jsonrpc": "2.0", "result": serializable_result, "id": request_id}
             except Exception as e:
                 logger.exception(f"Error calling tool '{tool_name}': {e}")
                 return {
                     "jsonrpc": "2.0",
                     "error": {"code": -32603, "message": f"Error calling tool: {str(e)}"},
-                    "id": request_id
+                    "id": request_id,
                 }
-        
+
         else:
             # Unknown method
             return {
                 "jsonrpc": "2.0",
                 "error": {"code": -32601, "message": f"Method '{method}' not found"},
-                "id": request_id
+                "id": request_id,
             }

@@ -43,14 +43,14 @@ async def serve_stdio(bundle_dir: Path = None, verbose: bool = False) -> None:
     logger.info("Starting MCP server for Kubernetes support bundles")
     if bundle_dir:
         logger.info(f"Using bundle directory: {bundle_dir}")
-    
+
     try:
         # Create the server with the specified bundle directory
         server = TroubleshootMCPServer(bundle_dir=bundle_dir)
-        
+
         # Start the server using stdio for communication
         await server.serve()
-        
+
     except Exception as e:
         logger.exception(f"Error while serving: {e}")
         sys.exit(1)
@@ -59,17 +59,9 @@ async def serve_stdio(bundle_dir: Path = None, verbose: bool = False) -> None:
 def parse_args():
     """Parse command-line arguments for the MCP server."""
     parser = argparse.ArgumentParser(description="MCP server for Kubernetes support bundles")
-    parser.add_argument(
-        "--bundle-dir", 
-        type=Path, 
-        help="Directory to store bundles"
-    )
-    parser.add_argument(
-        "--verbose", 
-        action="store_true", 
-        help="Enable verbose logging"
-    )
-    
+    parser.add_argument("--bundle-dir", type=Path, help="Directory to store bundles")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
+
     return parser.parse_args()
 
 
@@ -78,18 +70,18 @@ def serve_main():
     Entry point for the serve command.
     """
     args = parse_args()
-    
+
     # Use the specified bundle directory or the default from environment
     bundle_dir = args.bundle_dir
     if not bundle_dir:
         env_bundle_dir = os.environ.get("MCP_BUNDLE_STORAGE")
         if env_bundle_dir:
             bundle_dir = Path(env_bundle_dir)
-    
+
     # If still no bundle directory, use the default /data/bundles in container
     if not bundle_dir and os.path.exists("/data/bundles"):
         bundle_dir = Path("/data/bundles")
-    
+
     # Start the server
     try:
         asyncio.run(serve_stdio(bundle_dir=bundle_dir, verbose=args.verbose))

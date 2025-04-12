@@ -269,24 +269,44 @@ async def test_serve():
 
     # Mock the readline method to return empty bytes after first call
     input_stream = MagicMock(spec=asyncio.StreamReader)
-    input_stream.readline = AsyncMock(side_effect=[b'{"jsonrpc": "2.0", "method": "get_tool_definitions", "id": 1}', b''])
-    
-    # Mock the output stream
+    input_stream.readline = AsyncMock(
+        side_effect=[b'{"jsonrpc": "2.0", "method": "get_tool_definitions", "id": 1}', b""]
+    )
+
+    # Mock the output stream with all required methods
     output_stream = MagicMock(spec=asyncio.StreamWriter)
     output_stream.drain = AsyncMock()
-    
-    # Mock the bundle manager cleanup method
+    output_stream.wait_closed = AsyncMock()
+
+    # Mock the bundle manager cleanup method with proper timeout handling
     server.bundle_manager.cleanup = AsyncMock()
+
+    # Mock asyncio.wait_for to pass through the result
+    original_wait_for = asyncio.wait_for
+
+    async def mock_wait_for(coro, timeout):
+        if isinstance(coro, AsyncMock) or coro is input_stream.readline:
+            return await coro
+        elif coro is output_stream.wait_closed:
+            return None
+        else:
+            return await original_wait_for(coro, timeout)
 
     # Mock event loop methods that might fail in tests
     mock_loop = AsyncMock()
-    
+
     # Call serve with the mock streams
-    with patch("asyncio.get_event_loop", return_value=mock_loop):
+    with (
+        patch("asyncio.get_event_loop", return_value=mock_loop),
+        patch("asyncio.wait_for", side_effect=mock_wait_for),
+    ):
         await server.serve(input_stream, output_stream)
 
     # Verify that the output stream was written to
     assert output_stream.write.called
-    
+
     # Verify that the bundle manager cleanup method was called
     server.bundle_manager.cleanup.assert_awaited_once()
+
+    # Verify that output_stream.wait_closed was called (new behavior)
+    output_stream.wait_closed.assert_awaited_once()
