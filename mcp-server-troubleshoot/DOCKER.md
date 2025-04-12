@@ -11,7 +11,7 @@ You can build the Docker container using the provided build script:
 cd mcp-server-troubleshoot
 
 # Run the build script
-./build.sh
+./scripts/build.sh
 ```
 
 This will create a Docker image named `mcp-server-troubleshoot:latest`.
@@ -31,16 +31,16 @@ You can run the container using the provided run script, which automatically set
 export SBCTL_TOKEN="your_token_here"
 
 # Run the container in interactive mode
-./run.sh
+./scripts/run.sh
 
 # You can also pass command-line options
-./run.sh --verbose
+./scripts/run.sh --verbose
 
 # Run in MCP server mode for use with MCP clients (using stdio)
-./run.sh --mcp
+./scripts/run.sh --mcp
 
 # Specify a custom bundle directory
-./run.sh --bundle-dir=/path/to/bundles
+./scripts/run.sh --bundle-dir=/path/to/bundles
 ```
 
 Alternatively, you can run the container manually:
@@ -79,20 +79,25 @@ The container can be configured using the following:
 
 ## Testing the Container
 
-A test script is provided to verify that the container works correctly with MCP clients:
+You can run the container tests using pytest:
 
 ```bash
-# Run the test script
-python test_mcp.py
+# Run the container tests
+pytest tests/e2e/test_container.py -v
 ```
 
-This script:
-1. Builds the container if needed
-2. Starts the container in MCP mode
-3. Sends a request to list available tools
-4. If test bundles are available, initializes a bundle
-5. Verifies the responses
-6. Cleans up the container
+For a more comprehensive test of the MCP protocol:
+
+```bash
+# Run the MCP protocol tests
+./scripts/test_mcp.sh
+```
+
+These tests:
+1. Verify that the container builds and runs correctly
+2. Test the Python environment in the container
+3. Verify the MCP server CLI functionality
+4. Test JSON-RPC communication with the MCP server
 
 ## Configuration with MCP Clients
 
@@ -107,7 +112,7 @@ In the `.mcpconfig.json` file (or corresponding environment variables):
   "mcpServers": {
     "troubleshoot": {
       "type": "stdio",
-      "command": "/path/to/run.sh",
+      "command": "/path/to/scripts/run.sh",
       "args": [
         "--mcp"
       ],
@@ -165,21 +170,21 @@ For other MCP clients, the configuration will follow a similar pattern:
 
 ```bash
 # Using the MCP inspector to send a request to initialize a bundle
-echo '{"jsonrpc":"2.0","id":"1","method":"call_tool","params":{"name":"initialize_bundle","arguments":{"source":"/data/bundles/bundle.tar.gz"}}}' | ./run.sh --mcp
+echo '{"jsonrpc":"2.0","id":"1","method":"call_tool","params":{"name":"initialize_bundle","arguments":{"source":"/data/bundles/bundle.tar.gz"}}}' | ./scripts/run.sh --mcp
 ```
 
 ### Execute kubectl Commands
 
 ```bash
 # Using the MCP inspector to send a request to execute a kubectl command
-echo '{"jsonrpc":"2.0","id":"1","method":"call_tool","params":{"name":"kubectl","arguments":{"command":"get pods"}}}' | ./run.sh --mcp
+echo '{"jsonrpc":"2.0","id":"1","method":"call_tool","params":{"name":"kubectl","arguments":{"command":"get pods"}}}' | ./scripts/run.sh --mcp
 ```
 
 ### Explore Files
 
 ```bash
 # Using the MCP inspector to send a request to list files
-echo '{"jsonrpc":"2.0","id":"1","method":"call_tool","params":{"name":"list_files","arguments":{"path":"/"}}}' | ./run.sh --mcp
+echo '{"jsonrpc":"2.0","id":"1","method":"call_tool","params":{"name":"list_files","arguments":{"path":"/"}}}' | ./scripts/run.sh --mcp
 ```
 
 ### Using with an MCP Client
