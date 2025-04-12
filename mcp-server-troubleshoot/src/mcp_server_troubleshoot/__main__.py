@@ -3,12 +3,13 @@ Entry point for the MCP server.
 """
 
 import argparse
-import asyncio
 import logging
+import os
 import sys
+from pathlib import Path
 from typing import List, Optional
 
-from .server import TroubleshootMCPServer
+from .server import mcp, initialize_with_bundle_dir
 
 logger = logging.getLogger(__name__)
 
@@ -24,26 +25,25 @@ def setup_logging(verbose: bool = False, mcp_mode: bool = False) -> None:
     # Set log level based on environment, verbose flag, and mode
     if mcp_mode and not verbose:
         # In MCP mode, use ERROR or the level from env var
-        import os
         env_log_level = os.environ.get("MCP_LOG_LEVEL", "ERROR").upper()
         log_levels = {
             "DEBUG": logging.DEBUG,
             "INFO": logging.INFO,
             "WARNING": logging.WARNING,
             "ERROR": logging.ERROR,
-            "CRITICAL": logging.CRITICAL
+            "CRITICAL": logging.CRITICAL,
         }
         log_level = log_levels.get(env_log_level, logging.ERROR)
     else:
         # In normal mode or verbose mode, use normal levels
         log_level = logging.DEBUG if verbose else logging.INFO
-    
+
     logging.basicConfig(
         level=log_level,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         stream=sys.stderr,
     )
-    
+
     # When in MCP mode, ensure all loggers use stderr
     if mcp_mode:
         # Configure root logger to use stderr
@@ -68,34 +68,6 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     return parser.parse_args(args)
 
 
-async def run_server(args: argparse.Namespace, mcp_mode: bool = False) -> None:
-    """
-    Run the MCP server.
-
-    Args:
-        args: Command line arguments
-        mcp_mode: Whether the server is running in MCP mode
-    """
-    setup_logging(args.verbose, mcp_mode)
-
-    bundle_dir = None
-    if args.bundle_dir:
-        from pathlib import Path
-
-        bundle_dir = Path(args.bundle_dir)
-        bundle_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Only log to stderr or at debug level in MCP mode
-        if not mcp_mode:
-            logger.info(f"Using bundle directory: {bundle_dir}")
-        else:
-            logger.debug(f"Using bundle directory: {bundle_dir}")
-
-    # Create and start the server
-    server = TroubleshootMCPServer(bundle_dir=bundle_dir)
-    await server.serve(mcp_mode=mcp_mode)
-
-
 def main(args: Optional[List[str]] = None) -> None:
     """
     Main entry point for the application.
@@ -104,13 +76,48 @@ def main(args: Optional[List[str]] = None) -> None:
         args: Command line arguments (defaults to sys.argv[1:])
     """
     parsed_args = parse_args(args)
-    
+
     # Detect if we're running in MCP mode (stdin is not a terminal)
     mcp_mode = not sys.stdin.isatty()
 
+    # Set up logging
+    setup_logging(parsed_args.verbose, mcp_mode)
+
+    # Log startup information
+    if not mcp_mode:
+        logger.info("Starting MCP server for Kubernetes support bundles")
+    else:
+        logger.debug("Starting MCP server for Kubernetes support bundles")
+
+    # Process bundle directory
+    bundle_dir = None
+    if parsed_args.bundle_dir:
+        bundle_dir = Path(parsed_args.bundle_dir)
+        bundle_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        # Check environment variables
+        env_bundle_dir = os.environ.get("MCP_BUNDLE_STORAGE")
+        if env_bundle_dir:
+            bundle_dir = Path(env_bundle_dir)
+            bundle_dir.mkdir(parents=True, exist_ok=True)
+
+        # If still no bundle directory, use the default /data/bundles in container
+        elif os.path.exists("/data/bundles"):
+            bundle_dir = Path("/data/bundles")
+
+    # Log bundle directory info
+    if bundle_dir:
+        if not mcp_mode:
+            logger.info(f"Using bundle directory: {bundle_dir}")
+        else:
+            logger.debug(f"Using bundle directory: {bundle_dir}")
+
+    # Initialize bundle manager with the bundle directory
+    initialize_with_bundle_dir(bundle_dir)
+
+    # Run the FastMCP server - this handles stdin/stdout automatically
     try:
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(run_server(parsed_args, mcp_mode=mcp_mode))
+        mcp.run()
     except KeyboardInterrupt:
         logger.info("Server stopped by user")
     except Exception as e:

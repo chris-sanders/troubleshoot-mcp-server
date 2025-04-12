@@ -2,14 +2,13 @@
 CLI entry points for the MCP server.
 """
 
-import asyncio
 import logging
 import sys
 from pathlib import Path
 import argparse
 import os
 
-from .server import TroubleshootMCPServer
+from .server import mcp, initialize_with_bundle_dir
 
 logger = logging.getLogger(__name__)
 
@@ -28,63 +27,28 @@ def setup_logging(verbose: bool = False, mcp_mode: bool = False) -> None:
         env_log_level = os.environ.get("MCP_LOG_LEVEL", "ERROR").upper()
         log_levels = {
             "DEBUG": logging.DEBUG,
-            "INFO": logging.INFO, 
+            "INFO": logging.INFO,
             "WARNING": logging.WARNING,
             "ERROR": logging.ERROR,
-            "CRITICAL": logging.CRITICAL
+            "CRITICAL": logging.CRITICAL,
         }
         log_level = log_levels.get(env_log_level, logging.ERROR)
     else:
         # In normal mode or verbose mode, use normal levels
         log_level = logging.DEBUG if verbose else logging.INFO
-    
+
     logging.basicConfig(
         level=log_level,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         stream=sys.stderr,
     )
-    
+
     # When in MCP mode, ensure all loggers use stderr
     if mcp_mode:
         # Configure root logger to use stderr
         root_logger = logging.getLogger()
         for handler in root_logger.handlers:
             handler.stream = sys.stderr
-
-
-async def serve_stdio(bundle_dir: Path = None, verbose: bool = False, mcp_mode: bool = True) -> None:
-    """
-    Serve the MCP server over stdio.
-
-    Args:
-        bundle_dir: Directory to store bundles
-        verbose: Whether to enable verbose logging
-        mcp_mode: Whether the server is running in MCP mode (default True)
-    """
-    # Set up logging first - ensuring all output goes to stderr when in MCP mode
-    setup_logging(verbose, mcp_mode)
-
-    # Only log to stderr in MCP mode
-    if not mcp_mode:
-        logger.info("Starting MCP server for Kubernetes support bundles")
-        if bundle_dir:
-            logger.info(f"Using bundle directory: {bundle_dir}")
-    else:
-        # In MCP mode, still log but make it debug level
-        logger.debug("Starting MCP server for Kubernetes support bundles")
-        if bundle_dir:
-            logger.debug(f"Using bundle directory: {bundle_dir}")
-
-    try:
-        # Create the server with the specified bundle directory
-        server = TroubleshootMCPServer(bundle_dir=bundle_dir)
-        
-        # Start the server using stdio for communication
-        await server.serve(mcp_mode=mcp_mode)
-
-    except Exception as e:
-        logger.exception(f"Error while serving: {e}")
-        sys.exit(1)
 
 
 def parse_args():
@@ -96,14 +60,23 @@ def parse_args():
     return parser.parse_args()
 
 
-def serve_main(mcp_mode: bool = False):
+def main():
     """
-    Entry point for the serve command.
-    
-    Args:
-        mcp_mode: Whether the server is running in MCP mode
+    Main entry point that adapts based on how it's called.
+    This allows the module to be used both as a direct CLI and
+    as an MCP server that responds to JSON-RPC over stdio.
     """
     args = parse_args()
+
+    # Set up logging based on whether we're in MCP mode
+    mcp_mode = not sys.stdin.isatty()
+    setup_logging(verbose=args.verbose, mcp_mode=mcp_mode)
+
+    # Log information about startup
+    if not mcp_mode:
+        logger.info("Starting MCP server for Kubernetes support bundles")
+    else:
+        logger.debug("Starting MCP server for Kubernetes support bundles")
 
     # Use the specified bundle directory or the default from environment
     bundle_dir = args.bundle_dir
@@ -116,32 +89,23 @@ def serve_main(mcp_mode: bool = False):
     if not bundle_dir and os.path.exists("/data/bundles"):
         bundle_dir = Path("/data/bundles")
 
-    # Start the server
+    if bundle_dir:
+        if not mcp_mode:
+            logger.info(f"Using bundle directory: {bundle_dir}")
+        else:
+            logger.debug(f"Using bundle directory: {bundle_dir}")
+
+    # Initialize bundle manager with the bundle directory
+    initialize_with_bundle_dir(bundle_dir)
+
+    # Run the FastMCP server - this handles stdin/stdout automatically
     try:
-        asyncio.run(serve_stdio(bundle_dir=bundle_dir, verbose=args.verbose, mcp_mode=mcp_mode))
+        mcp.run()
     except KeyboardInterrupt:
         logger.info("Server interrupted, shutting down")
     except Exception as e:
         logger.exception(f"Unexpected error: {e}")
         sys.exit(1)
-
-
-def main():
-    """
-    Main entry point that adapts based on how it's called.
-    This allows the module to be used both as a direct CLI and
-    as an MCP server that responds to JSON-RPC over stdio.
-    """
-    # Check if stdin has data (which means it's being piped to)
-    if not sys.stdin.isatty():
-        # Run in MCP server mode to handle the piped input
-        serve_main(mcp_mode=True)
-    else:
-        # Run in normal CLI mode
-        # It's okay to log to stdout in non-MCP mode
-        setup_logging(verbose=False, mcp_mode=False)
-        logger.info("Starting MCP server in interactive mode...")
-        serve_main(mcp_mode=False)
 
 
 # Entry point when run as a module

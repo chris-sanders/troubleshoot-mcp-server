@@ -85,20 +85,37 @@ async def integration_components(mock_bundle_path):
         kubectl_executor = KubectlExecutor(bundle_manager)
         file_explorer = FileExplorer(bundle_manager)
 
-        # Create a simplified mock server for testing
-        mcp_server = mock.MagicMock()
-        mcp_server.list_tools = mock.MagicMock(
-            return_value=[
-                {"name": "initialize_bundle", "description": "Initialize a support bundle"},
-                {"name": "kubectl", "description": "Execute kubectl commands"},
-                {"name": "list_files", "description": "List directory contents"},
-                {"name": "read_file", "description": "Read file contents"},
-                {"name": "grep_files", "description": "Search for patterns in files"},
-            ]
-        )
+        # Mock the FastMCP server
+        with mock.patch("mcp_server_troubleshoot.server.mcp") as mock_mcp:
+            # Mock tool registry
+            mock_mcp.tool_registry = {
+                "initialize_bundle": mock.MagicMock(
+                    name="initialize_bundle", description="Initialize a support bundle"
+                ),
+                "kubectl": mock.MagicMock(name="kubectl", description="Execute kubectl commands"),
+                "list_files": mock.MagicMock(
+                    name="list_files", description="List directory contents"
+                ),
+                "read_file": mock.MagicMock(name="read_file", description="Read file contents"),
+                "grep_files": mock.MagicMock(
+                    name="grep_files", description="Search for patterns in files"
+                ),
+            }
 
-        # Mock the call_tool method
-        mcp_server.call_tool = mock.AsyncMock()
+            # Create mock server for compatibility with existing tests
+            mcp_server = mock.MagicMock()
+            mcp_server.list_tools = mock.MagicMock(
+                return_value=[
+                    {"name": "initialize_bundle", "description": "Initialize a support bundle"},
+                    {"name": "kubectl", "description": "Execute kubectl commands"},
+                    {"name": "list_files", "description": "List directory contents"},
+                    {"name": "read_file", "description": "Read file contents"},
+                    {"name": "grep_files", "description": "Search for patterns in files"},
+                ]
+            )
+
+            # Mock the call_tool method
+            mcp_server.call_tool = mock.AsyncMock()
 
         yield bundle_manager, kubectl_executor, file_explorer, mcp_server
 
@@ -535,82 +552,77 @@ def test_clean_stdio_in_mcp_mode():
     """
     try:
         # Create subprocess and send a JSON-RPC request to it
-        import io
         import sys
         import json
-        from pathlib import Path
-        
+
         # Create a test subprocess that runs the MCP server
         process = subprocess.Popen(
             [sys.executable, "-m", "mcp_server_troubleshoot.cli"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=False, # Use binary mode for exact byte-level control
+            text=False,  # Use binary mode for exact byte-level control
             bufsize=0,  # Unbuffered to avoid issues with reading responses
         )
-        
+
         try:
             # Make a valid JSON-RPC request
-            request = {
-                "jsonrpc": "2.0", 
-                "id": "1", 
-                "method": "get_tool_definitions"
-            }
+            request = {"jsonrpc": "2.0", "id": "1", "method": "get_tool_definitions"}
             request_str = json.dumps(request) + "\n"
-            
+
             # Send the request to stdin
             process.stdin.write(request_str.encode("utf-8"))
             process.stdin.flush()
-            
+
             # Read response from stdout
             stdout_data = b""
             stderr_data = b""
-            
+
             # Define helper function to read stdout without blocking indefinitely
             def read_stdout_with_timeout():
                 import select
+
                 readable, _, _ = select.select([process.stdout], [], [], 5.0)
                 if readable:
                     return process.stdout.readline()
                 return None
-            
+
             # Read response line from stdout
             response_line = read_stdout_with_timeout()
             if response_line:
                 stdout_data += response_line
-            
+
             # Check if we can get any data from stderr
             stderr_data = process.stderr.read(4096)  # Non-blocking read up to 4KB
-            
+
             # Now verify the outputs:
-            
+
             # 1. stdout should contain ONLY valid JSON-RPC
             try:
                 stdout_text = stdout_data.decode("utf-8").strip()
                 json_response = json.loads(stdout_text)
-                
+
                 # Verify it's a valid JSON-RPC response
                 assert "jsonrpc" in json_response
                 assert json_response["jsonrpc"] == "2.0"
                 assert "id" in json_response
                 assert json_response["id"] == "1"
                 assert "result" in json_response or "error" in json_response
-                
+
                 # Verify no log messages in stdout
                 assert "DEBUG" not in stdout_text
                 assert "INFO" not in stdout_text
-                assert "WARNING" not in stdout_text 
+                assert "WARNING" not in stdout_text
                 assert "ERROR" not in stdout_text
             except json.JSONDecodeError:
                 pytest.fail(f"stdout did not contain valid JSON-RPC: {stdout_data}")
-            
+
             # 2. stderr should contain log messages but not JSON-RPC responses
             stderr_text = stderr_data.decode("utf-8", errors="replace")
             if stderr_text:
                 # Log messages should be in stderr
                 assert any(level in stderr_text for level in ["DEBUG", "INFO", "WARNING", "ERROR"])
-                
+
                 # Check that stderr doesn't contain JSON-RPC syntax
                 try:
                     json_data = json.loads(stderr_text)
@@ -620,7 +632,7 @@ def test_clean_stdio_in_mcp_mode():
                 except json.JSONDecodeError:
                     # This is expected - stderr should not be valid JSON
                     pass
-        
+
         finally:
             # Clean up the process
             process.terminate()
@@ -629,6 +641,6 @@ def test_clean_stdio_in_mcp_mode():
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait()
-    
+
     except Exception as e:
         pytest.fail(f"Failed to test clean stdio handling: {e}")

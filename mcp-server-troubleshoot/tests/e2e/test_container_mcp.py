@@ -547,20 +547,18 @@ def test_stdout_contains_only_jsonrpc(container_client, docker_setup):
     """Test that the container's stdout contains only valid JSON-RPC in MCP mode."""
     # Get access to the raw stdout data from the process
     process = container_client.process
-    
+
     # Keep track of response count and json content
     response_count = 0
     stdout_buffer = ""
-    
+
     # Send a JSON-RPC request
-    response = container_client.call_tool(
-        "list_files", {"path": "/"}
-    )
-    
+    response = container_client.call_tool("list_files", {"path": "/"})
+
     # Increase response count since we got a valid response
     if "jsonrpc" in response and response["jsonrpc"] == "2.0":
         response_count += 1
-    
+
     # Read directly from process stdout to check all content
     # Be careful not to consume data needed by the container_client
     raw_data = None
@@ -571,20 +569,22 @@ def test_stdout_contains_only_jsonrpc(container_client, docker_setup):
     except (AttributeError, IOError):
         # If peek isn't available or fails, we'll skip that check
         pass
-    
+
     if raw_data:
         stdout_buffer = raw_data.decode("utf-8", errors="replace")
-        
+
         # Make assertions on the stdout content:
-        
+
         # 1. No log messages should be in stdout - verify none of these patterns exist
         log_patterns = ["DEBUG", "INFO", "WARNING", "ERROR"]
         for pattern in log_patterns:
-            assert pattern not in stdout_buffer, f"Found log level '{pattern}' in stdout, should be in stderr only"
-        
+            assert (
+                pattern not in stdout_buffer
+            ), f"Found log level '{pattern}' in stdout, should be in stderr only"
+
         # 2. No plaintext messages that aren't JSON-RPC
         assert "Starting MCP server" not in stdout_buffer, "Found log message in stdout"
-        
+
         # 3. Each line should be valid JSON
         for line in stdout_buffer.splitlines():
             line = line.strip()
@@ -597,6 +597,6 @@ def test_stdout_contains_only_jsonrpc(container_client, docker_setup):
                 except json.JSONDecodeError:
                     # If we fail to parse JSON, it means non-JSON content was found
                     assert False, f"Non-JSON content found in stdout: {line}"
-    
+
     # Verify we received at least one response
     assert response_count > 0, "No valid JSON-RPC responses received"

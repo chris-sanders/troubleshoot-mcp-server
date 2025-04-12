@@ -29,10 +29,10 @@ def docker_setup(docker_image, ensure_bundles_directory):
     """Setup Docker environment for testing."""
     # The docker_image fixture ensures Docker is available and the image is built
     # The ensure_bundles_directory fixture creates and returns the bundles directory
-    
+
     # Get bundles directory
     bundles_dir = ensure_bundles_directory
-    
+
     # Clean up any existing test container
     cleanup_test_container()
 
@@ -298,7 +298,7 @@ def test_mcp_protocol(docker_setup):
 if __name__ == "__main__":
     # Allow running as a standalone script
     from conftest import is_docker_available, build_docker_image  # Import from conftest
-    
+
     if is_docker_available():
         bundles_dir = PROJECT_ROOT / "bundles"
         bundles_dir.mkdir(exist_ok=True)
