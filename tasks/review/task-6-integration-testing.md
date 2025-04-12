@@ -86,6 +86,12 @@ With all components implemented and the container build process established, we 
             - Example prompts and responses for AI models
             - Troubleshooting guide with common solutions
 2025-04-11: Updated README.md with new documentation links and improved structure
+2025-04-12: Fixed MCP server container integration and stdio communication:
+            - Updated Dockerfile to use proper entrypoint for flexibility
+            - Fixed JSON-RPC communication in server module
+            - Improved CLI module stdin handling
+            - Added integration test script for validating container functionality
+            - Updated documentation for container usage
 
 ## Evidence of Completion
 - [x] Created comprehensive integration test suite (mcp-server-troubleshoot/tests/test_integration.py)
