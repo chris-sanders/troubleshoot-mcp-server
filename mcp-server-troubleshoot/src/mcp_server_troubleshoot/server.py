@@ -377,6 +377,7 @@ class TroubleshootMCPServer:
         self,
         input_stream: Optional[asyncio.StreamReader] = None,
         output_stream: Optional[asyncio.StreamWriter] = None,
+        mcp_mode: bool = False
     ) -> None:
         """
         Start the MCP server with the given input and output streams.
@@ -384,8 +385,9 @@ class TroubleshootMCPServer:
         Args:
             input_stream: The input stream to read from (defaults to stdin)
             output_stream: The output stream to write to (defaults to stdout)
+            mcp_mode: Whether the server is running in MCP mode
         """
-        logger.debug("Starting MCP server")
+        logger.debug("Starting MCP server" + (" in MCP mode" if mcp_mode else ""))
 
         # Flag to track if we created streams internally
         created_streams = False

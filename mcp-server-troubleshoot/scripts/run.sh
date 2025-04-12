@@ -4,7 +4,7 @@ set -e
 # Configuration
 IMAGE_NAME="mcp-server-troubleshoot"
 IMAGE_TAG="latest"
-BUNDLE_DIR="$(pwd)/bundles"
+BUNDLE_DIR="$(pwd)/tests/fixtures"
 MCP_MODE=false
 INTERACTIVE="-it"
 VERBOSE=""
@@ -44,12 +44,14 @@ done
 
 # Create bundle directory if it doesn't exist
 mkdir -p "${BUNDLE_DIR}"
-echo "Using bundle directory: ${BUNDLE_DIR}"
+if [ "$MCP_MODE" != true ]; then
+  echo "Using bundle directory: ${BUNDLE_DIR}"
 
-# Check if SBCTL_TOKEN is set
-if [ -z "${SBCTL_TOKEN}" ]; then
-  echo "Warning: SBCTL_TOKEN is not set. Some operations may fail."
-  echo "Set it with: export SBCTL_TOKEN=your_token_here"
+  # Check if SBCTL_TOKEN is set
+  if [ -z "${SBCTL_TOKEN}" ]; then
+    echo "Warning: SBCTL_TOKEN is not set. Some operations may fail."
+    echo "Set it with: export SBCTL_TOKEN=your_token_here"
+  fi
 fi
 
 # Run the container

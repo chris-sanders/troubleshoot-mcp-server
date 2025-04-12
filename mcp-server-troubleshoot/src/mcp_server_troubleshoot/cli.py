@@ -14,12 +14,13 @@ from .server import TroubleshootMCPServer
 logger = logging.getLogger(__name__)
 
 
-def setup_logging(verbose: bool = False) -> None:
+def setup_logging(verbose: bool = False, mcp_mode: bool = False) -> None:
     """
     Set up logging configuration.
 
     Args:
         verbose: Whether to enable verbose logging
+        mcp_mode: Whether the server is running in MCP mode
     """
     log_level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
@@ -27,17 +28,25 @@ def setup_logging(verbose: bool = False) -> None:
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         stream=sys.stderr,
     )
+    
+    # When in MCP mode, ensure all loggers use stderr
+    if mcp_mode:
+        # Configure root logger to use stderr
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers:
+            handler.stream = sys.stderr
 
 
-async def serve_stdio(bundle_dir: Path = None, verbose: bool = False) -> None:
+async def serve_stdio(bundle_dir: Path = None, verbose: bool = False, mcp_mode: bool = True) -> None:
     """
     Serve the MCP server over stdio.
 
     Args:
         bundle_dir: Directory to store bundles
         verbose: Whether to enable verbose logging
+        mcp_mode: Whether the server is running in MCP mode (default True)
     """
-    setup_logging(verbose)
+    setup_logging(verbose, mcp_mode)
 
     # Initialize the server
     logger.info("Starting MCP server for Kubernetes support bundles")
@@ -49,7 +58,7 @@ async def serve_stdio(bundle_dir: Path = None, verbose: bool = False) -> None:
         server = TroubleshootMCPServer(bundle_dir=bundle_dir)
 
         # Start the server using stdio for communication
-        await server.serve()
+        await server.serve(mcp_mode=mcp_mode)
 
     except Exception as e:
         logger.exception(f"Error while serving: {e}")
@@ -65,9 +74,12 @@ def parse_args():
     return parser.parse_args()
 
 
-def serve_main():
+def serve_main(mcp_mode: bool = False):
     """
     Entry point for the serve command.
+    
+    Args:
+        mcp_mode: Whether the server is running in MCP mode
     """
     args = parse_args()
 
@@ -84,7 +96,7 @@ def serve_main():
 
     # Start the server
     try:
-        asyncio.run(serve_stdio(bundle_dir=bundle_dir, verbose=args.verbose))
+        asyncio.run(serve_stdio(bundle_dir=bundle_dir, verbose=args.verbose, mcp_mode=mcp_mode))
     except KeyboardInterrupt:
         logger.info("Server interrupted, shutting down")
     except Exception as e:
@@ -101,11 +113,13 @@ def main():
     # Check if stdin has data (which means it's being piped to)
     if not sys.stdin.isatty():
         # Run in MCP server mode to handle the piped input
-        serve_main()
+        serve_main(mcp_mode=True)
     else:
         # Run in normal CLI mode
-        print("Starting MCP server in interactive mode...")
-        serve_main()
+        # It's okay to log to stdout in non-MCP mode
+        setup_logging(verbose=False, mcp_mode=False)
+        logger.info("Starting MCP server in interactive mode...")
+        serve_main(mcp_mode=False)
 
 
 # Entry point when run as a module

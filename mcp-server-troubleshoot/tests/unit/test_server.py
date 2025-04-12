@@ -3,6 +3,8 @@ Tests for the MCP server.
 """
 
 import asyncio
+import json
+import logging
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -310,3 +312,99 @@ async def test_serve():
 
     # Verify that output_stream.wait_closed was called (new behavior)
     output_stream.wait_closed.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_clean_stdio_handling():
+    """Test that the server correctly separates stdout and stderr when in MCP mode."""
+    server = TroubleshootMCPServer()
+
+    # Mock the readline method to return a valid JSON-RPC request followed by empty bytes
+    input_stream = MagicMock(spec=asyncio.StreamReader)
+    input_stream.readline = AsyncMock(
+        side_effect=[b'{"jsonrpc": "2.0", "method": "get_tool_definitions", "id": 1}', b""]
+    )
+
+    # Mock the output stream to capture what's written to stdout
+    output_stream = MagicMock(spec=asyncio.StreamWriter)
+    output_stream.drain = AsyncMock()
+    output_stream.wait_closed = AsyncMock()
+    output_stream.write = MagicMock()  # We'll check what's written to stdout
+
+    # Mock the bundle manager cleanup method with proper timeout handling
+    server.bundle_manager.cleanup = AsyncMock()
+
+    # Mock asyncio.wait_for to pass through the result
+    original_wait_for = asyncio.wait_for
+
+    async def mock_wait_for(coro, timeout):
+        if isinstance(coro, AsyncMock) or coro is input_stream.readline:
+            return await coro
+        elif coro is output_stream.wait_closed:
+            return None
+        else:
+            return await original_wait_for(coro, timeout)
+
+    # Set up to capture logging messages
+    log_messages = []
+    
+    class TestLogHandler(logging.Handler):
+        def emit(self, record):
+            log_messages.append(record.getMessage())
+    
+    handler = TestLogHandler()
+    root_logger = logging.getLogger()
+    
+    # Store original settings to restore later
+    original_level = root_logger.level
+    original_handlers = root_logger.handlers.copy()
+    
+    # Set debug level to ensure logs are generated
+    root_logger.setLevel(logging.DEBUG)
+    root_logger.addHandler(handler)
+    
+    try:
+        # Call serve with the mock streams and MCP mode enabled
+        with (
+            patch("asyncio.get_event_loop", return_value=AsyncMock()),
+            patch("asyncio.wait_for", side_effect=mock_wait_for),
+        ):
+            await server.serve(input_stream, output_stream, mcp_mode=True)
+        
+        # Verify that the output stream received only valid JSON-RPC responses
+        # and no log messages were sent to stdout
+        for call in output_stream.write.call_args_list:
+            args = call[0]
+            written_bytes = args[0]
+            written_text = written_bytes.decode('utf-8')
+            
+            # Check that it's valid JSON
+            json_data = json.loads(written_text.strip())
+            # Verify it contains required JSON-RPC fields
+            assert "jsonrpc" in json_data
+            assert json_data["jsonrpc"] == "2.0"
+            assert "id" in json_data
+            
+            # Make sure common log message patterns aren't in stdout
+            assert "Starting MCP server" not in written_text
+            assert "DEBUG" not in written_text
+            assert "INFO" not in written_text
+            assert "WARNING" not in written_text
+            assert "ERROR" not in written_text
+        
+        # Verify that logs were captured somewhere (stderr in real use)
+        assert len(log_messages) > 0
+        
+        # Check specific log messages we know should be generated
+        found_startup_log = False
+        for message in log_messages:
+            if "Starting MCP server in MCP mode" in message:
+                found_startup_log = True
+                break
+        
+        assert found_startup_log, "Expected startup log message wasn't found"
+    
+    finally:
+        # Clean up logging handlers and restore original settings
+        root_logger.handlers = original_handlers
+        root_logger.setLevel(original_level)

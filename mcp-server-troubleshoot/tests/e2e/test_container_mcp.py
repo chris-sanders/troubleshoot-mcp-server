@@ -153,56 +153,12 @@ class DockerMCPClient:
                 pass
 
 
-def is_docker_available():
-    """Check if Docker is available on the system."""
-    try:
-        subprocess.run(
-            ["docker", "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        return True
-    except (subprocess.SubprocessError, FileNotFoundError):
-        return False
-
-
-def is_image_built():
-    """Check if the Docker image is already built."""
-    result = subprocess.run(
-        ["docker", "images", "-q", "mcp-server-troubleshoot:latest"],
-        stdout=subprocess.PIPE,
-        text=True,
-    )
-    return bool(result.stdout.strip())
-
-
-def build_image():
-    """Build the Docker image if needed."""
-    if not is_image_built():
-        build_script = PROJECT_ROOT / "scripts" / "build.sh"
-        try:
-            subprocess.run(
-                [str(build_script)],
-                check=True,
-                cwd=str(PROJECT_ROOT),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            return True
-        except subprocess.CalledProcessError:
-            return False
-    return True
-
-
 @pytest.fixture(scope="module")
-def docker_setup():
+def docker_setup(docker_image):
     """Setup Docker environment for testing."""
-    # Skip all tests if Docker is not available
-    if not is_docker_available():
-        pytest.skip("Docker is not available")
-
-    # Build the image if needed
-    if not build_image():
-        pytest.skip("Failed to build Docker image")
+    # The docker_image fixture ensures Docker is available and the image is built
+    # This fixture doesn't need to do anything else, just depends on docker_image
+    pass
 
 
 @pytest.fixture
@@ -584,3 +540,63 @@ def test_end_to_end_workflow(container_client):
 
     # If we've gotten this far, the workflow is successful
     assert True
+
+
+@pytest.mark.skipif(not TEST_BUNDLE.exists(), reason="Test bundle not available")
+def test_stdout_contains_only_jsonrpc(container_client, docker_setup):
+    """Test that the container's stdout contains only valid JSON-RPC in MCP mode."""
+    # Get access to the raw stdout data from the process
+    process = container_client.process
+    
+    # Keep track of response count and json content
+    response_count = 0
+    stdout_buffer = ""
+    
+    # Send a JSON-RPC request
+    response = container_client.call_tool(
+        "list_files", {"path": "/"}
+    )
+    
+    # Increase response count since we got a valid response
+    if "jsonrpc" in response and response["jsonrpc"] == "2.0":
+        response_count += 1
+    
+    # Read directly from process stdout to check all content
+    # Be careful not to consume data needed by the container_client
+    raw_data = None
+    try:
+        # Try to peek at the current stdout content without consuming it
+        if hasattr(process.stdout, "peek"):
+            raw_data = process.stdout.peek(4096)  # Peek at up to 4KB
+    except (AttributeError, IOError):
+        # If peek isn't available or fails, we'll skip that check
+        pass
+    
+    if raw_data:
+        stdout_buffer = raw_data.decode("utf-8", errors="replace")
+        
+        # Make assertions on the stdout content:
+        
+        # 1. No log messages should be in stdout - verify none of these patterns exist
+        log_patterns = ["DEBUG", "INFO", "WARNING", "ERROR"]
+        for pattern in log_patterns:
+            assert pattern not in stdout_buffer, f"Found log level '{pattern}' in stdout, should be in stderr only"
+        
+        # 2. No plaintext messages that aren't JSON-RPC
+        assert "Starting MCP server" not in stdout_buffer, "Found log message in stdout"
+        
+        # 3. Each line should be valid JSON
+        for line in stdout_buffer.splitlines():
+            line = line.strip()
+            if line:  # Skip empty lines
+                try:
+                    data = json.loads(line)
+                    # It should be a valid JSON-RPC message
+                    assert "jsonrpc" in data and data["jsonrpc"] == "2.0"
+                    assert "id" in data
+                except json.JSONDecodeError:
+                    # If we fail to parse JSON, it means non-JSON content was found
+                    assert False, f"Non-JSON content found in stdout: {line}"
+    
+    # Verify we received at least one response
+    assert response_count > 0, "No valid JSON-RPC responses received"

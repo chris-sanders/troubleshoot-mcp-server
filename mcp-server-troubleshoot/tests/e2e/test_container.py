@@ -15,48 +15,6 @@ from pathlib import Path
 
 # Get the project root directory
 PROJECT_ROOT = Path(__file__).parents[2].absolute()
-SCRIPTS_DIR = PROJECT_ROOT / "scripts"
-
-
-def is_docker_available():
-    """Check if Docker is available on the system."""
-    try:
-        subprocess.run(
-            ["docker", "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        return True
-    except (subprocess.SubprocessError, FileNotFoundError):
-        return False
-
-
-def is_image_built():
-    """Check if the Docker image is already built."""
-    result = subprocess.run(
-        ["docker", "images", "-q", "mcp-server-troubleshoot:latest"],
-        stdout=subprocess.PIPE,
-        text=True,
-    )
-    return bool(result.stdout.strip())
-
-
-def build_image():
-    """Build the Docker image."""
-    build_script = SCRIPTS_DIR / "build.sh"
-    if not build_script.exists():
-        build_script = PROJECT_ROOT / "build.sh"
-
-    try:
-        result = subprocess.run(
-            [str(build_script)],
-            check=True,
-            cwd=str(PROJECT_ROOT),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        return True, result
-    except subprocess.CalledProcessError as e:
-        return False, e
 
 
 def cleanup_test_container():
@@ -66,29 +24,15 @@ def cleanup_test_container():
     )
 
 
-def ensure_bundles_directory():
-    """Create a bundles directory for testing if it doesn't exist."""
-    bundles_dir = PROJECT_ROOT / "bundles"
-    bundles_dir.mkdir(exist_ok=True)
-    return bundles_dir
-
-
-@pytest.fixture(scope="module")
-def docker_setup():
+@pytest.fixture
+def docker_setup(docker_image, ensure_bundles_directory):
     """Setup Docker environment for testing."""
-    # Skip all tests if Docker is not available
-    if not is_docker_available():
-        pytest.skip("Docker is not available")
-
-    # Create bundles directory
-    bundles_dir = ensure_bundles_directory()
-
-    # Build the image if needed
-    if not is_image_built():
-        success, result = build_image()
-        if not success:
-            pytest.skip(f"Failed to build Docker image: {result.stderr}")
-
+    # The docker_image fixture ensures Docker is available and the image is built
+    # The ensure_bundles_directory fixture creates and returns the bundles directory
+    
+    # Get bundles directory
+    bundles_dir = ensure_bundles_directory
+    
     # Clean up any existing test container
     cleanup_test_container()
 
@@ -353,17 +297,20 @@ def test_mcp_protocol(docker_setup):
 
 if __name__ == "__main__":
     # Allow running as a standalone script
+    from conftest import is_docker_available, build_docker_image  # Import from conftest
+    
     if is_docker_available():
-        bundles_dir = ensure_bundles_directory()
+        bundles_dir = PROJECT_ROOT / "bundles"
+        bundles_dir.mkdir(exist_ok=True)
 
-        # Build the image if needed
-        if not is_image_built():
-            print("Building container image...")
-            success, result = build_image()
-            if not success:
-                print(f"Failed to build image: {result.stderr}")
-                sys.exit(1)
-            print("Container image built successfully")
+        # Always rebuild the image for testing
+        print("Rebuilding container image...")
+        # Build using the centralized build function
+        success, result = build_docker_image(PROJECT_ROOT)
+        if not success:
+            print(f"Failed to build image: {result}")
+            sys.exit(1)
+        print("Container image built successfully")
 
         # Clean up any existing test container
         print("Cleaning up any existing test containers...")

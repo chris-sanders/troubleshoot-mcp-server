@@ -13,12 +13,13 @@ from .server import TroubleshootMCPServer
 logger = logging.getLogger(__name__)
 
 
-def setup_logging(verbose: bool = False) -> None:
+def setup_logging(verbose: bool = False, mcp_mode: bool = False) -> None:
     """
     Set up logging configuration.
 
     Args:
         verbose: Whether to enable verbose logging
+        mcp_mode: Whether the server is running in MCP mode
     """
     log_level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
@@ -26,6 +27,13 @@ def setup_logging(verbose: bool = False) -> None:
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         stream=sys.stderr,
     )
+    
+    # When in MCP mode, ensure all loggers use stderr
+    if mcp_mode:
+        # Configure root logger to use stderr
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers:
+            handler.stream = sys.stderr
 
 
 def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
@@ -44,14 +52,15 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     return parser.parse_args(args)
 
 
-async def run_server(args: argparse.Namespace) -> None:
+async def run_server(args: argparse.Namespace, mcp_mode: bool = False) -> None:
     """
     Run the MCP server.
 
     Args:
         args: Command line arguments
+        mcp_mode: Whether the server is running in MCP mode
     """
-    setup_logging(args.verbose)
+    setup_logging(args.verbose, mcp_mode)
 
     bundle_dir = None
     if args.bundle_dir:
@@ -63,7 +72,7 @@ async def run_server(args: argparse.Namespace) -> None:
 
     logger.info("Starting MCP server for Kubernetes support bundles")
     server = TroubleshootMCPServer(bundle_dir=bundle_dir)
-    await server.serve()
+    await server.serve(mcp_mode=mcp_mode)
 
 
 def main(args: Optional[List[str]] = None) -> None:
@@ -74,10 +83,13 @@ def main(args: Optional[List[str]] = None) -> None:
         args: Command line arguments (defaults to sys.argv[1:])
     """
     parsed_args = parse_args(args)
+    
+    # Detect if we're running in MCP mode (stdin is not a terminal)
+    mcp_mode = not sys.stdin.isatty()
 
     try:
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(run_server(parsed_args))
+        loop.run_until_complete(run_server(parsed_args, mcp_mode=mcp_mode))
     except KeyboardInterrupt:
         logger.info("Server stopped by user")
     except Exception as e:

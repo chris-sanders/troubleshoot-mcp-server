@@ -9,12 +9,12 @@ IMAGE_TAG="latest"
 set -x
 
 # Build the Docker image
-docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+docker build --no-cache -t ${IMAGE_NAME}:${IMAGE_TAG} .
 
 echo "Build completed successfully. The image is available as ${IMAGE_NAME}:${IMAGE_TAG}"
 echo ""
 echo "To run the container:"
 echo "  docker run -it --rm \\"
-echo "    -v \$(pwd)/bundles:/data/bundles \\"
+echo "    -v \$(pwd)/tests/fixtures:/data/bundles \\"
 echo "    -e SBCTL_TOKEN=your_token_here \\"
 echo "    ${IMAGE_NAME}:${IMAGE_TAG} [options]"
