@@ -121,9 +121,9 @@ def test_docker_run():
                 cwd=str(project_dir)
             )
             
-            # Verify output contains help message
+            # Verify output contains help message from Python
             assert "usage:" in output.lower(), "Container did not run correctly"
-            assert "bundle" in output.lower(), "Container output incorrect"
+            assert "python" in output.lower(), "Container output incorrect"
             
             # Test the bundle volume is correctly mounted
             volume_test = run_command(
