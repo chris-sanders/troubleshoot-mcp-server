@@ -102,7 +102,6 @@ async def mcp_server():
         await process.wait()
 
 
-@pytest.mark.skip(reason="Temporarily skipped until MCP server is properly configured")
 @pytest.mark.asyncio
 async def test_list_tools(mcp_server):
     """Test that the server returns a list of available tools."""
@@ -121,7 +120,6 @@ async def test_list_tools(mcp_server):
         assert tool in tool_names
 
 
-@pytest.mark.skip(reason="Temporarily skipped until MCP server is properly configured")
 @pytest.mark.asyncio
 async def test_call_tool_list_files(mcp_server):
     """Test calling the list_files tool."""

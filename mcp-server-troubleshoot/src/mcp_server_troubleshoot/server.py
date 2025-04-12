@@ -476,8 +476,31 @@ class TroubleshootMCPServer:
         params = request.get("params", {})
         
         if method == "get_tool_definitions":
-            # Get list of available tools
-            tools = await self.server.list_tools_handler()
+            # Get list of available tools manually since we can't directly access
+            # the tools decorator in the server object
+            tools = [
+                {
+                    "name": "initialize_bundle",
+                    "description": "Initialize a Kubernetes support bundle for analysis"
+                },
+                {
+                    "name": "kubectl",
+                    "description": "Execute kubectl commands against the initialized bundle's API server"
+                },
+                {
+                    "name": "list_files",
+                    "description": "List files and directories within the support bundle"
+                },
+                {
+                    "name": "read_file",
+                    "description": "Read a file within the support bundle with optional line range filtering"
+                },
+                {
+                    "name": "grep_files",
+                    "description": "Search for patterns in files within the support bundle"
+                }
+            ]
+            
             return {
                 "jsonrpc": "2.0",
                 "result": tools,
@@ -498,7 +521,33 @@ class TroubleshootMCPServer:
             
             # Call the tool and get the result
             try:
-                result = await self.server.call_tool_handler(tool_name, arguments)
+                # Check if the tool name is valid
+                valid_tools = ["initialize_bundle", "kubectl", "list_files", "read_file", "grep_files"]
+                if tool_name not in valid_tools:
+                    return {
+                        "jsonrpc": "2.0",
+                        "error": {"code": -32601, "message": f"Tool '{tool_name}' not found"},
+                        "id": request_id
+                    }
+                
+                # Forward to the actual implementation based on tool name
+                if tool_name == "initialize_bundle":
+                    result = await self._handle_initialize_bundle(arguments)
+                elif tool_name == "kubectl":
+                    result = await self._handle_kubectl(arguments)
+                elif tool_name == "list_files":
+                    result = await self._handle_list_files(arguments)
+                elif tool_name == "read_file":
+                    result = await self._handle_read_file(arguments)
+                elif tool_name == "grep_files":
+                    result = await self._handle_grep_files(arguments)
+                else:
+                    return {
+                        "jsonrpc": "2.0",
+                        "error": {"code": -32601, "message": f"Tool '{tool_name}' handler not implemented"},
+                        "id": request_id
+                    }
+                
                 return {
                     "jsonrpc": "2.0",
                     "result": result,
