@@ -173,7 +173,6 @@ def test_mcp_cli(docker_setup):
     assert "usage:" in combined_output.lower() or result.returncode == 0
 
 
-@pytest.mark.xfail(reason="MCP protocol test not yet implemented")
 def test_mcp_protocol(docker_setup):
     """
     Test MCP protocol communication with the container.
@@ -181,11 +180,139 @@ def test_mcp_protocol(docker_setup):
     This test sends a JSON-RPC request to the container running in MCP mode
     and verifies that it responds correctly.
     """
-    # docker_setup is used by the fixture but not needed in this test yet
+    import json
+    import uuid
+    import tempfile
+    import time
+    from pathlib import Path
     
-    # This is a placeholder for an actual MCP protocol test
-    # TODO: Implement a full MCP client-server test
-    assert False, "MCP protocol test not implemented yet"
+    # Create a temporary directory for the bundle
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        
+        # Generate a unique container ID for this test
+        container_id = f"mcp-test-{uuid.uuid4().hex[:8]}"
+        
+        # Start the container in MCP mode
+        process = subprocess.Popen(
+            [
+                "docker", "run", 
+                "--name", container_id, 
+                "-i",  # Interactive mode for stdin
+                "-v", f"{temp_path}:/data/bundles",
+                "-e", "SBCTL_TOKEN=test-token",
+                "-e", "MCP_BUNDLE_STORAGE=/data/bundles",
+                "--entrypoint", "python",
+                "mcp-server-troubleshoot:latest",
+                "-m", "mcp_server_troubleshoot.cli"
+            ],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        
+        try:
+            # Wait a moment for the container to start
+            time.sleep(2)
+            
+            # Check if the container started successfully
+            ps_check = subprocess.run(
+                ["docker", "ps", "-q", "-f", f"name={container_id}"],
+                stdout=subprocess.PIPE,
+                text=True
+            )
+            
+            assert ps_check.stdout.strip(), "Docker container failed to start"
+            
+            # Simple JSON-RPC client for testing
+            class JSONRPCClient:
+                def __init__(self, process):
+                    self.process = process
+                    self.request_id = 0
+                
+                def send_request(self, method, params=None):
+                    if params is None:
+                        params = {}
+                    
+                    self.request_id += 1
+                    request = {
+                        "jsonrpc": "2.0",
+                        "id": str(self.request_id),
+                        "method": method,
+                        "params": params
+                    }
+                    
+                    request_str = json.dumps(request) + "\n"
+                    self.process.stdin.write(request_str.encode("utf-8"))
+                    self.process.stdin.flush()
+                    
+                    # Read response with a timeout
+                    max_attempts = 5
+                    for _ in range(max_attempts):
+                        if self.process.stdout.readable():
+                            response_line = self.process.stdout.readline()
+                            if response_line:
+                                try:
+                                    response_str = response_line.decode("utf-8").strip()
+                                    return json.loads(response_str)
+                                except json.JSONDecodeError:
+                                    print(f"Error decoding response: {response_line}")
+                                    return {"error": {"code": -32700, "message": "Response was not valid JSON"}}
+                        
+                        # Wait a bit before trying again
+                        time.sleep(0.5)
+                    
+                    # If we get here, we failed to get a response
+                    return {"error": {"code": -32000, "message": "Timeout waiting for response"}}
+            
+            # Create a client
+            client = JSONRPCClient(process)
+            
+            # 1. Test the get_tool_definitions method
+            response = client.send_request("get_tool_definitions")
+            assert "jsonrpc" in response, "Not a JSON-RPC response"
+            assert response["jsonrpc"] == "2.0", "Invalid JSON-RPC version"
+            assert "result" in response, "Missing result in JSON-RPC response"
+            
+            # Verify that expected tools are available
+            tools = response["result"]
+            tool_names = [tool["name"] for tool in tools]
+            expected_tools = ["initialize_bundle", "kubectl", "list_files", "read_file", "grep_files"]
+            for tool in expected_tools:
+                assert tool in tool_names, f"Tool {tool} not found in tools list"
+            
+            # 2. Test a simple call_tool method (will fail since no bundle is initialized, but should be a valid response)
+            response = client.send_request(
+                "call_tool", 
+                {"name": "list_files", "arguments": {"path": "/"}}
+            )
+            assert "jsonrpc" in response, "Not a JSON-RPC response"
+            assert response["jsonrpc"] == "2.0", "Invalid JSON-RPC version"
+            assert "result" in response, "Missing result in JSON-RPC response"
+            
+            # 3. Test invalid method
+            response = client.send_request("non_existent_method")
+            assert "jsonrpc" in response, "Not a JSON-RPC response"
+            assert response["jsonrpc"] == "2.0", "Invalid JSON-RPC version"
+            # Should receive an error for invalid method
+            if "error" in response:
+                assert "code" in response["error"], "Missing error code"
+                assert "message" in response["error"], "Missing error message"
+            
+        finally:
+            # Clean up
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+            
+            # Clean up the container
+            subprocess.run(
+                ["docker", "rm", "-f", container_id],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
 
 
 if __name__ == "__main__":
