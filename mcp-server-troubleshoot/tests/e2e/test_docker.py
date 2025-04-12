@@ -27,21 +27,21 @@ def run_command(cmd, cwd=None, check=True):
 
 def test_dockerfile_exists():
     """Test that the Dockerfile exists in the project directory."""
-    project_dir = Path(__file__).parents[1]
+    project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
     dockerfile_path = project_dir / "Dockerfile"
     assert dockerfile_path.exists(), "Dockerfile does not exist"
 
 
 def test_dockerignore_exists():
     """Test that the .dockerignore file exists in the project directory."""
-    project_dir = Path(__file__).parents[1]
+    project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
     dockerignore_path = project_dir / ".dockerignore"
     assert dockerignore_path.exists(), ".dockerignore does not exist"
 
 
 def test_build_script_exists_and_executable():
     """Test that the build script exists and is executable."""
-    project_dir = Path(__file__).parents[1]
+    project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
     build_script = project_dir / "build.sh"
     assert build_script.exists(), "build.sh does not exist"
     assert os.access(build_script, os.X_OK), "build.sh is not executable"
@@ -49,7 +49,7 @@ def test_build_script_exists_and_executable():
 
 def test_run_script_exists_and_executable():
     """Test that the run script exists and is executable."""
-    project_dir = Path(__file__).parents[1]
+    project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
     run_script = project_dir / "run.sh"
     assert run_script.exists(), "run.sh does not exist"
     assert os.access(run_script, os.X_OK), "run.sh is not executable"
@@ -58,7 +58,7 @@ def test_run_script_exists_and_executable():
 @pytest.mark.docker
 def test_docker_build():
     """Test that the Docker image builds successfully."""
-    project_dir = Path(__file__).parents[1]
+    project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
     
     # Use a unique tag for testing
     test_tag = "mcp-server-troubleshoot:test"
@@ -102,7 +102,7 @@ def test_docker_build():
 @pytest.mark.docker
 def test_docker_run():
     """Test that the Docker container runs and exits successfully."""
-    project_dir = Path(__file__).parents[1]
+    project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
     
     # Use a unique tag for testing
     test_tag = "mcp-server-troubleshoot:test-run"
@@ -143,7 +143,7 @@ def test_docker_run():
 @pytest.mark.docker
 def test_sbctl_installed():
     """Test that sbctl is installed in the container."""
-    project_dir = Path(__file__).parents[1]
+    project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
     
     # Use a unique tag for testing
     test_tag = "mcp-server-troubleshoot:test-sbctl"
@@ -175,7 +175,7 @@ def test_sbctl_installed():
 @pytest.mark.docker
 def test_kubectl_installed():
     """Test that kubectl is installed in the container."""
-    project_dir = Path(__file__).parents[1]
+    project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
     
     # Use a unique tag for testing
     test_tag = "mcp-server-troubleshoot:test-kubectl"
