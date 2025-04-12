@@ -267,25 +267,26 @@ async def test_serve():
     """Test that the server can be served."""
     server = TroubleshootMCPServer()
 
-    # Mock the MCP Server serve method
-    server.server.serve = AsyncMock()
-
-    # Mock the BundleManager cleanup method
+    # Mock the readline method to return empty bytes after first call
+    input_stream = MagicMock(spec=asyncio.StreamReader)
+    input_stream.readline = AsyncMock(side_effect=[b'{"jsonrpc": "2.0", "method": "get_tool_definitions", "id": 1}', b''])
+    
+    # Mock the output stream
+    output_stream = MagicMock(spec=asyncio.StreamWriter)
+    output_stream.drain = AsyncMock()
+    
+    # Mock the bundle manager cleanup method
     server.bundle_manager.cleanup = AsyncMock()
 
-    # Create mock input and output streams
-    input_stream = MagicMock(spec=asyncio.StreamReader)
-    output_stream = MagicMock(spec=asyncio.StreamWriter)
-
-    # Mock the connect_read_pipe method which fails in tests
+    # Mock event loop methods that might fail in tests
     mock_loop = AsyncMock()
-
+    
     # Call serve with the mock streams
     with patch("asyncio.get_event_loop", return_value=mock_loop):
         await server.serve(input_stream, output_stream)
 
-    # Verify that the MCP Server serve method was called with the mock streams
-    server.server.serve.assert_awaited_once_with(input_stream, output_stream)
-
+    # Verify that the output stream was written to
+    assert output_stream.write.called
+    
     # Verify that the bundle manager cleanup method was called
     server.bundle_manager.cleanup.assert_awaited_once()
