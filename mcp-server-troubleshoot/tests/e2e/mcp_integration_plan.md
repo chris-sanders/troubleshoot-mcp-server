@@ -1,23 +1,24 @@
 # MCP Protocol Integration Test Plan
 
-This document outlines the implementation plan for a complete MCP protocol integration test that verifies client-server communication.
+This document outlines the implementation plan for a complete MCP protocol integration test that verifies client-server communication with the containerized MCP server.
 
 ## Objective
 
 Create an end-to-end test that validates:
-1. Starting the MCP server in a separate process
+1. Building and starting the MCP server in a Docker container
 2. Connecting to it from a client
-3. Exchanging JSON-RPC messages
+3. Exchanging JSON-RPC messages over stdio
 4. Verifying correct responses
 5. Testing all key functionality
 
 ## Implementation Steps
 
-### 1. Server-Client Test Framework
+### 1. Container-Client Test Framework
 
 The framework should:
-- Start the MCP server in a subprocess
-- Connect to it via stdio
+- Build the Docker container if needed
+- Start the container in MCP mode with proper volume mounts
+- Connect to it via stdio pipes
 - Handle JSON-RPC message exchange
 - Provide clean setup/teardown
 - Support asynchronous operations
@@ -62,15 +63,16 @@ The framework should:
 
 - The test should work both in development and CI environments
 - It should handle environment variable setup for SBCTL_TOKEN
-- It should clean up resources after test completion
+- It should mount the test fixtures directory to make test bundles available
+- It should clean up containers and other resources after test completion
 
 ## Implementation Notes
 
-1. Use `asyncio.create_subprocess_exec` to start the server
-2. Use pipes for stdin/stdout communication
-3. Implement a simple MCPClient class to handle protocol details
-4. Use a temporary directory for test bundles
-5. Make tests skippable in environments where they can't run
+1. Use `subprocess.Popen` to start the Docker container with proper pipes
+2. Connect to stdin/stdout/stderr of the container for communication
+3. Implement a simple MCPClient class to handle protocol details with containers
+4. Use volume mounts to make test fixtures and bundle directories available
+5. Make tests skippable in environments where Docker isn't available
 
 ## Expected Outcome
 

@@ -548,9 +548,31 @@ class TroubleshootMCPServer:
                         "id": request_id
                     }
                 
+                # Convert TextContent objects to a serializable format
+                serializable_result = []
+                for item in result:
+                    # Handle TextContent objects directly
+                    if hasattr(item, 'type') and hasattr(item, 'text'):
+                        serializable_result.append({
+                            "type": item.type,
+                            "text": item.text
+                        })
+                    elif hasattr(item, 'model_dump'):
+                        # For Pydantic models
+                        serializable_result.append(item.model_dump())
+                    elif hasattr(item, 'to_dict'):
+                        # For objects with to_dict method
+                        serializable_result.append(item.to_dict())
+                    elif hasattr(item, '__dict__'):
+                        # For generic objects
+                        serializable_result.append(vars(item))
+                    else:
+                        # For primitive types
+                        serializable_result.append(str(item))
+                
                 return {
                     "jsonrpc": "2.0",
-                    "result": result,
+                    "result": serializable_result,
                     "id": request_id
                 }
             except Exception as e:
