@@ -374,40 +374,28 @@ class TroubleshootMCPServer:
             logger.exception(error_message)
             return [TextContent(type="text", text=error_message)]
 
-    async def serve(
-        self,
-        input_stream: Optional[asyncio.StreamReader] = None,
-        output_stream: Optional[asyncio.StreamWriter] = None,
-        mcp_mode: bool = False
-    ) -> None:
+    async def serve(self, mcp_mode: bool = False) -> None:
         """
-        Start the MCP server with the given input and output streams.
+        Start the MCP server using stdin/stdout for communication.
 
         Args:
-            input_stream: The input stream to read from (defaults to stdin)
-            output_stream: The output stream to write to (defaults to stdout)
             mcp_mode: Whether the server is running in MCP mode
         """
         logger.debug("Starting MCP server" + (" in MCP mode" if mcp_mode else ""))
         
-        # Create streams if not provided
-        if input_stream is None:
-            input_stream = asyncio.StreamReader()
-            protocol = asyncio.StreamReaderProtocol(input_stream)
-            loop = asyncio.get_event_loop()
-            await loop.connect_read_pipe(lambda: protocol, sys.stdin)
-            logger.debug("Created input stream from stdin")
-
-        if output_stream is None:
-            # Get the transport for stdout
-            loop = asyncio.get_event_loop()
-            transport, protocol = await loop.connect_write_pipe(
-                asyncio.streams.FlowControlMixin, sys.stdout
-            )
-            output_stream = asyncio.StreamWriter(transport, protocol, None, loop)
-            logger.debug("Created output stream to stdout")
+        # Set up simplified streaming I/O directly with sys.stdin and sys.stdout
+        input_stream = asyncio.StreamReader()
+        protocol = asyncio.StreamReaderProtocol(input_stream)
+        loop = asyncio.get_event_loop()
+        await loop.connect_read_pipe(lambda: protocol, sys.stdin)
         
-        # Set up keep-alive based on environment for MCP mode
+        # Create a StreamWriter for stdout
+        transport, protocol = await loop.connect_write_pipe(
+            asyncio.streams.FlowControlMixin, sys.stdout
+        )
+        output_stream = asyncio.StreamWriter(transport, protocol, None, loop)
+        
+        # Check for keep-alive based on environment for MCP mode
         keep_alive = False
         if mcp_mode:
             keep_alive = os.environ.get("MCP_KEEP_ALIVE", "").lower() in ("true", "1", "yes")
@@ -416,7 +404,6 @@ class TroubleshootMCPServer:
         try:
             # Process JSON-RPC requests in a loop
             while True:
-                # CRITICAL: In MCP mode, stdout must have ONLY JSON-RPC messages
                 try:
                     # Read a line with appropriate timeout
                     timeout = 3600.0 if (mcp_mode and keep_alive) else 300.0
@@ -426,7 +413,6 @@ class TroubleshootMCPServer:
                     if not line:
                         logger.debug("End of input stream")
                         if mcp_mode and keep_alive:
-                            # In MCP mode with keep-alive, wait and try again
                             logger.debug("Keep-alive active, waiting for reconnection")
                             await asyncio.sleep(5.0)
                             continue
@@ -435,7 +421,6 @@ class TroubleshootMCPServer:
                 except asyncio.TimeoutError:
                     logger.debug(f"Timeout reading from input stream (timeout={timeout}s)")
                     if mcp_mode and keep_alive:
-                        # In MCP mode with keep-alive, just continue waiting
                         logger.debug("Keep-alive active, continuing to wait")
                         continue
                     break
@@ -449,7 +434,7 @@ class TroubleshootMCPServer:
                     # Use our helper method to handle the request
                     response = await self._process_jsonrpc(request)
                     
-                    # CRITICAL: Only write JSON-RPC to stdout
+                    # Write JSON-RPC to stdout and flush immediately
                     response_str = json.dumps(response) + "\n"
                     output_stream.write(response_str.encode("utf-8"))
                     await output_stream.drain()

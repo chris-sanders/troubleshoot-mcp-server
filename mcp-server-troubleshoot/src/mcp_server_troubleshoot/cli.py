@@ -61,19 +61,23 @@ async def serve_stdio(bundle_dir: Path = None, verbose: bool = False, mcp_mode: 
         verbose: Whether to enable verbose logging
         mcp_mode: Whether the server is running in MCP mode (default True)
     """
+    # Set up logging first - ensuring all output goes to stderr when in MCP mode
     setup_logging(verbose, mcp_mode)
 
-    # Initialize the server - log only to stderr
-    logger.info("Starting MCP server for Kubernetes support bundles")
-    if bundle_dir:
-        logger.info(f"Using bundle directory: {bundle_dir}")
+    # Only log to stderr in MCP mode
+    if not mcp_mode:
+        logger.info("Starting MCP server for Kubernetes support bundles")
+        if bundle_dir:
+            logger.info(f"Using bundle directory: {bundle_dir}")
+    else:
+        # In MCP mode, still log but make it debug level
+        logger.debug("Starting MCP server for Kubernetes support bundles")
+        if bundle_dir:
+            logger.debug(f"Using bundle directory: {bundle_dir}")
 
     try:
         # Create the server with the specified bundle directory
         server = TroubleshootMCPServer(bundle_dir=bundle_dir)
-
-        # IMPORTANT: In MCP mode, make sure nothing else writes to stdout
-        # except the JSON-RPC messages from the server.serve() method
         
         # Start the server using stdio for communication
         await server.serve(mcp_mode=mcp_mode)

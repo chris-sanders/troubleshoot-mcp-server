@@ -81,6 +81,7 @@ if [ "$MCP_MODE" = true ]; then
   >&2 echo "Using bundle directory: $BUNDLE_DIR"
   
   # IMPORTANT: Use -i flag, not -it for MCP mode
+  # Redirect stderr to file descriptor 2 (stderr) instead of discarding it
   cat | docker run -i \
     -v "${BUNDLE_DIR}:/data/bundles" \
     -e SBCTL_TOKEN="${SBCTL_TOKEN:-}" \
@@ -90,7 +91,7 @@ if [ "$MCP_MODE" = true ]; then
     --rm \
     --name "$CONTAINER_NAME" \
     --entrypoint python \
-    "${IMAGE_NAME}:${IMAGE_TAG}" -u -m mcp_server_troubleshoot.cli ${VERBOSE} ${ARGS} 2>/dev/null
+    "${IMAGE_NAME}:${IMAGE_TAG}" -u -m mcp_server_troubleshoot.cli ${VERBOSE} ${ARGS} 2>&2
 else
   # Run in regular mode
   docker run ${INTERACTIVE} --rm \
