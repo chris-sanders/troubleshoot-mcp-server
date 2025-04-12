@@ -5,6 +5,7 @@ MCP server implementation for Kubernetes support bundles.
 import asyncio
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -388,13 +389,9 @@ class TroubleshootMCPServer:
             mcp_mode: Whether the server is running in MCP mode
         """
         logger.debug("Starting MCP server" + (" in MCP mode" if mcp_mode else ""))
-
-        # Flag to track if we created streams internally
-        created_streams = False
-
+        
         # Create streams if not provided
         if input_stream is None:
-            created_streams = True
             input_stream = asyncio.StreamReader()
             protocol = asyncio.StreamReaderProtocol(input_stream)
             loop = asyncio.get_event_loop()
@@ -402,7 +399,6 @@ class TroubleshootMCPServer:
             logger.debug("Created input stream from stdin")
 
         if output_stream is None:
-            created_streams = True
             # Get the transport for stdout
             loop = asyncio.get_event_loop()
             transport, protocol = await loop.connect_write_pipe(
@@ -410,60 +406,77 @@ class TroubleshootMCPServer:
             )
             output_stream = asyncio.StreamWriter(transport, protocol, None, loop)
             logger.debug("Created output stream to stdout")
-
+        
+        # Set up keep-alive based on environment for MCP mode
+        keep_alive = False
+        if mcp_mode:
+            keep_alive = os.environ.get("MCP_KEEP_ALIVE", "").lower() in ("true", "1", "yes")
+            logger.debug(f"MCP mode keep_alive setting: {keep_alive}")
+            
         try:
             # Process JSON-RPC requests in a loop
             while True:
-                # Read a line from the input stream with a timeout
+                # CRITICAL: In MCP mode, stdout must have ONLY JSON-RPC messages
                 try:
-                    line = await asyncio.wait_for(input_stream.readline(), timeout=30.0)
+                    # Read a line with appropriate timeout
+                    timeout = 3600.0 if (mcp_mode and keep_alive) else 300.0
+                    line = await asyncio.wait_for(input_stream.readline(), timeout=timeout)
+                    
+                    # Handle end of input
                     if not line:
                         logger.debug("End of input stream")
+                        if mcp_mode and keep_alive:
+                            # In MCP mode with keep-alive, wait and try again
+                            logger.debug("Keep-alive active, waiting for reconnection")
+                            await asyncio.sleep(5.0)
+                            continue
                         break
+                        
                 except asyncio.TimeoutError:
-                    # No input for 30 seconds, continue waiting
-                    logger.debug("No input received for 30 seconds, continuing to wait")
-                    if not created_streams:
-                        # In tests with provided streams, we don't want to hang indefinitely
-                        logger.debug("Timeout in test environment, breaking")
-                        break
-                    continue
+                    logger.debug(f"Timeout reading from input stream (timeout={timeout}s)")
+                    if mcp_mode and keep_alive:
+                        # In MCP mode with keep-alive, just continue waiting
+                        logger.debug("Keep-alive active, continuing to wait")
+                        continue
+                    break
 
                 try:
-                    # Parse the request
+                    # Process the JSON-RPC request
                     request_str = line.decode("utf-8").strip()
-                    logger.debug(f"Received request: {request_str}")
+                    logger.debug(f"Received: {request_str}")
                     request = json.loads(request_str)
-
-                    # Process the request using a helper method
+                    
+                    # Use our helper method to handle the request
                     response = await self._process_jsonrpc(request)
-
-                    # Format and write the response
+                    
+                    # CRITICAL: Only write JSON-RPC to stdout
                     response_str = json.dumps(response) + "\n"
                     output_stream.write(response_str.encode("utf-8"))
                     await output_stream.drain()
-                    logger.debug(f"Sent response: {response_str.strip()}")
-
+                    logger.debug(f"Sent: {response_str.strip()}")
+                    
                 except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse JSON request: {e}")
-                    error_response = {
+                    logger.error(f"Invalid JSON: {e}")
+                    # Send a properly formatted JSON-RPC error
+                    error = {
                         "jsonrpc": "2.0",
                         "error": {"code": -32700, "message": "Parse error"},
-                        "id": None,
+                        "id": None
                     }
-                    output_stream.write((json.dumps(error_response) + "\n").encode("utf-8"))
+                    output_stream.write((json.dumps(error) + "\n").encode("utf-8"))
                     await output_stream.drain()
-
+                    
                 except Exception as e:
                     logger.exception(f"Error processing request: {e}")
-                    error_response = {
+                    # Send a properly formatted JSON-RPC error
+                    error = {
                         "jsonrpc": "2.0",
                         "error": {"code": -32603, "message": f"Internal error: {str(e)}"},
-                        "id": None,
+                        "id": None
                     }
-                    output_stream.write((json.dumps(error_response) + "\n").encode("utf-8"))
+                    output_stream.write((json.dumps(error) + "\n").encode("utf-8"))
                     await output_stream.drain()
-
+                    
         except asyncio.CancelledError:
             logger.info("Server task cancelled")
         except Exception as e:
@@ -474,23 +487,16 @@ class TroubleshootMCPServer:
             if output_stream:
                 try:
                     output_stream.close()
-                    # If this is a test environment with provided streams,
-                    # let's make sure the writer is properly closed
-                    if hasattr(output_stream, "wait_closed"):
-                        try:
-                            # Use a timeout to avoid hanging
-                            await asyncio.wait_for(output_stream.wait_closed(), timeout=1.0)
-                        except (asyncio.TimeoutError, Exception) as e:
-                            logger.debug(f"Error waiting for output stream to close: {e}")
                 except Exception as e:
                     logger.debug(f"Error closing output stream: {e}")
 
             try:
-                await asyncio.wait_for(self.bundle_manager.cleanup(), timeout=5.0)
-            except asyncio.TimeoutError:
-                logger.warning("Timeout waiting for bundle manager cleanup")
+                await self.bundle_manager.cleanup()
             except Exception as e:
                 logger.exception(f"Error during bundle manager cleanup: {e}")
+    
+# The _serve_manual_stdio method has been removed since we simplified
+# the implementation and moved it directly into the serve() method
 
     async def _process_jsonrpc(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -506,8 +512,30 @@ class TroubleshootMCPServer:
         request_id = request.get("id")
         method = request.get("method")
         params = request.get("params", {})
+        
+        # Ensure request_id is a string, number, or null to ensure valid JSON-RPC
+        if request_id is not None and not isinstance(request_id, (str, int, float)):
+            request_id = str(request_id)
+        
+        if method == "initialize":
+            # Handle the initialize message from MCP Inspector
+            logger.debug(f"Received initialize request with params: {params}")
+            # Return a successful initialization response
+            capabilities = {
+                "toolCallHistorySupport": True,
+                "textProcessingSupport": False,
+                "imageProcessingSupport": False
+            }
+            return {"jsonrpc": "2.0", "result": {"capabilities": capabilities}, "id": request_id}
+            
+        elif method == "initialized":
+            # Client confirms initialization is complete
+            logger.debug("Received initialized notification")
+            # This is typically a notification without an ID that doesn't require a response
+            # But we'll respond anyway to be safe
+            return {"jsonrpc": "2.0", "result": None, "id": request_id}
 
-        if method == "get_tool_definitions":
+        elif method == "get_tool_definitions":
             # Get list of available tools manually since we can't directly access
             # the tools decorator in the server object
             tools = [
@@ -613,8 +641,22 @@ class TroubleshootMCPServer:
                     "id": request_id,
                 }
 
+        elif method == "shutdown":
+            # Client is requesting shutdown
+            logger.debug("Received shutdown request")
+            # We'll respond with a success but won't exit yet - the client should send an 'exit' notification
+            return {"jsonrpc": "2.0", "result": None, "id": request_id}
+            
+        elif method == "exit":
+            # Client is requesting exit after shutdown
+            logger.debug("Received exit notification")
+            # This typically doesn't need a response as it's a notification
+            # We'd normally exit here, but will let the main loop handle it
+            return {"jsonrpc": "2.0", "result": None, "id": request_id}
+            
         else:
             # Unknown method
+            logger.warning(f"Unknown method requested: {method}")
             return {
                 "jsonrpc": "2.0",
                 "error": {"code": -32601, "message": f"Method '{method}' not found"},

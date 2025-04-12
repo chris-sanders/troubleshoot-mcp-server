@@ -63,7 +63,7 @@ async def serve_stdio(bundle_dir: Path = None, verbose: bool = False, mcp_mode: 
     """
     setup_logging(verbose, mcp_mode)
 
-    # Initialize the server
+    # Initialize the server - log only to stderr
     logger.info("Starting MCP server for Kubernetes support bundles")
     if bundle_dir:
         logger.info(f"Using bundle directory: {bundle_dir}")
@@ -72,6 +72,9 @@ async def serve_stdio(bundle_dir: Path = None, verbose: bool = False, mcp_mode: 
         # Create the server with the specified bundle directory
         server = TroubleshootMCPServer(bundle_dir=bundle_dir)
 
+        # IMPORTANT: In MCP mode, make sure nothing else writes to stdout
+        # except the JSON-RPC messages from the server.serve() method
+        
         # Start the server using stdio for communication
         await server.serve(mcp_mode=mcp_mode)
 

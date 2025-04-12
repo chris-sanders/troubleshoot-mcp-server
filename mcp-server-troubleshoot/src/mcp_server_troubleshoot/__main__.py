@@ -84,9 +84,9 @@ async def run_server(args: argparse.Namespace, mcp_mode: bool = False) -> None:
 
         bundle_dir = Path(args.bundle_dir)
         bundle_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Using bundle directory: {bundle_dir}")
+        #logger.info(f"Using bundle directory: {bundle_dir}")
 
-    logger.info("Starting MCP server for Kubernetes support bundles")
+    #logger.info("Starting MCP server for Kubernetes support bundles")
     server = TroubleshootMCPServer(bundle_dir=bundle_dir)
     await server.serve(mcp_mode=mcp_mode)
 
