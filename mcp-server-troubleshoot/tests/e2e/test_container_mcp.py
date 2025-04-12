@@ -211,8 +211,7 @@ def container_client(docker_setup, temp_bundle_dir, temp_token):
         command,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        bufsize=1  # Line buffered
+        stderr=subprocess.PIPE
     )
     
     # Wait a moment for the container to start
