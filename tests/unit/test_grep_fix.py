@@ -4,14 +4,12 @@ Test script to verify the grep_files function fix.
 """
 
 import pytest
-import pytest_asyncio
 
 # Mark all tests in this file as unit tests
 pytestmark = pytest.mark.unit
 
 import asyncio
 import tempfile
-import os
 import shutil
 from pathlib import Path
 
@@ -69,7 +67,7 @@ async def test_grep_files_with_kubeconfig():
         result = await explorer.grep_files("kubeconfig", "", recursive=True, case_sensitive=False)
         
         # Print the results
-        print(f"\nSearch results for 'kubeconfig':")
+        print("\nSearch results for 'kubeconfig':")
         print(f"Total matches: {result.total_matches}")
         print(f"Files searched: {result.files_searched}")
         

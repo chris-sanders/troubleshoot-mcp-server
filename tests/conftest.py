@@ -3,9 +3,7 @@ Test configuration and fixtures for pytest.
 """
 
 import os
-import signal
 import subprocess
-import time
 import contextlib
 import pytest
 from pathlib import Path

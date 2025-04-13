@@ -216,7 +216,7 @@ def handle_get(args):
             # Simple plain text output
             resource_type = args.resource.upper()
             if "items" in data:
-                print(f"NAME\tSTATUS")
+                print("NAME\tSTATUS")
                 for item in data["items"]:
                     name = item["metadata"]["name"]
                     status = "Ready"

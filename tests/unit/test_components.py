@@ -6,18 +6,15 @@ This script directly tests the key components without relying on the MCP protoco
 """
 
 import pytest
-import pytest_asyncio
 
 # Mark all tests in this file as unit tests
 pytestmark = pytest.mark.unit
 
 import argparse
 import asyncio
-import json
 import logging
 import os
 import sys
-import tempfile
 from pathlib import Path
 
 # Set up logging

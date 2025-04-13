@@ -6,7 +6,9 @@ with actual support bundles, focusing on user-visible behavior
 rather than implementation details.
 """
 
+import time
 import asyncio
+import subprocess
 import tempfile
 from pathlib import Path
 import pytest
@@ -20,6 +22,10 @@ from mcp_server_troubleshoot.kubectl import KubectlExecutor
 # Mark all tests in this file as integration tests
 pytestmark = pytest.mark.integration
 
+from mcp_server_troubleshoot.bundle import BundleManager
+
+# Import pytest_asyncio for proper fixture setup
+import pytest_asyncio
 
 @pytest_asyncio.fixture
 async def bundle_manager_fixture(test_support_bundle):

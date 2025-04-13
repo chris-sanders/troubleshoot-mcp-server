@@ -4,14 +4,12 @@ Test script to verify bundle path resolution behavior.
 """
 
 import pytest
-import pytest_asyncio
 
 # Mark all tests in this file as unit tests
 pytestmark = pytest.mark.unit
 
 import asyncio
 import tempfile
-import os
 from pathlib import Path
 import shutil
 from unittest.mock import Mock

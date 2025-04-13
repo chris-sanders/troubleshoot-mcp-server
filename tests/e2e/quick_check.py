@@ -6,7 +6,6 @@ without running the full test suite.
 import pytest
 import asyncio
 import subprocess
-import time
 from pathlib import Path
 
 # Run a basic container test to verify Docker works

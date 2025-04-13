@@ -147,7 +147,6 @@ def test_mcp_protocol(docker_setup):
     This test sends a JSON-RPC request to the container running in MCP mode
     and verifies that it responds correctly.
     """
-    import json
     import uuid
     import tempfile
     import time
