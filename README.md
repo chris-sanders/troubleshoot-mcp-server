@@ -21,13 +21,13 @@ The easiest way to get started is using Docker:
 
 ```bash
 # Build the image
-./mcp-server-troubleshoot/scripts/build.sh
+./scripts/build.sh
 
 # Run the server
-./mcp-server-troubleshoot/scripts/run.sh /path/to/bundles your-token
+./scripts/run.sh /path/to/bundles your-token
 ```
 
-See the [Docker documentation](mcp-server-troubleshoot/DOCKER.md) for more details.
+See the [Docker documentation](DOCKER.md) for more details.
 
 ### Manual Installation
 
@@ -36,10 +36,10 @@ See the [Docker documentation](mcp-server-troubleshoot/DOCKER.md) for more detai
 
 ```bash
 # Using uv (recommended)
-uv pip install -e ./mcp-server-troubleshoot
+uv pip install -e .
 
 # Or using pip
-pip install -e ./mcp-server-troubleshoot
+pip install -e .
 ```
 
 3. Set up your authentication token:
@@ -63,7 +63,7 @@ For comprehensive documentation, see:
 - [Developer Guide](docs/developer_guide.md): Information for developers
 - [Example Prompts](docs/examples/prompt_examples.md): Sample AI prompts and responses
 - [Troubleshooting Guide](docs/troubleshooting.md): Solutions for common issues
-- [Docker Guide](mcp-server-troubleshoot/DOCKER.md): Container usage and configuration
+- [Docker Guide](DOCKER.md): Container usage and configuration
 - [System Architecture](docs/architecture.md): Overall system design
 
 ## Tools
@@ -113,27 +113,74 @@ AI models can interact with the server using the MCP protocol:
 │   └── examples/              # Example prompts and usage
 ├── examples/                  # Example configurations
 │   └── mcp-servers/           # MCP server example configs
-├── mcp-server-troubleshoot/   # Main package
-│   ├── scripts/               # Utility scripts
-│   │   ├── build.sh           # Docker build script
-│   │   └── run.sh             # Docker run script
-│   ├── src/                   # Source code
-│   │   └── mcp_server_troubleshoot/
-│   │       ├── __init__.py
-│   │       ├── __main__.py    # Entry point
-│   │       ├── bundle.py      # Bundle management
-│   │       ├── cli.py         # CLI interface
-│   │       ├── files.py       # File operations
-│   │       ├── kubectl.py     # Kubectl command execution
-│   │       └── server.py      # MCP server implementation
-│   └── tests/                 # Test files
-│       ├── e2e/               # End-to-end tests
-│       ├── fixtures/          # Test fixtures 
-│       ├── integration/       # Integration tests
-│       └── unit/              # Unit tests
+├── scripts/                   # Utility scripts
+│   ├── build.sh               # Docker build script
+│   └── run.sh                 # Docker run script
+├── src/                       # Source code
+│   └── mcp_server_troubleshoot/
+│       ├── __init__.py
+│       ├── __main__.py        # Entry point
+│       ├── bundle.py          # Bundle management
+│       ├── cli.py             # CLI interface
+│       ├── files.py           # File operations
+│       ├── kubectl.py         # Kubectl command execution
+│       └── server.py          # MCP server implementation
+├── tests/                     # Test files
+│   ├── e2e/                   # End-to-end tests
+│   ├── fixtures/              # Test fixtures 
+│   ├── integration/           # Integration tests
+│   └── unit/                  # Unit tests
 └── tasks/                     # Task definitions
     ├── completed/             # Completed tasks
     └── review/                # Tasks under review
+```
+
+## Development
+
+### Installation
+
+For development, install the package in editable mode with development dependencies:
+
+```bash
+# Clone the repository
+git clone https://github.com/your-username/mcp-server-troubleshoot.git
+cd mcp-server-troubleshoot
+
+# Install with development dependencies
+uv pip install -e ".[dev]"
+```
+
+### Code Style
+
+Code formatting is done using Black and Ruff:
+
+```bash
+# Format code with Black
+black .
+
+# Lint code with Ruff
+ruff check .
+```
+
+### Testing
+
+```bash
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run a specific test type using markers
+pytest -m unit
+pytest -m integration
+pytest -m e2e
+
+# Run tests with detailed warnings
+pytest -W all
+
+# Run tests with warnings as errors
+pytest -W error
 ```
 
 ## Requirements
