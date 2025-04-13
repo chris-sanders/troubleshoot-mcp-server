@@ -1,5 +1,6 @@
 """
 Entry point for the MCP server.
+This comment was added to test Docker cache invalidation.
 """
 
 import argparse

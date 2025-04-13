@@ -8,8 +8,8 @@ IMAGE_TAG="latest"
 # Print commands before executing them
 set -x
 
-# Build the Docker image
-docker build --no-cache -t ${IMAGE_NAME}:${IMAGE_TAG} .
+# Build the Docker image (without --no-cache to allow proper layer caching)
+docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
 
 echo "Build completed successfully. The image is available as ${IMAGE_NAME}:${IMAGE_TAG}"
 echo ""

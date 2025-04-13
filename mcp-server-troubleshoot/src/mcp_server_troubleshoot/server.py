@@ -60,8 +60,18 @@ async def initialize_bundle(args: InitializeBundleArgs) -> List[TextContent]:
     Returns:
         A list of content items to return to the model
     """
+    bundle_manager = get_bundle_manager()
+    
     try:
-        result = await get_bundle_manager().initialize_bundle(args.source, args.force)
+        # Check if sbctl is available before attempting to initialize
+        sbctl_available = await bundle_manager._check_sbctl_available()
+        if not sbctl_available:
+            error_message = "sbctl is not available in the environment. This is required for bundle initialization."
+            logger.error(error_message)
+            return [TextContent(type="text", text=error_message)]
+        
+        # Initialize the bundle
+        result = await bundle_manager.initialize_bundle(args.source, args.force)
 
         # Convert the metadata to a dictionary
         metadata_dict = json.loads(result.model_dump_json())
@@ -70,18 +80,51 @@ async def initialize_bundle(args: InitializeBundleArgs) -> List[TextContent]:
         metadata_dict["path"] = str(metadata_dict["path"])
         metadata_dict["kubeconfig_path"] = str(metadata_dict["kubeconfig_path"])
 
-        response = (
-            f"Bundle initialized successfully:\n```json\n{json.dumps(metadata_dict, indent=2)}\n```"
-        )
+        # Check if the API server is available
+        api_server_available = await bundle_manager.check_api_server_available()
+        
+        # Get diagnostic information
+        diagnostics = await bundle_manager.get_diagnostic_info()
+        
+        # Format response based on API server status
+        if api_server_available:
+            response = (
+                f"Bundle initialized successfully:\n```json\n{json.dumps(metadata_dict, indent=2)}\n```"
+            )
+        else:
+            response = (
+                f"Bundle initialized but API server is NOT available. kubectl commands may fail:\n"
+                f"```json\n{json.dumps(metadata_dict, indent=2)}\n```\n\n"
+                f"Diagnostic information:\n```json\n{json.dumps(diagnostics, indent=2)}\n```"
+            )
+        
         return [TextContent(type="text", text=response)]
 
     except BundleManagerError as e:
         error_message = f"Failed to initialize bundle: {str(e)}"
         logger.error(error_message)
+        
+        # Try to get diagnostic information even on failure
+        try:
+            diagnostics = await bundle_manager.get_diagnostic_info()
+            diagnostic_info = f"\n\nDiagnostic information:\n```json\n{json.dumps(diagnostics, indent=2)}\n```"
+            error_message += diagnostic_info
+        except Exception as diag_error:
+            logger.error(f"Failed to get diagnostics: {diag_error}")
+            
         return [TextContent(type="text", text=error_message)]
     except Exception as e:
         error_message = f"Unexpected error initializing bundle: {str(e)}"
         logger.exception(error_message)
+        
+        # Try to get diagnostic information even on failure
+        try:
+            diagnostics = await bundle_manager.get_diagnostic_info()
+            diagnostic_info = f"\n\nDiagnostic information:\n```json\n{json.dumps(diagnostics, indent=2)}\n```"
+            error_message += diagnostic_info
+        except Exception as diag_error:
+            logger.error(f"Failed to get diagnostics: {diag_error}")
+            
         return [TextContent(type="text", text=error_message)]
 
 
@@ -96,7 +139,23 @@ async def kubectl(args: KubectlCommandArgs) -> List[TextContent]:
     Returns:
         A list of content items to return to the model
     """
+    bundle_manager = get_bundle_manager()
+    
     try:
+        # Check if the API server is available before attempting kubectl
+        api_server_available = await bundle_manager.check_api_server_available()
+        if not api_server_available:
+            # Get diagnostic information
+            diagnostics = await bundle_manager.get_diagnostic_info()
+            error_message = (
+                "Kubernetes API server is not available. kubectl commands cannot be executed.\n\n"
+                f"Diagnostic information:\n```json\n{json.dumps(diagnostics, indent=2)}\n```\n\n"
+                "Try reinitializing the bundle with the initialize_bundle tool."
+            )
+            logger.error("API server not available for kubectl command")
+            return [TextContent(type="text", text=error_message)]
+        
+        # Execute the kubectl command
         result = await get_kubectl_executor().execute(args.command, args.timeout, args.json_output)
 
         # Format the response based on the result
@@ -124,14 +183,48 @@ async def kubectl(args: KubectlCommandArgs) -> List[TextContent]:
     except KubectlError as e:
         error_message = f"kubectl command failed: {str(e)}"
         logger.error(error_message)
+        
+        # Try to get diagnostic information for the API server
+        try:
+            diagnostics = await bundle_manager.get_diagnostic_info()
+            
+            # Check if this is a connection issue
+            if "connection refused" in str(e).lower() or "could not connect" in str(e).lower():
+                error_message += (
+                    "\n\nThis appears to be a connection issue with the Kubernetes API server. "
+                    "The API server may not be running properly.\n\n"
+                    f"Diagnostic information:\n```json\n{json.dumps(diagnostics, indent=2)}\n```\n\n"
+                    "Try reinitializing the bundle with the initialize_bundle tool."
+                )
+            else:
+                error_message += f"\n\nDiagnostic information:\n```json\n{json.dumps(diagnostics, indent=2)}\n```"
+        except Exception as diag_error:
+            logger.error(f"Failed to get diagnostics: {diag_error}")
+            
         return [TextContent(type="text", text=error_message)]
     except BundleManagerError as e:
         error_message = f"Bundle error: {str(e)}"
         logger.error(error_message)
+        
+        # Try to get diagnostic information
+        try:
+            diagnostics = await bundle_manager.get_diagnostic_info()
+            error_message += f"\n\nDiagnostic information:\n```json\n{json.dumps(diagnostics, indent=2)}\n```"
+        except Exception as diag_error:
+            logger.error(f"Failed to get diagnostics: {diag_error}")
+            
         return [TextContent(type="text", text=error_message)]
     except Exception as e:
         error_message = f"Unexpected error executing kubectl command: {str(e)}"
         logger.exception(error_message)
+        
+        # Try to get diagnostic information
+        try:
+            diagnostics = await bundle_manager.get_diagnostic_info()
+            error_message += f"\n\nDiagnostic information:\n```json\n{json.dumps(diagnostics, indent=2)}\n```"
+        except Exception as diag_error:
+            logger.error(f"Failed to get diagnostics: {diag_error}")
+            
         return [TextContent(type="text", text=error_message)]
 
 

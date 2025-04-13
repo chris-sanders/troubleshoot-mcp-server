@@ -7,24 +7,37 @@ extraction, initialization, and cleanup.
 """
 
 import asyncio
+import json
 import logging
 import os
 import re
 import shutil
+import signal
+import subprocess
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 from urllib.parse import urlparse
 
 import aiohttp
 from pydantic import BaseModel, Field, field_validator
 
-# Constants for resource limits
-MAX_DOWNLOAD_SIZE = 1024 * 1024 * 1024  # 1 GB
-MAX_DOWNLOAD_TIMEOUT = 300  # 5 minutes
-MAX_INITIALIZATION_TIMEOUT = 120  # 2 minutes
-
+# Set up logging
 logger = logging.getLogger(__name__)
+
+# Constants for resource limits - can be overridden by environment variables
+DEFAULT_DOWNLOAD_SIZE = 1024 * 1024 * 1024  # 1 GB
+DEFAULT_DOWNLOAD_TIMEOUT = 300  # 5 minutes
+DEFAULT_INITIALIZATION_TIMEOUT = 120  # 2 minutes
+
+# Override with environment variables if provided
+MAX_DOWNLOAD_SIZE = int(os.environ.get("MAX_DOWNLOAD_SIZE", DEFAULT_DOWNLOAD_SIZE))
+MAX_DOWNLOAD_TIMEOUT = int(os.environ.get("MAX_DOWNLOAD_TIMEOUT", DEFAULT_DOWNLOAD_TIMEOUT))
+MAX_INITIALIZATION_TIMEOUT = int(os.environ.get("MAX_INITIALIZATION_TIMEOUT", DEFAULT_INITIALIZATION_TIMEOUT))
+
+logger.debug(f"Using MAX_DOWNLOAD_SIZE: {MAX_DOWNLOAD_SIZE / 1024 / 1024:.1f} MB")
+logger.debug(f"Using MAX_DOWNLOAD_TIMEOUT: {MAX_DOWNLOAD_TIMEOUT} seconds")
+logger.debug(f"Using MAX_INITIALIZATION_TIMEOUT: {MAX_INITIALIZATION_TIMEOUT} seconds")
 
 
 class BundleMetadata(BaseModel):
@@ -392,8 +405,17 @@ class BundleManager:
         while asyncio.get_event_loop().time() - start_time < timeout:
             if kubeconfig_path.exists():
                 logger.info(f"Kubeconfig found at: {kubeconfig_path}")
-                return
-
+                
+                # Wait an additional second for the API server to start listening
+                await asyncio.sleep(1.0)
+                
+                # Check if the API server is actually responding
+                if await self.check_api_server_available():
+                    logger.info("API server is available and responding")
+                    return
+                else:
+                    logger.warning("Kubeconfig found but API server is not responding yet")
+            
             # Check if the process is still running
             if self.sbctl_process and self.sbctl_process.returncode is not None:
                 # Process exited before kubeconfig was created
@@ -425,15 +447,60 @@ class BundleManager:
             try:
                 logger.debug("Terminating sbctl process...")
                 self.sbctl_process.terminate()
-                await asyncio.wait_for(self.sbctl_process.wait(), timeout=5.0)
-                logger.debug("sbctl process terminated gracefully")
-            except (asyncio.TimeoutError, ProcessLookupError) as e:
-                logger.warning(f"Failed to terminate sbctl process gracefully: {str(e)}")
-                if self.sbctl_process:
-                    logger.debug("Killing sbctl process...")
-                    self.sbctl_process.kill()
-                    logger.debug("sbctl process killed")
+                try:
+                    await asyncio.wait_for(self.sbctl_process.wait(), timeout=3.0)
+                    logger.debug("sbctl process terminated gracefully")
+                except (asyncio.TimeoutError, ProcessLookupError) as e:
+                    logger.warning(f"Failed to terminate sbctl process gracefully: {str(e)}")
+                    if self.sbctl_process:
+                        try:
+                            logger.debug("Killing sbctl process...")
+                            self.sbctl_process.kill()
+                            logger.debug("sbctl process killed")
+                        except ProcessLookupError:
+                            logger.debug("Process already gone when trying to kill")
+            except Exception as e:
+                logger.warning(f"Error during process termination: {str(e)}")
+                
+            # Always set to None regardless of success
             self.sbctl_process = None
+            
+            # Check for any lingering mock_sbctl.pid file in the output directory
+            # This helps us clean up in case the signal handling didn't work
+            if self.active_bundle and self.active_bundle.path.exists():
+                pid_file = self.active_bundle.path / "mock_sbctl.pid"
+                if pid_file.exists():
+                    try:
+                        with open(pid_file, "r") as f:
+                            pid = int(f.read().strip())
+                        
+                        # Try to kill the process if it exists
+                        try:
+                            logger.debug(f"Killing leftover process with PID {pid}")
+                            os.kill(pid, signal.SIGTERM)
+                            # Wait briefly for termination
+                            await asyncio.sleep(0.5)
+                            try:
+                                # Check if process is gone
+                                os.kill(pid, 0)
+                                # If we get here, process still exists, try SIGKILL
+                                logger.debug(f"Process {pid} still exists, sending SIGKILL")
+                                os.kill(pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                logger.debug(f"Process {pid} terminated successfully")
+                        except ProcessLookupError:
+                            logger.debug(f"Process {pid} not found")
+                        except PermissionError:
+                            logger.warning(f"Permission error trying to kill process {pid}")
+                            
+                        # Remove the PID file
+                        try:
+                            pid_file.unlink()
+                            logger.debug(f"Removed PID file: {pid_file}")
+                        except Exception as e:
+                            logger.warning(f"Failed to remove PID file: {e}")
+                    except Exception as e:
+                        logger.warning(f"Error handling leftover PID file: {e}")
 
     async def _cleanup_active_bundle(self) -> None:
         """
@@ -500,6 +567,200 @@ class BundleManager:
             The active bundle metadata, or None if no bundle is active
         """
         return self.active_bundle
+    
+    async def check_api_server_available(self) -> bool:
+        """
+        Check if the Kubernetes API server is available.
+        
+        Returns:
+            True if the API server is responding, False otherwise
+        """
+        # First check if sbctl process is running
+        if not self.sbctl_process or self.sbctl_process.returncode is not None:
+            logger.warning("sbctl process is not running")
+            return False
+        
+        # Check if we have a kubeconfig to extract the port from
+        port = 8080
+        if self.active_bundle and self.active_bundle.kubeconfig_path.exists():
+            try:
+                with open(self.active_bundle.kubeconfig_path, "r") as f:
+                    config = json.load(f)
+                if config.get("clusters") and len(config["clusters"]) > 0:
+                    server_url = config["clusters"][0]["cluster"].get("server", "")
+                    if ":" in server_url:
+                        # Extract port from URL like http://localhost:8091
+                        port = int(server_url.split(":")[-1])
+                        logger.debug(f"Extracted API server port from kubeconfig: {port}")
+            except (json.JSONDecodeError, KeyError, ValueError, IndexError) as e:
+                logger.warning(f"Failed to parse kubeconfig: {e}")
+            
+        # Also check the environment variable used by our mock for testing
+        env_port = os.environ.get("MOCK_K8S_API_PORT")
+        if env_port:
+            try:
+                port = int(env_port)
+                logger.debug(f"Using API server port from environment: {port}")
+            except ValueError:
+                pass
+            
+        # Try to connect to the API server using aiohttp
+        try:
+            url = f"http://localhost:{port}/api"
+            logger.debug(f"Checking API server at {url}")
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=2.0) as response:
+                    if response.status == 200:
+                        logger.debug(f"API server is available at {url}")
+                        return True
+                    else:
+                        logger.warning(f"API server returned status {response.status}")
+                        return False
+        except aiohttp.ClientError as e:
+            logger.warning(f"Failed to connect to API server: {str(e)}")
+            return False
+    
+    async def get_diagnostic_info(self) -> dict:
+        """
+        Get diagnostic information about the current bundle and sbctl.
+        
+        Returns:
+            A dictionary with diagnostic information
+        """
+        diagnostics = {
+            "sbctl_available": await self._check_sbctl_available(),
+            "sbctl_process_running": self.sbctl_process is not None and self.sbctl_process.returncode is None,
+            "api_server_available": await self.check_api_server_available(),
+            "bundle_initialized": self.active_bundle is not None and self.active_bundle.initialized,
+            "system_info": await self._get_system_info(),
+        }
+        
+        # Add active bundle info if available
+        if self.active_bundle:
+            diagnostics["active_bundle"] = {
+                "id": self.active_bundle.id,
+                "source": self.active_bundle.source,
+                "path": str(self.active_bundle.path),
+                "kubeconfig_exists": self.active_bundle.kubeconfig_path.exists(),
+                "kubeconfig_path": str(self.active_bundle.kubeconfig_path),
+            }
+            
+        # Add sbctl process info if available
+        if self.sbctl_process:
+            diagnostics["sbctl_process"] = {
+                "pid": self.sbctl_process.pid,
+                "returncode": self.sbctl_process.returncode,
+            }
+            
+        return diagnostics
+    
+    async def _check_sbctl_available(self) -> bool:
+        """
+        Check if sbctl is available in the current environment.
+        
+        Returns:
+            True if sbctl is available, False otherwise
+        """
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "which", "sbctl",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await proc.communicate()
+            
+            if proc.returncode == 0 and stdout:
+                logger.debug(f"sbctl found at: {stdout.decode().strip()}")
+                return True
+            else:
+                logger.warning("sbctl not found")
+                return False
+        except Exception as e:
+            logger.warning(f"Error checking sbctl availability: {str(e)}")
+            return False
+    
+    async def _get_system_info(self) -> dict:
+        """
+        Get system information.
+        
+        Returns:
+            A dictionary with system information
+        """
+        info = {}
+        
+        # Get the API port from environment or default
+        ports_to_check = [8080]  # Default port
+        
+        # Check for port in environment variable
+        env_port = os.environ.get("MOCK_K8S_API_PORT")
+        if env_port:
+            try:
+                ports_to_check.insert(0, int(env_port))  # Check this port first
+            except ValueError:
+                pass
+        
+        # If we have an active bundle with a kubeconfig, extract the port
+        if self.active_bundle and self.active_bundle.kubeconfig_path.exists():
+            try:
+                with open(self.active_bundle.kubeconfig_path, "r") as f:
+                    config = json.load(f)
+                if config.get("clusters") and len(config["clusters"]) > 0:
+                    server_url = config["clusters"][0]["cluster"].get("server", "")
+                    if ":" in server_url:
+                        port = int(server_url.split(":")[-1])
+                        if port not in ports_to_check:
+                            ports_to_check.insert(0, port)
+            except Exception:
+                pass
+        
+        # Check all possible ports
+        for port in ports_to_check:
+            info[f"port_{port}_checked"] = True
+            
+            # Check network connections on the port
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "netstat", "-tuln",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await proc.communicate()
+                
+                if proc.returncode == 0:
+                    netstat_output = stdout.decode()
+                    for line in netstat_output.splitlines():
+                        if f":{port}" in line:
+                            info[f"port_{port}_listening"] = True
+                            info[f"port_{port}_details"] = line.strip()
+                            break
+                    else:
+                        info[f"port_{port}_listening"] = False
+                else:
+                    info["netstat_error"] = stderr.decode()
+            except Exception as e:
+                info["netstat_error"] = str(e)
+                
+            # Try curl to test API server on this port
+            try:
+                url = f"http://localhost:{port}/api"
+                proc = await asyncio.create_subprocess_exec(
+                    "curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", url,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await proc.communicate()
+                
+                if proc.returncode == 0:
+                    info[f"curl_{port}_status_code"] = stdout.decode().strip()
+                else:
+                    info[f"curl_{port}_error"] = stderr.decode()
+            except Exception as e:
+                info[f"curl_{port}_error"] = str(e)
+        
+        # Add environment info
+        info["env_mock_k8s_api_port"] = os.environ.get("MOCK_K8S_API_PORT", "not set")
+        
+        return info
 
     async def cleanup(self) -> None:
         """
