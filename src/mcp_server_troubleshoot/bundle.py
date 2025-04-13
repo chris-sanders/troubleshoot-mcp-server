@@ -918,15 +918,51 @@ class BundleManager:
 
     async def _cleanup_active_bundle(self) -> None:
         """
-        Clean up the active bundle.
+        Clean up the active bundle including processes and extracted directories.
+        
+        This method:
+        1. Terminates the sbctl process first (if running)
+        2. Removes extracted bundle directories
+        3. Resets the active bundle reference
         """
         if self.active_bundle:
             logger.info(f"Cleaning up active bundle: {self.active_bundle.id}")
 
-            # Stop the sbctl process if it's running
+            # 1. Stop the sbctl process if it's running
             await self._terminate_sbctl_process()
 
-            # Reset the active bundle
+            # 2. Remove extracted bundle directories
+            try:
+                if self.active_bundle.path and self.active_bundle.path.exists():
+                    # Get the bundle path before resetting active_bundle reference
+                    bundle_path = self.active_bundle.path
+                    logger.info(f"Removing extracted bundle directory: {bundle_path}")
+
+                    # Create a list of paths we should not delete (containing parent directories)
+                    protected_paths = [
+                        self.bundle_dir,                  # Main bundle directory
+                        Path(self.bundle_dir).parent,     # Parent of bundle directory
+                    ]
+
+                    # Only remove if it's not a protected path and exists
+                    if bundle_path.exists() and bundle_path not in protected_paths:
+                        # Check if this is inside our bundle directory (additional protection)
+                        if str(bundle_path).startswith(str(self.bundle_dir)):
+                            try:
+                                import shutil
+                                shutil.rmtree(bundle_path)
+                                logger.info(f"Successfully removed bundle directory: {bundle_path}")
+                            except PermissionError as e:
+                                logger.warning(f"Permission error removing bundle directory: {e}")
+                            except OSError as e:
+                                logger.warning(f"OS error removing bundle directory: {e}")
+                        else:
+                            logger.warning(f"Not removing bundle directory outside bundle_dir: {bundle_path}")
+            except Exception as e:
+                logger.error(f"Error cleaning up bundle directory: {e}")
+                # Continue with cleanup even if directory removal fails
+
+            # 3. Reset the active bundle
             self.active_bundle = None
 
     def _generate_bundle_id(self, source: str) -> str:
@@ -1531,16 +1567,54 @@ class BundleManager:
 
     async def cleanup(self) -> None:
         """
-        Clean up all resources.
-
-        This should be called when shutting down the server.
+        Clean up all resources when shutting down the server.
+        
+        This method performs a complete cleanup sequence:
+        1. Terminates the active bundle and its processes
+        2. Removes extracted bundle directories
+        3. Removes the temporary bundle directory if created by this instance
+        
+        This should be called when shutting down the server to ensure proper resource
+        management and prevent orphaned files/processes.
         """
+        logger.info("Performing complete cleanup during server shutdown")
+
+        # 1. Clean up the active bundle (processes and directories)
         await self._cleanup_active_bundle()
 
-        # Remove temporary directory if it was created by us
+        # 2. Clean up any orphaned sbctl processes that might still be running
+        if CLEANUP_ORPHANED:
+            try:
+                # Use pkill as a final safety measure to ensure no sbctl processes remain
+                import subprocess
+                try:
+                    logger.info("Checking for any remaining sbctl processes")
+                    ps_cmd = ["ps", "-ef"]
+                    ps_result = subprocess.run(ps_cmd, capture_output=True, text=True)
+
+                    if ps_result.returncode == 0:
+                        sbctl_processes = [line for line in ps_result.stdout.splitlines() if "sbctl" in line]
+                        if sbctl_processes:
+                            logger.warning(f"Found {len(sbctl_processes)} sbctl processes still running during shutdown")
+                            # Try to terminate them
+                            kill_cmd = ["pkill", "-f", "sbctl"]
+                            kill_result = subprocess.run(kill_cmd, capture_output=True, text=True)
+                            if kill_result.returncode not in (0, 1):  # 1 means no processes found
+                                logger.warning(f"pkill returned non-zero exit code: {kill_result.returncode}")
+                        else:
+                            logger.info("No sbctl processes found during shutdown")
+                except Exception as process_err:
+                    logger.warning(f"Error checking for orphaned processes during shutdown: {process_err}")
+            except Exception as e:
+                logger.warning(f"Error during extended process cleanup: {e}")
+
+        # 3. Remove temporary directory if it was created by us
         if self.bundle_dir and str(self.bundle_dir).startswith(tempfile.gettempdir()):
             try:
+                logger.info(f"Removing temporary bundle directory: {self.bundle_dir}")
                 shutil.rmtree(self.bundle_dir)
-                logger.info(f"Removed temporary bundle directory: {self.bundle_dir}")
+                logger.info(f"Successfully removed temporary bundle directory: {self.bundle_dir}")
             except Exception as e:
                 logger.error(f"Failed to remove temporary bundle directory: {str(e)}")
+
+        logger.info("Cleanup completed")

@@ -2,9 +2,12 @@
 MCP server implementation for Kubernetes support bundles.
 """
 
+import asyncio
 import datetime
 import json
 import logging
+import signal
+import sys
 from pathlib import Path
 from typing import List, Optional
 
@@ -29,6 +32,9 @@ mcp = FastMCP("troubleshoot-mcp-server")
 _bundle_manager = None
 _kubectl_executor = None
 _file_explorer = None
+
+# Flag to track if we're shutting down
+_is_shutting_down = False
 
 
 def get_bundle_manager(bundle_dir: Optional[Path] = None) -> BundleManager:
@@ -172,7 +178,7 @@ async def list_available_bundles(args: ListAvailableBundlesArgs) -> List[TextCon
 
         # Create structured JSON response for MCP clients
         bundle_list = []
-        
+
         for bundle in bundles:
             # Format human-readable size
             size_str = ""
@@ -189,7 +195,7 @@ async def list_available_bundles(args: ListAvailableBundlesArgs) -> List[TextCon
             modified_time_str = datetime.datetime.fromtimestamp(bundle.modified_time).strftime(
                 "%Y-%m-%d %H:%M:%S"
             )
-            
+
             # Add bundle entry
             bundle_entry = {
                 "name": bundle.name,
@@ -201,24 +207,24 @@ async def list_available_bundles(args: ListAvailableBundlesArgs) -> List[TextCon
                 "modified": modified_time_str,
                 "valid": bundle.valid,
             }
-            
+
             if not bundle.valid and bundle.validation_message:
                 bundle_entry["validation_message"] = bundle.validation_message
-                
+
             bundle_list.append(bundle_entry)
-            
+
         # Create response object
         response_obj = {
             "bundles": bundle_list,
             "total": len(bundle_list)
         }
-        
+
         # Get example bundle for usage instructions
         example_bundle = next((b for b in bundles if b.valid), bundles[0] if bundles else None)
-        
+
         # Create response text with JSON result and usage instructions
         response = f"```json\n{json.dumps(response_obj, indent=2)}\n```\n\n"
-        
+
         if example_bundle:
             response += "## Usage Instructions\n\n"
             response += "To use one of these bundles, initialize it with the `initialize_bundle` tool using the `source` value:\n\n"
@@ -583,3 +589,115 @@ def initialize_with_bundle_dir(bundle_dir: Optional[Path] = None) -> None:
         bundle_dir: The directory to use for bundle storage
     """
     get_bundle_manager(bundle_dir)
+
+
+# Signal handling and shutdown functionality
+
+async def cleanup_resources() -> None:
+    """
+    Clean up all resources when the server is shutting down.
+    
+    This function:
+    1. Sets the global shutdown flag to prevent new operations
+    2. Cleans up the bundle manager resources
+    """
+    global _is_shutting_down
+
+    if _is_shutting_down:
+        logger.info("Cleanup already in progress, skipping duplicate request")
+        return
+
+    _is_shutting_down = True
+    logger.info("Server shutdown initiated, cleaning up resources...")
+
+    # Clean up the bundle manager if it exists
+    if _bundle_manager:
+        try:
+            logger.info("Cleaning up bundle manager resources")
+            await _bundle_manager.cleanup()
+        except Exception as e:
+            logger.error(f"Error during bundle manager cleanup: {e}")
+
+    logger.info("Server shutdown cleanup completed")
+
+
+def register_signal_handlers() -> None:
+    """
+    Register signal handlers for graceful shutdown.
+    
+    This function sets up handlers for common termination signals to ensure
+    proper cleanup of resources when the server is stopped.
+    """
+    try:
+        # New API since Python 3.10 to get the running loop
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # Fallback for when there is no running loop yet
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    def signal_handler(sig_name: str):
+        """Create a signal handler that triggers cleanup."""
+        def handler():
+            logger.info(f"Received {sig_name}, initiating graceful shutdown")
+            if not loop.is_closed():
+                # Schedule the cleanup task
+                asyncio.create_task(cleanup_resources())
+
+                # Give cleanup time to execute, then stop the event loop
+                loop.call_later(1.0, loop.stop)
+        return handler
+
+    # Register handlers for typical termination signals
+    if sys.platform != "win32":  # POSIX signals
+        for sig_name, sig_num in (
+            ("SIGINT", signal.SIGINT),   # Keyboard interrupt (Ctrl+C)
+            ("SIGTERM", signal.SIGTERM), # Termination signal (kill)
+        ):
+            try:
+                loop.add_signal_handler(sig_num, signal_handler(sig_name))
+                logger.debug(f"Registered {sig_name} handler for graceful shutdown")
+            except (NotImplementedError, RuntimeError) as e:
+                logger.warning(f"Failed to add signal handler for {sig_name}: {e}")
+    else:  # Windows
+        # Windows doesn't support all POSIX signals, so we only use SIGINT
+        try:
+            loop.add_signal_handler(signal.SIGINT, signal_handler("SIGINT"))
+            logger.debug("Registered SIGINT handler for graceful shutdown on Windows")
+        except (NotImplementedError, RuntimeError) as e:
+            logger.warning(f"Failed to add signal handler for SIGINT: {e}")
+
+
+# Register signal handlers when this module is imported
+try:
+    register_signal_handlers()
+    logger.info("Registered signal handlers for graceful shutdown")
+except Exception as e:
+    logger.warning(f"Failed to register signal handlers: {e}")
+
+
+# Cleanup function to call from __main__ or other shutdown points
+def shutdown() -> None:
+    """
+    Trigger the cleanup process synchronously.
+    
+    This function can be called directly to initiate the shutdown sequence from
+    non-async contexts like __main__.
+    """
+    try:
+        # Try to get the running loop
+        loop = asyncio.get_running_loop()
+        if not loop.is_closed():
+            # We're in an async context, create a task
+            asyncio.create_task(cleanup_resources())
+    except RuntimeError:
+        # No running loop, create one
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            # Run the cleanup task
+            loop.run_until_complete(cleanup_resources())
+        except Exception as e:
+            logger.error(f"Error during shutdown cleanup: {e}")
+        finally:
+            loop.close()
