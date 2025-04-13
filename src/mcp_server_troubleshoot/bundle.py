@@ -235,7 +235,8 @@ class BundleManager:
                                 safe_members.append(member)
                                 
                             # Extract with the sanitized member list
-                            tar.extractall(path=extract_dir, members=safe_members)
+                            # Use filter='data' to only extract file data without modifying metadata
+                            tar.extractall(path=extract_dir, members=safe_members, filter='data')
                         
                         # List extracted files and verify extraction was successful
                         file_count = 0
@@ -1132,6 +1133,11 @@ class BundleManager:
         Returns:
             True if sbctl is available, False otherwise
         """
+        # If we're in test mode with USE_MOCK_SBCTL, assume it's available
+        if os.environ.get("USE_MOCK_SBCTL", "").lower() in ("true", "1", "yes"):
+            logger.info("Using mock sbctl for testing")
+            return True
+            
         try:
             proc = await asyncio.create_subprocess_exec(
                 "which", "sbctl",

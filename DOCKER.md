@@ -8,7 +8,7 @@ You can build the Docker container using the provided build script:
 
 ```bash
 # Navigate to the project directory
-cd mcp-server-troubleshoot
+cd troubleshoot-mcp-server
 
 # Run the build script
 ./scripts/build.sh
