@@ -33,3 +33,6 @@ ENV/
 *.swp
 *.swo
 .DS_Store
+
+# Testing files
+./mcp-server-troubleshoot/tests/fixtures

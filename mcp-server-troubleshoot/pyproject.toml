@@ -13,7 +13,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "mcp",
+    "mcp>=0.5.0",  # Required for FastMCP
     "pydantic>=2.0.0",
     "aiohttp",
 ]
@@ -25,6 +25,12 @@ dev = [
     "ruff",
     "mypy",
 ]
+yaml = [
+    "pyyaml>=6.0",  # Optional for better kubeconfig parsing
+]
+all = [
+    "pyyaml>=6.0", 
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -34,6 +40,9 @@ mcp_server_troubleshoot = ["py.typed"]
 
 [project.scripts]
 mcp-server-troubleshoot = "mcp_server_troubleshoot.__main__:main"
+
+[project.entry-points.console_scripts]
+mcp-server-troubleshoot-serve = "mcp_server_troubleshoot.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

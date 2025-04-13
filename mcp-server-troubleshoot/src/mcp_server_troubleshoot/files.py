@@ -286,6 +286,30 @@ class FileExplorer:
         bundle = self.bundle_manager.get_active_bundle()
         if bundle is None:
             raise FileSystemError("No bundle is active")
+            
+        # Check if we should use the extracted directory for file operations
+        extract_dir = bundle.path / "extracted"
+        if extract_dir.exists() and extract_dir.is_dir():
+            # Check if there are actual files in the extracted directory
+            support_bundle_dirs = list(extract_dir.glob("support-bundle-*"))
+            
+            # First check for support-bundle-* directories
+            if support_bundle_dirs:
+                support_bundle_dir = support_bundle_dirs[0]  # Use the first one found
+                if support_bundle_dir.exists() and support_bundle_dir.is_dir():
+                    logger.debug(f"Using extracted bundle subdirectory: {support_bundle_dir}")
+                    return support_bundle_dir
+            
+            # If no support-bundle-* directory, check if the extracted directory itself has files
+            any_files = False
+            for _ in extract_dir.glob("*"):
+                any_files = True
+                break
+                
+            if any_files:
+                logger.debug(f"Using extracted bundle directory: {extract_dir}")
+                return extract_dir
+                
         return bundle.path
 
     def _normalize_path(self, path: str) -> Path:
@@ -582,31 +606,6 @@ class FileExplorer:
             if not full_path.exists():
                 raise PathNotFoundError(f"Path not found: {path}")
 
-            if not full_path.is_dir():
-                # If the path is a file, use it directly
-                files_to_search = [full_path]
-            else:
-                # Otherwise, search for matching files
-                files_to_search = []
-
-                for root, _, files in os.walk(full_path):
-                    # If not recursive, skip subdirectories
-                    if not recursive and root != str(full_path):
-                        continue
-
-                    for filename in files:
-                        file_path = Path(root) / filename
-
-                        # Skip binary files
-                        if self._is_binary(file_path):
-                            continue
-
-                        # If a glob pattern is provided, check if the file matches
-                        if glob_pattern and not fnmatch.fnmatch(filename, glob_pattern):
-                            continue
-
-                        files_to_search.append(file_path)
-
             # Compile the pattern
             try:
                 if case_sensitive:
@@ -616,11 +615,74 @@ class FileExplorer:
             except re.error as e:
                 raise SearchError(f"Invalid regular expression: {str(e)}")
 
-            # Search the files
+            # Initialize results tracking
             matches = []
             total_matches = 0
             truncated = False
+            files_to_search = []
+            file_paths_with_matching_names = []
 
+            if not full_path.is_dir():
+                # If the path is a file, use it directly
+                files_to_search = [full_path]
+                
+                # Check if the filename matches the pattern
+                filename = full_path.name
+                if regex.search(filename):
+                    file_paths_with_matching_names.append(full_path)
+            else:
+                # Otherwise, walk the directory to find matching files
+                for root, dirs, files in os.walk(full_path):
+                    # If not recursive, skip subdirectories
+                    if not recursive and root != str(full_path):
+                        continue
+
+                    for filename in files:
+                        file_path = Path(root) / filename
+
+                        # Check if the filename matches the pattern
+                        if regex.search(filename):
+                            file_paths_with_matching_names.append(file_path)
+
+                        # Skip binary files for content search
+                        if self._is_binary(file_path):
+                            continue
+
+                        # If a glob pattern is provided, check if the file matches
+                        if glob_pattern and not fnmatch.fnmatch(filename, glob_pattern):
+                            continue
+
+                        files_to_search.append(file_path)
+
+            # First add matches from filenames
+            for file_path in file_paths_with_matching_names:
+                # Skip if we've hit the max results
+                if total_matches >= max_results:
+                    truncated = True
+                    break
+
+                rel_path = str(file_path.relative_to(bundle_path))
+                filename = file_path.name
+                
+                # Find all matches of the pattern in the filename
+                for match in regex.finditer(filename):
+                    matches.append(
+                        GrepMatch(
+                            path=rel_path,
+                            line_number=0,  # Use 0 for filename matches
+                            line=f"File: {filename}",
+                            match=match.group(0),
+                            offset=match.start(),
+                        )
+                    )
+                    total_matches += 1
+                    
+                    # Stop if we've hit the max results
+                    if total_matches >= max_results:
+                        truncated = True
+                        break
+
+            # Now search file contents
             for file_path in files_to_search:
                 # Skip if we've hit the max results
                 if total_matches >= max_results:

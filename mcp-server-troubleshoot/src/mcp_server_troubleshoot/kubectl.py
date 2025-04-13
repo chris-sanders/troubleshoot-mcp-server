@@ -162,6 +162,8 @@ class KubectlExecutor:
         Raises:
             KubectlError: If the command fails
         """
+
+        # Normal execution for non-test mode
         # Format the command
         if json_output and not re.search(r"\s+-o\s+(\S+)", command):
             command = f"{command} -o json"

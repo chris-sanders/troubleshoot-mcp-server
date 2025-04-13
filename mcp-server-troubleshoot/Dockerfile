@@ -17,8 +17,9 @@ WORKDIR /app
 # Copy project files
 COPY . .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -e .
+# Install Python dependencies including optional ones
+RUN pip install --no-cache-dir -e ".[all]" && \
+    pip install --no-cache-dir -e ".[all]"
 
 # Second stage for runtime
 FROM python:3.11-slim
@@ -27,13 +28,18 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
-    PATH="/usr/local/bin:${PATH}"
+    PATH="/usr/local/bin:${PATH}" \
+    MAX_INITIALIZATION_TIMEOUT=180 \
+    MAX_DOWNLOAD_TIMEOUT=120 \
+    SBCTL_CLEANUP_ORPHANED=true \
+    SBCTL_ALLOW_ALTERNATIVE_KUBECONFIG=true
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     apt-transport-https \
     gnupg \
+    file \
     && rm -rf /var/lib/apt/lists/*
 
 # Install kubectl
@@ -44,11 +50,15 @@ RUN curl -LO "https://dl.k8s.io/release/stable.txt" && \
     mv kubectl /usr/local/bin/ && \
     rm stable.txt
 
-# Install sbctl (using direct binary download)
-ARG SBCTL_VERSION=0.17.1
-RUN mkdir -p /usr/local/bin && \
-    curl -L "https://github.com/replicatedhq/sbctl/releases/download/v${SBCTL_VERSION}/sbctl_linux_amd64" -o /usr/local/bin/sbctl && \
-    chmod +x /usr/local/bin/sbctl
+# Install the real sbctl binary - AMD64 version for standard container usage
+RUN mkdir -p /tmp/sbctl && cd /tmp/sbctl && \
+    curl -L -o sbctl.tar.gz "https://github.com/replicatedhq/sbctl/releases/latest/download/sbctl_linux_amd64.tar.gz" && \
+    tar xzf sbctl.tar.gz && \
+    chmod +x sbctl && \
+    mv sbctl /usr/local/bin/ && \
+    cd / && \
+    rm -rf /tmp/sbctl && \
+    sbctl --help
 
 # Create data directory for bundles
 RUN mkdir -p /data/bundles
@@ -67,6 +77,7 @@ RUN useradd -m mcp-user && \
 
 USER mcp-user
 
-# Command to run
-ENTRYPOINT ["python", "-m", "mcp_server_troubleshoot"]
-CMD []
+# Command to run - use ENTRYPOINT + CMD pattern for flexibility
+# This allows overriding the command while keeping the entrypoint
+ENTRYPOINT ["python"]
+CMD ["-m", "mcp_server_troubleshoot"]

@@ -1,14 +1,12 @@
 """
-Entry point for the MCP server.
-This comment was added to test Docker cache invalidation.
+CLI entry points for the MCP server.
 """
 
-import argparse
 import logging
-import os
 import sys
 from pathlib import Path
-from typing import List, Optional
+import argparse
+import os
 
 from .server import mcp, initialize_with_bundle_dir
 
@@ -53,60 +51,44 @@ def setup_logging(verbose: bool = False, mcp_mode: bool = False) -> None:
             handler.stream = sys.stderr
 
 
-def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
-    """
-    Parse command line arguments.
-
-    Args:
-        args: Command line arguments (defaults to sys.argv[1:])
-
-    Returns:
-        Parsed arguments
-    """
+def parse_args():
+    """Parse command-line arguments for the MCP server."""
     parser = argparse.ArgumentParser(description="MCP server for Kubernetes support bundles")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
-    parser.add_argument("--bundle-dir", type=str, help="Directory to store support bundles")
-    return parser.parse_args(args)
+    parser.add_argument("--bundle-dir", type=Path, help="Directory to store bundles")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
+
+    return parser.parse_args()
 
 
-def main(args: Optional[List[str]] = None) -> None:
+def main():
     """
-    Main entry point for the application.
-
-    Args:
-        args: Command line arguments (defaults to sys.argv[1:])
+    Main entry point that adapts based on how it's called.
+    This allows the module to be used both as a direct CLI and
+    as an MCP server that responds to JSON-RPC over stdio.
     """
-    parsed_args = parse_args(args)
+    args = parse_args()
 
-    # Detect if we're running in MCP mode (stdin is not a terminal)
+    # Set up logging based on whether we're in MCP mode
     mcp_mode = not sys.stdin.isatty()
+    setup_logging(verbose=args.verbose, mcp_mode=mcp_mode)
 
-    # Set up logging
-    setup_logging(parsed_args.verbose, mcp_mode)
-
-    # Log startup information
+    # Log information about startup
     if not mcp_mode:
         logger.info("Starting MCP server for Kubernetes support bundles")
     else:
         logger.debug("Starting MCP server for Kubernetes support bundles")
 
-    # Process bundle directory
-    bundle_dir = None
-    if parsed_args.bundle_dir:
-        bundle_dir = Path(parsed_args.bundle_dir)
-        bundle_dir.mkdir(parents=True, exist_ok=True)
-    else:
-        # Check environment variables
+    # Use the specified bundle directory or the default from environment
+    bundle_dir = args.bundle_dir
+    if not bundle_dir:
         env_bundle_dir = os.environ.get("MCP_BUNDLE_STORAGE")
         if env_bundle_dir:
             bundle_dir = Path(env_bundle_dir)
-            bundle_dir.mkdir(parents=True, exist_ok=True)
 
-        # If still no bundle directory, use the default /data/bundles in container
-        elif os.path.exists("/data/bundles"):
-            bundle_dir = Path("/data/bundles")
+    # If still no bundle directory, use the default /data/bundles in container
+    if not bundle_dir and os.path.exists("/data/bundles"):
+        bundle_dir = Path("/data/bundles")
 
-    # Log bundle directory info
     if bundle_dir:
         if not mcp_mode:
             logger.info(f"Using bundle directory: {bundle_dir}")
@@ -120,11 +102,12 @@ def main(args: Optional[List[str]] = None) -> None:
     try:
         mcp.run()
     except KeyboardInterrupt:
-        logger.info("Server stopped by user")
+        logger.info("Server interrupted, shutting down")
     except Exception as e:
-        logger.exception(f"Error running server: {e}")
+        logger.exception(f"Unexpected error: {e}")
         sys.exit(1)
 
 
+# Entry point when run as a module
 if __name__ == "__main__":
     main()
