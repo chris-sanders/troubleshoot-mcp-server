@@ -6,7 +6,7 @@ import datetime
 import json
 import logging
 from pathlib import Path
-from typing import List, Optional, cast
+from typing import List, Optional
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import TextContent
@@ -170,15 +170,11 @@ async def list_available_bundles(args: ListAvailableBundlesArgs) -> List[TextCon
                 )
             ]
 
-        # Format the response
-        response = f"Found {len(bundles)} support bundle{'s' if len(bundles) != 1 else ''}:\n\n"
-
-        # Add formatted table of bundles
-        response += "| Name | Size | Modified | Valid | Path |\n"
-        response += "|------|------|----------|-------|------|\n"
-
+        # Create structured JSON response for MCP clients
+        bundle_list = []
+        
         for bundle in bundles:
-            # Format size (convert bytes to KB/MB/GB)
+            # Format human-readable size
             size_str = ""
             if bundle.size_bytes < 1024:
                 size_str = f"{bundle.size_bytes} B"
@@ -189,31 +185,45 @@ async def list_available_bundles(args: ListAvailableBundlesArgs) -> List[TextCon
             else:
                 size_str = f"{bundle.size_bytes / (1024 * 1024 * 1024):.1f} GB"
 
-            # Format modification time
-            modified_time = datetime.datetime.fromtimestamp(bundle.modified_time).strftime(
+            # Format modification time for human readability
+            modified_time_str = datetime.datetime.fromtimestamp(bundle.modified_time).strftime(
                 "%Y-%m-%d %H:%M:%S"
             )
-
-            # Format valid status
-            valid_str = "✓" if bundle.valid else "✗"
+            
+            # Add bundle entry
+            bundle_entry = {
+                "name": bundle.name,
+                "source": bundle.relative_path,  # Use relative path for initializing
+                "full_path": bundle.path,
+                "size_bytes": bundle.size_bytes,
+                "size": size_str,
+                "modified_time": bundle.modified_time,
+                "modified": modified_time_str,
+                "valid": bundle.valid,
+            }
+            
             if not bundle.valid and bundle.validation_message:
-                valid_str += f" ({bundle.validation_message})"
-
-            # Add row to table
-            response += f"| {bundle.name} | {size_str} | {modified_time} | {valid_str} | `{bundle.path}` |\n"
-
-        # Add instructions for using the bundles
-        response += "\n## Usage Instructions\n\n"
-        response += "To use one of these bundles, initialize it with the `initialize_bundle` tool using its path:\n\n"
-        response += '```json\n{\n  "source": "<bundle-path>"\n}\n```\n\n'
-        response += "For example:\n\n"
-
-        # Use the first valid bundle as an example, or just the first bundle if none are valid
+                bundle_entry["validation_message"] = bundle.validation_message
+                
+            bundle_list.append(bundle_entry)
+            
+        # Create response object
+        response_obj = {
+            "bundles": bundle_list,
+            "total": len(bundle_list)
+        }
+        
+        # Get example bundle for usage instructions
         example_bundle = next((b for b in bundles if b.valid), bundles[0] if bundles else None)
+        
+        # Create response text with JSON result and usage instructions
+        response = f"```json\n{json.dumps(response_obj, indent=2)}\n```\n\n"
+        
         if example_bundle:
-            response += f'```json\n{{\n  "source": "{example_bundle.path}"\n}}\n```\n\n'
-
-        response += "After initializing a bundle, you can explore its contents using the file exploration tools (`list_files`, `read_file`, `grep_files`) and run kubectl commands with the `kubectl` tool."
+            response += "## Usage Instructions\n\n"
+            response += "To use one of these bundles, initialize it with the `initialize_bundle` tool using the `source` value:\n\n"
+            response += '```json\n{\n  "source": "' + example_bundle.relative_path + '"\n}\n```\n\n'
+            response += "After initializing a bundle, you can explore its contents using the file exploration tools (`list_files`, `read_file`, `grep_files`) and run kubectl commands with the `kubectl` tool."
 
         return [TextContent(type="text", text=response)]
 

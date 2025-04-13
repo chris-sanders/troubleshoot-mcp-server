@@ -149,7 +149,8 @@ class BundleFileInfo(BaseModel):
     Information about an available support bundle file.
     """
 
-    path: str = Field(description="The path to the bundle file")
+    path: str = Field(description="The full path to the bundle file")
+    relative_path: str = Field(description="The relative path without bundle directory prefix")
     name: str = Field(description="The name of the bundle file")
     size_bytes: int = Field(description="The size of the bundle file in bytes")
     modified_time: float = Field(
@@ -1395,8 +1396,11 @@ class BundleManager:
                     continue
 
                 # Create the bundle info
+                # Store both the full path and the relative path (without bundle_dir prefix)
+                relative_path = file_path.name
                 bundle_info = BundleFileInfo(
                     path=str(file_path),
+                    relative_path=relative_path,
                     name=file_path.name,
                     size_bytes=stat_result.st_size,
                     modified_time=stat_result.st_mtime,
@@ -1414,6 +1418,7 @@ class BundleManager:
                         bundles.append(
                             BundleFileInfo(
                                 path=str(file_path),
+                                relative_path=file_path.name,
                                 name=file_path.name,
                                 size_bytes=file_path.stat().st_size if file_path.exists() else 0,
                                 modified_time=(
@@ -1428,6 +1433,7 @@ class BundleManager:
                         bundles.append(
                             BundleFileInfo(
                                 path=str(file_path),
+                                relative_path=file_path.name,
                                 name=file_path.name,
                                 size_bytes=0,
                                 modified_time=0,

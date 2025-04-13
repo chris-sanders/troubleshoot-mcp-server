@@ -76,6 +76,7 @@ async def test_list_available_bundles_valid_bundle(temp_bundle_dir, mock_valid_b
     assert len(bundles) == 1
     assert bundles[0].name == "valid_bundle.tar.gz"
     assert bundles[0].path == str(mock_valid_bundle)
+    assert bundles[0].relative_path == "valid_bundle.tar.gz"  # Check relative path
     assert bundles[0].valid is True
     assert bundles[0].validation_message is None
 
@@ -94,6 +95,7 @@ async def test_list_available_bundles_invalid_bundle(temp_bundle_dir, mock_inval
     assert len(bundles) == 1
     assert bundles[0].name == "invalid_bundle.tar.gz"
     assert bundles[0].path == str(mock_invalid_bundle)
+    assert bundles[0].relative_path == "invalid_bundle.tar.gz"  # Check relative path
     assert bundles[0].valid is False
     assert bundles[0].validation_message is not None
 
