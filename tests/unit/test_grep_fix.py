@@ -4,6 +4,7 @@ Test script to verify the grep_files function fix.
 """
 
 import pytest
+import pytest_asyncio
 
 # Mark all tests in this file as unit tests
 pytestmark = pytest.mark.unit
@@ -19,6 +20,7 @@ from mcp_server_troubleshoot.files import FileExplorer
 from unittest.mock import Mock
 
 
+@pytest.mark.asyncio
 async def test_grep_files_with_kubeconfig():
     """Test the grep_files function with the 'kubeconfig' pattern."""
     # Create a temporary test directory

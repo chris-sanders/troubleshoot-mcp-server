@@ -6,6 +6,7 @@ This script directly tests the key components without relying on the MCP protoco
 """
 
 import pytest
+import pytest_asyncio
 
 # Mark all tests in this file as unit tests
 pytestmark = pytest.mark.unit
@@ -31,6 +32,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 TEST_BUNDLE = FIXTURES_DIR / "support-bundle-2025-04-11T14_05_31.tar.gz"
 
 
+@pytest.mark.asyncio
 async def test_bundle_initialization():
     """Test bundle initialization."""
     from mcp_server_troubleshoot.bundle import BundleManager
@@ -135,6 +137,7 @@ python "{mock_kubectl_path}" "$@"
             os.environ["PATH"] = old_path
 
 
+@pytest.mark.asyncio
 async def test_kubectl():
     """Test kubectl command execution."""
     from mcp_server_troubleshoot.bundle import BundleManager
@@ -308,6 +311,7 @@ python "{mock_kubectl_path}" "$@"
             os.environ["PATH"] = old_path
 
 
+@pytest.mark.asyncio
 async def test_file_explorer():
     """Test file explorer functionality."""
     from mcp_server_troubleshoot.bundle import BundleManager

@@ -4,6 +4,7 @@ Test script to verify bundle path resolution behavior.
 """
 
 import pytest
+import pytest_asyncio
 
 # Mark all tests in this file as unit tests
 pytestmark = pytest.mark.unit
@@ -19,6 +20,7 @@ from mcp_server_troubleshoot.bundle import BundleManager, BundleMetadata
 from mcp_server_troubleshoot.files import FileExplorer
 
 
+@pytest.mark.asyncio
 async def test_bundle_path_resolution():
     """Test that the file explorer correctly resolves paths within the bundle."""
     # Create a temporary test directory
