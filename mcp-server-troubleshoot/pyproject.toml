@@ -25,6 +25,12 @@ dev = [
     "ruff",
     "mypy",
 ]
+yaml = [
+    "pyyaml>=6.0",  # Optional for better kubeconfig parsing
+]
+all = [
+    "pyyaml>=6.0", 
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

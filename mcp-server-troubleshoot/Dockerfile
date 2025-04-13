@@ -17,9 +17,9 @@ WORKDIR /app
 # Copy project files
 COPY . .
 
-# Install Python dependencies and make sure entry points are installed
-RUN pip install --no-cache-dir -e . && \
-    pip install --no-cache-dir -e .
+# Install Python dependencies including optional ones
+RUN pip install --no-cache-dir -e ".[all]" && \
+    pip install --no-cache-dir -e ".[all]"
 
 # Second stage for runtime
 FROM python:3.11-slim
@@ -28,7 +28,11 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
-    PATH="/usr/local/bin:${PATH}"
+    PATH="/usr/local/bin:${PATH}" \
+    MAX_INITIALIZATION_TIMEOUT=180 \
+    MAX_DOWNLOAD_TIMEOUT=120 \
+    SBCTL_CLEANUP_ORPHANED=true \
+    SBCTL_ALLOW_ALTERNATIVE_KUBECONFIG=true
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \

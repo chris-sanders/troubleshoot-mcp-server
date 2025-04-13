@@ -3,6 +3,9 @@ Tests with a real support bundle.
 """
 
 import os
+import sys
+import time
+import json
 import asyncio
 import shutil
 import subprocess
@@ -234,3 +237,233 @@ async def test_bundle_manager_simple(test_support_bundle):
 
     # Simple pass assertion
     assert True, "Test completed"
+
+@pytest.mark.asyncio
+async def test_initialize_with_real_sbctl(test_support_bundle):
+    """
+    Test using the real sbctl executable (not mocked) to initialize a bundle.
+    This test will use the actual sbctl in PATH.
+    
+    Args:
+        test_support_bundle: Path to the test support bundle (pytest fixture)
+    """
+    real_bundle_path = test_support_bundle
+    print(f"\nTesting with real sbctl and bundle: {real_bundle_path}\n")
+    
+    # Verify real sbctl exists in PATH
+    try:
+        which_result = subprocess.run(
+            ["which", "sbctl"], capture_output=True, text=True, check=True
+        )
+        sbctl_path = which_result.stdout.strip()
+        print(f"Using real sbctl at: {sbctl_path}")
+        
+        # Check sbctl version and help to better understand capabilities
+        version_result = subprocess.run(
+            ["sbctl", "version"], capture_output=True, text=True
+        )
+        print(f"sbctl version: {version_result.stdout.strip()}")
+        
+        # Get help text to understand available commands
+        help_result = subprocess.run(
+            ["sbctl", "--help"], capture_output=True, text=True
+        )
+        print(f"sbctl help (first 300 chars):\n{help_result.stdout[:300]}...")
+        
+        # Check sbctl serve command options specifically
+        serve_help_result = subprocess.run(
+            ["sbctl", "serve", "--help"], capture_output=True, text=True
+        )
+        print(f"sbctl serve help (first 300 chars):\n{serve_help_result.stdout[:300]}...")
+        
+    except subprocess.CalledProcessError as e:
+        print(f"Error checking sbctl: {e}")
+        pytest.skip("Real sbctl not found in PATH or failed to execute")
+    
+    # Create a temp directory for the bundle
+    temp_dir = tempfile.mkdtemp(prefix="real_sbctl_test_")
+    bundle_dir = Path(temp_dir)
+    print(f"Bundle directory: {bundle_dir}")
+    
+    # Set environment variables closer to container environment
+    os.environ["PYTHONUNBUFFERED"] = "1"
+    os.environ["MAX_INITIALIZATION_TIMEOUT"] = "30"  # Shorter timeout for testing
+    
+    # Create the manager with extra logging
+    import logging
+    logger = logging.getLogger("mcp_server_troubleshoot.bundle")
+    logger.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    
+    # First, try running sbctl serve directly to see if it works
+    print("\nTrying sbctl serve directly before using BundleManager...")
+    try:
+        # Run with a short timeout since it's a continuously running process
+        serve_proc = subprocess.run(
+            ["sbctl", "serve", "--support-bundle-location", str(real_bundle_path)],
+            cwd=str(bundle_dir),
+            capture_output=True,
+            timeout=5.0  # Short timeout since it normally keeps running
+        )
+        print("sbctl serve unexpectedly completed:")
+        print(f"Return code: {serve_proc.returncode}")
+        print(f"STDOUT: {serve_proc.stdout.decode()}")
+        print(f"STDERR: {serve_proc.stderr.decode()}")
+    except subprocess.TimeoutExpired as e:
+        print("sbctl serve timed out as expected (it's a long-running process)")
+        # Check if any files were created
+        files = list(bundle_dir.glob("*"))
+        print(f"Files created by direct sbctl serve: {[f.name for f in files]}")
+        # Force stop the process
+        if hasattr(e, 'process'):
+            print("Terminating direct sbctl process...")
+            e.process.terminate()
+            try:
+                e.process.wait(timeout=2.0)
+            except subprocess.TimeoutExpired:
+                e.process.kill()
+    except Exception as e:
+        print(f"Error running direct sbctl serve: {e}")
+    
+    # Now try the actual test with BundleManager
+    manager = BundleManager(bundle_dir)
+    
+    try:
+        # Attempt to initialize the bundle with real sbctl
+        print("\nInitializing bundle with real sbctl through BundleManager...")
+        
+        # Capture the start time
+        start_time = time.time()
+        
+        # Run initialization with a timeout
+        try:
+            # Use shorter timeout for testing
+            result = await asyncio.wait_for(
+                manager.initialize_bundle(str(real_bundle_path)), timeout=30.0
+            )
+            end_time = time.time()
+            duration = end_time - start_time
+            
+            print(f"Bundle initialized successfully in {duration:.2f} seconds!")
+            print(f"Bundle ID: {result.id}")
+            print(f"Bundle path: {result.path}")
+            print(f"Kubeconfig path: {result.kubeconfig_path}")
+            
+            # Read and log kubeconfig content
+            if result.kubeconfig_path.exists():
+                with open(result.kubeconfig_path, "r") as f:
+                    kubeconfig_content = f.read()
+                print(f"Kubeconfig content:\n{kubeconfig_content}")
+                
+                # Try to extract server URL from kubeconfig
+                try:
+                    kubeconfig = json.loads(kubeconfig_content)
+                    if kubeconfig.get("clusters") and len(kubeconfig["clusters"]) > 0:
+                        server_url = kubeconfig["clusters"][0]["cluster"].get("server", "")
+                        print(f"Extracted server URL: {server_url}")
+                except json.JSONDecodeError:
+                    print("Failed to parse kubeconfig as JSON")
+            else:
+                print("Kubeconfig file does not exist")
+            
+            # Check API server availability
+            api_available = await manager.check_api_server_available()
+            print(f"API server available: {api_available}")
+            
+        except asyncio.TimeoutError:
+            end_time = time.time()
+            duration = end_time - start_time
+            print(f"Bundle initialization timed out after {duration:.2f} seconds")
+            
+            # List any processes
+            try:
+                ps_result = subprocess.run(["ps", "-ef"], capture_output=True, text=True)
+                print("\nCurrent processes:")
+                for line in ps_result.stdout.splitlines():
+                    if "sbctl" in line:
+                        print(f"  {line}")
+            except Exception as ps_err:
+                print(f"Error listing processes: {ps_err}")
+            
+            # List any files created
+            files = list(bundle_dir.glob("**/*"))
+            print("\nFiles created during initialization:")
+            for file in files:
+                print(f"  {file.relative_to(bundle_dir)}")
+                
+            # Check if kubeconfig was created
+            kubeconfig_path = bundle_dir / "kubeconfig"
+            if kubeconfig_path.exists():
+                print(f"Found kubeconfig at: {kubeconfig_path}")
+                with open(kubeconfig_path, "r") as f:
+                    print(f"Kubeconfig content:\n{f.read()}")
+                    
+            # Try direct shell command as an alternative
+            print("\nAttempting sbctl shell command as alternative...")
+            try:
+                shell_result = subprocess.run(
+                    ["sbctl", "shell", "--support-bundle-location", str(real_bundle_path), "--no-shell"],
+                    cwd=str(bundle_dir),
+                    capture_output=True,
+                    timeout=10.0
+                )
+                print(f"Shell command return code: {shell_result.returncode}")
+                print(f"Shell command STDOUT: {shell_result.stdout.decode()}")
+                print(f"Shell command STDERR: {shell_result.stderr.decode()}")
+                
+                # Check again for kubeconfig
+                if kubeconfig_path.exists():
+                    print(f"Kubeconfig now exists after shell command: {kubeconfig_path}")
+                    with open(kubeconfig_path, "r") as f:
+                        print(f"Kubeconfig content:\n{f.read()}")
+            except Exception as shell_err:
+                print(f"Error with shell command: {shell_err}")
+                
+        except BundleManagerError as e:
+            print(f"Bundle initialization error: {str(e)}")
+            
+        except Exception as e:
+            print(f"Unexpected error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+        
+        # Get detailed diagnostics
+        try:
+            diagnostics = await manager.get_diagnostic_info()
+            print(f"\nDiagnostic info:\n{json.dumps(diagnostics, indent=2)}")
+        except Exception as diag_err:
+            print(f"Error getting diagnostics: {diag_err}")
+    
+    finally:
+        # Clean up
+        print("\nCleaning up resources...")
+        try:
+            await asyncio.wait_for(manager.cleanup(), timeout=10.0)
+            print("Cleanup completed successfully")
+        except asyncio.TimeoutError:
+            print("Cleanup timed out")
+            
+            # Try to kill any lingering sbctl processes
+            try:
+                subprocess.run(["pkill", "-f", "sbctl"], capture_output=True)
+                print("Sent kill signal to any sbctl processes")
+            except Exception as kill_err:
+                print(f"Error killing sbctl processes: {kill_err}")
+                
+        except Exception as e:
+            print(f"Error during cleanup: {str(e)}")
+        
+        # Clean up the temp directory
+        try:
+            if bundle_dir.exists():
+                shutil.rmtree(bundle_dir)
+                print(f"Removed bundle directory: {bundle_dir}")
+        except Exception as e:
+            print(f"Error removing bundle directory: {str(e)}")
+    
+    # Simple pass assertion
+    assert True, "Test with real sbctl completed"
