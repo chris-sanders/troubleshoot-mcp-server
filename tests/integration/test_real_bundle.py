@@ -168,95 +168,62 @@ def test_sbctl_direct(test_support_bundle):
 
 
 @pytest.mark.asyncio
-async def test_bundle_manager_simple(test_support_bundle, clean_asyncio):
+async def test_bundle_lifecycle(test_support_bundle, clean_asyncio):
     """
-    Simple test of the bundle manager with a real support bundle.
-    This test just prints results to stdout.
-
+    Test the complete lifecycle of a bundle with proper resource management.
+    This test verifies the functional behavior:
+    1. Bundle can be initialized from a local file
+    2. Initialized bundle has the expected properties
+    3. Resources are properly cleaned up after use
+    
     Args:
         test_support_bundle: Path to the test support bundle (pytest fixture)
         clean_asyncio: Fixture that ensures proper asyncio cleanup
     """
-    # Use a high-level context manager to handle resources
-    import contextlib
-    import gc
-    
+    # Arrange: Set up our test environment
     real_bundle_path = test_support_bundle
-
-    print(f"\nTesting BundleManager with real bundle: {real_bundle_path}\n")
-
-    # Create a temp directory for the bundle
-    temp_dir = tempfile.mkdtemp(prefix="bundle_test_")
-    bundle_dir = Path(temp_dir)
-    print(f"Bundle directory: {bundle_dir}")
-
-    # Create the manager
-    manager = BundleManager(bundle_dir)
-
-    try:
-        # Attempt to initialize the bundle
-        print("Initializing bundle, this might take a while...")
-
-        # Use a shorter timeout to avoid long hangs
-        try:
-            with contextlib.closing(asyncio.get_event_loop()) as loop:
-                result = await asyncio.wait_for(
-                    manager.initialize_bundle(str(real_bundle_path)), timeout=15.0
-                )
-                print("Bundle initialized successfully!")
-                print(f"Bundle ID: {result.id}")
-                print(f"Bundle path: {result.path}")
-                print(f"Kubeconfig path: {result.kubeconfig_path}")
-                print(f"Kubeconfig exists: {result.kubeconfig_path.exists()}")
-                print(f"Initialized: {result.initialized}")
-
-        except asyncio.TimeoutError:
-            print("Bundle initialization timed out after 15 seconds")
-
-            # List any files created
-            files = list(bundle_dir.glob("**/*"))
-            print("\nFiles created during initialization:")
-            for file in files:
-                print(f"  {file.relative_to(bundle_dir)}")
-
-        except BundleManagerError as e:
-            print(f"Bundle initialization error: {str(e)}")
-
-        except Exception as e:
-            print(f"Unexpected error: {str(e)}")
-
-    finally:
-        # Clean up
-        print("\nCleaning up resources...")
-        try:
-            await asyncio.wait_for(manager.cleanup(), timeout=5.0)
-            print("Cleanup completed successfully")
-        except asyncio.TimeoutError:
-            print("Cleanup timed out")
-            
-            # Try to force cleanup of any remaining processes
-            try:
-                subprocess.run(["pkill", "-f", "sbctl"], capture_output=True)
-                print("Sent kill signal to any sbctl processes")
-            except:
-                pass
-                
-        except Exception as e:
-            print(f"Error during cleanup: {str(e)}")
-
-        # Clean up the temp directory
-        try:
-            if bundle_dir.exists():
-                shutil.rmtree(bundle_dir)
-                print(f"Removed bundle directory: {bundle_dir}")
-        except Exception as e:
-            print(f"Error removing bundle directory: {str(e)}")
+    
+    # Create a temp directory that will be cleaned up automatically
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
         
-        # Force garbage collection to clean up any resources
-        gc.collect()
-
-    # Simple pass assertion
-    assert True, "Test completed"
+        try:
+            # Act: Initialize the bundle
+            result = await asyncio.wait_for(
+                manager.initialize_bundle(str(real_bundle_path)),
+                timeout=30.0
+            )
+            
+            # Assert: Verify functional behavior (not implementation details)
+            assert result.initialized, "Bundle should be marked as initialized"
+            assert result.kubeconfig_path.exists(), "Kubeconfig file should exist"
+            assert result.path.exists(), "Bundle directory should exist"
+            
+            # Verify the bundle can be retrieved by the public API
+            active_bundle = manager.get_active_bundle()
+            assert active_bundle is not None, "Active bundle should be available"
+            assert active_bundle.id == result.id, "Active bundle should match initialized bundle"
+            
+            # Verify API server functionality (behavior, not implementation)
+            api_available = await manager.check_api_server_available()
+            # We don't assert this is always True since it depends on the test environment,
+            # but we verify the method runs without error
+            
+            # Test that re-initialization without force returns the same bundle
+            second_result = await manager.initialize_bundle(str(real_bundle_path), force=False)
+            assert second_result.id == result.id, "Re-initialization without force should return the same bundle"
+            
+            # Test that force re-initialization creates a new bundle
+            force_result = await manager.initialize_bundle(str(real_bundle_path), force=True)
+            assert force_result.initialized, "Force reinitialization should succeed"
+            
+        finally:
+            # Clean up: Ensure resources are released 
+            await manager.cleanup()
+            
+            # Verify cleanup worked - the active bundle should be reset
+            assert manager.get_active_bundle() is None, "Active bundle should be cleared after cleanup"
 
 @pytest.mark.asyncio
 async def test_list_files_from_extracted_bundle(test_support_bundle, clean_asyncio):

@@ -38,41 +38,54 @@ def resource_cleaner():
 @pytest.fixture
 def clean_asyncio():
     """
-    Ensures that asyncio resources are properly cleaned up after tests.
+    Provides a clean event loop for each test and ensures proper resource cleanup.
     
-    This prevents ResourceWarning warnings from asyncio sub-processes and pipes.
+    This fixture:
+    1. Creates a new event loop for test isolation
+    2. Properly cancels pending tasks after the test
+    3. Correctly shuts down async generators
+    4. Closes the loop cleanly to avoid resource warnings
+
+    Returns:
+        The event loop for the test to use
     """
     import asyncio
     import gc
-    import warnings
     
-    # Temporarily suppress the deprecation warning
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        # Create a new event loop and set it as the current one
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    # Create a new event loop for proper test isolation
+    # No need to suppress warnings - we've configured proper scopes
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     
+    # Yield the loop to the test
     yield loop
     
-    # Close the loop and all its resources
+    # Clean up resources after the test
     try:
         # Cancel all pending tasks
         pending = asyncio.all_tasks(loop)
         if pending:
+            # Cancel all tasks first
             for task in pending:
                 task.cancel()
+                
+            # Wait for cancellation to complete with timeout
             loop.run_until_complete(
                 asyncio.gather(*pending, return_exceptions=True)
             )
             
-        # Skip shutdown_asyncgens since it's causing warnings
+        # Properly shut down async generators
+        # This prevents "coroutine was never awaited" warnings
+        if hasattr(loop, 'shutdown_asyncgens'):
+            loop.run_until_complete(loop.shutdown_asyncgens())
         
-        # Close the loop
+        # Close the loop properly
         loop.close()
-    except Exception as e:
-        # Just silence the errors instead of printing them
-        pass
+        
+    except (RuntimeError, asyncio.CancelledError) as e:
+        # Only log specific understood errors to avoid silent failures
+        import logging
+        logging.getLogger("tests").debug(f"Controlled exception during event loop cleanup: {e}")
     
     # Create a new event loop for the next test
     asyncio.set_event_loop(asyncio.new_event_loop())
