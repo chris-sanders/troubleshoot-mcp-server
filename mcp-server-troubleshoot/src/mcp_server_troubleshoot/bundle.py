@@ -192,6 +192,64 @@ class BundleManager:
             # Initialize the bundle with sbctl
             kubeconfig_path = await self._initialize_with_sbctl(bundle_path, bundle_output_dir)
 
+            # Debug: List all files in the bundle directory to diagnose file listing issues
+            try:
+                logger.info(f"Listing files in bundle directory: {bundle_output_dir}")
+                # First count files recursively
+                file_count = 0
+                dir_count = 0
+                for root, dirs, files in os.walk(bundle_output_dir):
+                    dir_count += len(dirs)
+                    file_count += len(files)
+                    
+                logger.info(f"Bundle directory contains {file_count} files and {dir_count} directories")
+                
+                # List top-level entries
+                top_entries = list(bundle_output_dir.glob("*"))
+                logger.info(f"Top-level entries in bundle directory: {[e.name for e in top_entries]}")
+                
+                # Also check if extracted_dir exists or needs to be created
+                extract_dir = bundle_output_dir / "extracted"
+                if not extract_dir.exists():
+                    logger.info(f"Creating extract directory: {extract_dir}")
+                    extract_dir.mkdir(exist_ok=True)
+                    
+                    # Extract the bundle if it's a tarfile - ensure support bundle extraction succeeds
+                    # Support bundles often have complex structures, so we need to handle them properly
+                    if str(bundle_path).endswith((".tar.gz", ".tgz")):
+                        import tarfile
+                        logger.info(f"Extracting bundle to: {extract_dir}")
+                        with tarfile.open(bundle_path, "r:gz") as tar:
+                            # First list the files to get a count
+                            members = tar.getmembers()
+                            logger.info(f"Support bundle contains {len(members)} entries")
+                            
+                            # Extract all files
+                            from pathlib import PurePath
+                            safe_members = []
+                            for member in members:
+                                # Make path safe by removing absolute paths and parent dir traversal
+                                if member.name.startswith(('/','../')):
+                                    # Remove leading slashes and parent directory traversal
+                                    member.name = PurePath(member.name).name
+                                safe_members.append(member)
+                                
+                            # Extract with the sanitized member list
+                            tar.extractall(path=extract_dir, members=safe_members)
+                        
+                        # List extracted files and verify extraction was successful
+                        file_count = 0
+                        dir_count = 0
+                        for root, dirs, files in os.walk(extract_dir):
+                            dir_count += len(dirs)
+                            file_count += len(files)
+                        
+                        extracted_files = list(extract_dir.glob("*"))
+                        logger.info(f"Extracted {len(extracted_files)} top-level entries to {extract_dir}")
+                        logger.info(f"Extracted bundle contains {file_count} files and {dir_count} directories")
+            except Exception as list_err:
+                logger.warning(f"Error while listing bundle files: {list_err}")
+            
             # Create and store bundle metadata
             metadata = BundleMetadata(
                 id=bundle_id,

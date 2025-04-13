@@ -286,6 +286,20 @@ class FileExplorer:
         bundle = self.bundle_manager.get_active_bundle()
         if bundle is None:
             raise FileSystemError("No bundle is active")
+            
+        # Check if we should use the extracted directory for file operations
+        extract_dir = bundle.path / "extracted"
+        if extract_dir.exists() and extract_dir.is_dir():
+            # Check if there are actual files in the extracted directory
+            any_files = False
+            for _ in extract_dir.glob("*"):
+                any_files = True
+                break
+                
+            if any_files:
+                logger.debug(f"Using extracted bundle directory: {extract_dir}")
+                return extract_dir
+                
         return bundle.path
 
     def _normalize_path(self, path: str) -> Path:

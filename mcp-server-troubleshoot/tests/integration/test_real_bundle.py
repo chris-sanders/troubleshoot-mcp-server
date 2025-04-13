@@ -239,6 +239,74 @@ async def test_bundle_manager_simple(test_support_bundle):
     assert True, "Test completed"
 
 @pytest.mark.asyncio
+async def test_list_files_from_extracted_bundle(test_support_bundle):
+    """
+    Test listing files from an extracted support bundle.
+    This test verifies that files can be listed from the extracted bundle directory.
+    
+    Args:
+        test_support_bundle: Path to the test support bundle (pytest fixture)
+    """
+    from mcp_server_troubleshoot.bundle import BundleManager
+    from mcp_server_troubleshoot.files import FileExplorer
+    
+    real_bundle_path = test_support_bundle
+    
+    # Create a temp directory for the bundle
+    temp_dir = tempfile.mkdtemp(prefix="bundle_explorer_test_")
+    bundle_dir = Path(temp_dir)
+    print(f"Bundle directory: {bundle_dir}")
+    
+    # Create the bundle manager
+    manager = BundleManager(bundle_dir)
+    
+    try:
+        # Initialize the bundle
+        result = await asyncio.wait_for(
+            manager.initialize_bundle(str(real_bundle_path)), timeout=30.0
+        )
+        
+        # Verify the bundle was initialized
+        assert result.initialized
+        assert result.kubeconfig_path.exists()
+        
+        # Try listing files
+        explorer = FileExplorer(manager)
+        
+        # First list top-level directories
+        file_list = await explorer.list_files("", False)
+        print(f"Top-level file listing: {[e.name for e in file_list.entries]}")
+        print(f"Total files: {file_list.total_files}, Total dirs: {file_list.total_dirs}")
+        
+        # There should be at least the kubeconfig file and the extracted directory
+        assert file_list.total_files + file_list.total_dirs >= 2
+        
+        # Now list the extracted directory
+        extract_list = await explorer.list_files("extracted", False)
+        print(f"Extracted directory contents: {[e.name for e in extract_list.entries]}")
+        print(f"Extracted total files: {extract_list.total_files}, Total dirs: {extract_list.total_dirs}")
+        
+        # There should be at least a few files or directories in the extracted folder
+        assert extract_list.total_files + extract_list.total_dirs > 0
+        
+        # Try reading a file to verify content access
+        if extract_list.total_files > 0:
+            # Find the first file to read
+            first_file = next((e.path for e in extract_list.entries if e.type == "file"), None)
+            if first_file:
+                file_content = await explorer.read_file(first_file)
+                print(f"Read file {first_file}: content length = {len(file_content.content)}")
+                assert len(file_content.content) > 0
+            
+    finally:
+        # Clean up
+        await manager.cleanup()
+        if bundle_dir.exists():
+            import shutil
+            shutil.rmtree(bundle_dir)
+            print(f"Removed bundle directory: {bundle_dir}")
+
+@pytest.mark.asyncio
 async def test_initialize_with_real_sbctl(test_support_bundle):
     """
     Test using the real sbctl executable (not mocked) to initialize a bundle.
