@@ -45,60 +45,7 @@ See the [Docker documentation](../mcp-server-troubleshoot/DOCKER.md) for more de
 
 To use the Docker container with MCP clients like Claude or other AI models, add it to your client's configuration.
 
-You can get the recommended configuration by running:
-
-```bash
-docker run --rm mcp-server-troubleshoot:latest --show-config
-```
-
-This will output a configuration like:
-
-```json
-{
-  "mcpServers": {
-    "troubleshoot": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-v", 
-        "${HOME}/bundles:/data/bundles",
-        "-e",
-        "SBCTL_TOKEN=${SBCTL_TOKEN}",
-        "-e",
-        "MCP_BUNDLE_STORAGE=/data/bundles",
-        "mcp-server-troubleshoot:latest"
-      ]
-    }
-  }
-}
-```
-
-This configuration assumes:
-
-1. You have the `SBCTL_TOKEN` environment variable set in your environment
-2. You want to store bundles in `${HOME}/bundles` on your host machine
-3. You're using Docker as your container runtime
-
-Replace `${HOME}/bundles` with the actual path to your bundles directory if needed.
-
-For convenience, you can also use the provided run.sh script:
-
-```json
-{
-  "mcpServers": {
-    "troubleshoot": {
-      "command": "/path/to/scripts/run.sh",
-      "env": {
-        "SBCTL_TOKEN": "${SBCTL_TOKEN}"
-      }
-    }
-  }
-}
-```
-
-These configurations allow AI models to interact with Kubernetes support bundles through the MCP protocol.
+See the [Docker documentation](../DOCKER.md#configuration-with-mcp-clients) for detailed MCP client configuration instructions.
 
 ### Manual Installation
 

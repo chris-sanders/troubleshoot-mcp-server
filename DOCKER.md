@@ -94,7 +94,7 @@ These tests:
 
 To use the Docker container with MCP clients (such as Claude or other AI models), add the server configuration to your client's settings.
 
-### Recommended Configuration
+### MCP Client Configuration
 
 You can get the recommended configuration by running:
 
@@ -133,23 +133,6 @@ This configuration assumes:
 3. You're using Docker as your container runtime
 
 Replace `${HOME}/bundles` with the actual path to your bundles directory if needed.
-
-### Using the run.sh Script
-
-For convenience, you can also use the provided run.sh script:
-
-```json
-{
-  "mcpServers": {
-    "troubleshoot": {
-      "command": "/path/to/scripts/run.sh",
-      "env": {
-        "SBCTL_TOKEN": "${SBCTL_TOKEN}"
-      }
-    }
-  }
-}
-```
 
 ## Usage Examples
 
