@@ -184,7 +184,21 @@ def handle_signal(signum: int, frame: Any) -> None:
     sig_name = signal.Signals(signum).name
     logger.info(f"Received signal {sig_name} ({signum}). Initiating shutdown...")
 
-    # Exit the process, which will trigger context manager cleanup
+    # Import locally to avoid circular imports
+    from .server import shutdown
+
+    try:
+        # Try direct shutdown call before exiting
+        logger.info("Calling explicit shutdown from signal handler")
+        shutdown()
+        logger.info("Explicit shutdown completed")
+    except Exception as e:
+        logger.error(f"Error during explicit shutdown: {e}")
+
+    # Wait a moment to allow logs to flush
+    time.sleep(0.5)
+
+    # Exit the process, which will trigger context manager cleanup as backup
     sys.exit(0)
 
 

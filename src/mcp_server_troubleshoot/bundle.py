@@ -938,11 +938,28 @@ class BundleManager:
                     bundle_path = self.active_bundle.path
                     logger.info(f"Removing extracted bundle directory: {bundle_path}")
 
+                    # Log directory details
+                    try:
+                        dir_stats = os.stat(bundle_path)
+                        logger.info(
+                            f"Bundle directory stats - permissions: {oct(dir_stats.st_mode)}, "
+                            f"owner: {dir_stats.st_uid}, group: {dir_stats.st_gid}"
+                        )
+
+                        # List directory contents
+                        import glob
+
+                        files = glob.glob(f"{bundle_path}/**", recursive=True)
+                        logger.info(f"Found {len(files)} items in bundle directory")
+                    except Exception as list_err:
+                        logger.warning(f"Error getting bundle directory details: {list_err}")
+
                     # Create a list of paths we should not delete (containing parent directories)
                     protected_paths = [
                         self.bundle_dir,  # Main bundle directory
                         Path(self.bundle_dir).parent,  # Parent of bundle directory
                     ]
+                    logger.info(f"Protected paths: {protected_paths}")
 
                     # Only remove if it's not a protected path and exists
                     if bundle_path.exists() and bundle_path not in protected_paths:
@@ -951,18 +968,51 @@ class BundleManager:
                             try:
                                 import shutil
 
+                                logger.info(f"Starting shutil.rmtree on bundle path: {bundle_path}")
                                 shutil.rmtree(bundle_path)
-                                logger.info(f"Successfully removed bundle directory: {bundle_path}")
+                                logger.info(
+                                    f"shutil.rmtree completed, checking if path still exists"
+                                )
+
+                                if os.path.exists(bundle_path):
+                                    logger.error(
+                                        f"Bundle directory still exists after rmtree: {bundle_path}"
+                                    )
+                                else:
+                                    logger.info(
+                                        f"Successfully removed bundle directory: {bundle_path}"
+                                    )
                             except PermissionError as e:
-                                logger.warning(f"Permission error removing bundle directory: {e}")
+                                logger.error(f"Permission error removing bundle directory: {e}")
+                                logger.error(
+                                    f"Error details: {str(e)}, file: {getattr(e, 'filename', 'unknown')}"
+                                )
                             except OSError as e:
-                                logger.warning(f"OS error removing bundle directory: {e}")
+                                logger.error(f"OS error removing bundle directory: {e}")
+                                logger.error(
+                                    f"Error type: {type(e).__name__}, errno: {getattr(e, 'errno', 'N/A')}"
+                                )
                         else:
                             logger.warning(
                                 f"Not removing bundle directory outside bundle_dir: {bundle_path}"
                             )
+                    else:
+                        if bundle_path in protected_paths:
+                            logger.warning(
+                                f"Bundle path {bundle_path} is a protected path, not removing"
+                            )
+                        if not bundle_path.exists():
+                            logger.warning(f"Bundle path {bundle_path} no longer exists")
+                else:
+                    if not self.active_bundle.path:
+                        logger.warning("Active bundle path is None")
+                    elif not self.active_bundle.path.exists():
+                        logger.warning(
+                            f"Active bundle path does not exist: {self.active_bundle.path}"
+                        )
             except Exception as e:
                 logger.error(f"Error cleaning up bundle directory: {e}")
+                logger.error(f"Exception type: {type(e).__name__}, details: {str(e)}")
                 # Continue with cleanup even if directory removal fails
 
             # 3. Reset the active bundle
