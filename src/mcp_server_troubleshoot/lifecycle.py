@@ -195,6 +195,11 @@ def setup_signal_handlers() -> None:
     This ensures that when the container receives termination signals,
     we properly clean up all resources.
     """
+    # Don't register signal handlers during test runs to avoid interfering with test processes
+    if "PYTEST_CURRENT_TEST" in os.environ:
+        logger.debug("Running in pytest, skipping signal handler registration")
+        return
+        
     try:
         # Register handlers for typical termination signals
         for sig_name, sig_num in (
