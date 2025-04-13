@@ -33,7 +33,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     MAX_DOWNLOAD_TIMEOUT=120 \
     SBCTL_CLEANUP_ORPHANED=true \
     SBCTL_ALLOW_ALTERNATIVE_KUBECONFIG=true \
-    MCP_BUNDLE_STORAGE=/data/bundles
+    MCP_BUNDLE_STORAGE=/data/bundles \
+    MCP_LOG_LEVEL=INFO \
+    ENABLE_PERIODIC_CLEANUP=true \
+    CLEANUP_INTERVAL=3600
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \

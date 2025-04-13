@@ -2,6 +2,7 @@
 CLI entry points for the MCP server.
 """
 
+import atexit
 import json
 import logging
 import sys
@@ -9,8 +10,9 @@ from pathlib import Path
 import argparse
 import os
 
-from .server import mcp, initialize_with_bundle_dir
+from .server import mcp, shutdown
 from .config import get_recommended_client_config
+from .lifecycle import setup_signal_handlers
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +65,22 @@ def parse_args():
         action="store_true",
         help="Show recommended MCP client configuration",
     )
+    parser.add_argument(
+        "--use-stdio",
+        action="store_true",
+        help="Use stdio mode for communication (instead of detecting from tty)",
+    )
+    parser.add_argument(
+        "--enable-periodic-cleanup",
+        action="store_true",
+        help="Enable periodic cleanup of bundle resources",
+    )
+    parser.add_argument(
+        "--cleanup-interval",
+        type=int,
+        default=3600,
+        help="Interval in seconds for periodic cleanup (default: 3600)",
+    )
 
     return parser.parse_args()
 
@@ -87,15 +105,18 @@ def main():
         handle_show_config()
         return  # This should never be reached as handle_show_config exits
 
+    # Determine if we're in stdio mode
+    # Use explicit flag or detect from terminal
+    mcp_mode = args.use_stdio or not sys.stdin.isatty()
+
     # Set up logging based on whether we're in MCP mode
-    mcp_mode = not sys.stdin.isatty()
     setup_logging(verbose=args.verbose, mcp_mode=mcp_mode)
 
     # Log information about startup
     if not mcp_mode:
         logger.info("Starting MCP server for Kubernetes support bundles")
     else:
-        logger.debug("Starting MCP server for Kubernetes support bundles")
+        logger.debug("Starting MCP server for Kubernetes support bundles (stdio mode)")
 
     # Use the specified bundle directory or the default from environment
     bundle_dir = args.bundle_dir
@@ -114,16 +135,34 @@ def main():
         else:
             logger.debug(f"Using bundle directory: {bundle_dir}")
 
-    # Initialize bundle manager with the bundle directory
-    initialize_with_bundle_dir(bundle_dir)
+    # Configure the MCP server for stdio mode if needed
+    if mcp_mode:
+        logger.debug("Configuring MCP server for stdio mode")
+        mcp.use_stdio = True
+        # Set up signal handlers specifically for stdio mode
+        setup_signal_handlers()
+
+    # Register shutdown handler for cleanup
+    logger.debug("Registering atexit shutdown handler")
+    atexit.register(shutdown)
+
+    # Set environment variables for lifecycle parameters
+    if args.enable_periodic_cleanup:
+        os.environ["ENABLE_PERIODIC_CLEANUP"] = "true"
+        os.environ["CLEANUP_INTERVAL"] = str(args.cleanup_interval)
 
     # Run the FastMCP server - this handles stdin/stdout automatically
     try:
+        logger.debug("Starting FastMCP server")
         mcp.run()
     except KeyboardInterrupt:
         logger.info("Server interrupted, shutting down")
+        # Explicitly call shutdown here to handle Ctrl+C case
+        shutdown()
     except Exception as e:
         logger.exception(f"Unexpected error: {e}")
+        # Ensure cleanup on error exit
+        shutdown()
         sys.exit(1)
 
 

@@ -22,41 +22,82 @@ from .bundle import (
 )
 from .kubectl import KubectlError, KubectlExecutor, KubectlCommandArgs
 from .files import FileExplorer, FileSystemError, GrepFilesArgs, ListFilesArgs, ReadFileArgs
+from .lifecycle import app_lifespan, AppContext
 
 logger = logging.getLogger(__name__)
 
-# Create FastMCP server
-mcp = FastMCP("troubleshoot-mcp-server")
-
-# Global instances for managers/executors
-_bundle_manager = None
-_kubectl_executor = None
-_file_explorer = None
+# Create FastMCP server with lifecycle management
+# We don't enable stdio mode here - it will be configured in __main__.py
+mcp = FastMCP("troubleshoot-mcp-server", lifespan=app_lifespan)
 
 # Flag to track if we're shutting down
 _is_shutting_down = False
 
+# Global app context for legacy function compatibility
+_app_context = None
+
+
+def set_app_context(context: AppContext) -> None:
+    """Set the global app context for legacy function compatibility."""
+    global _app_context
+    _app_context = context
+
+
+def get_app_context() -> Optional[AppContext]:
+    """Get the global app context."""
+    return _app_context
+
 
 def get_bundle_manager(bundle_dir: Optional[Path] = None) -> BundleManager:
-    """Get the bundle manager instance."""
+    """
+    Get the bundle manager instance.
+
+    In the lifecycle context version, this returns the bundle manager from the context.
+    In the legacy version, this creates a new bundle manager if needed.
+    """
+    # First try to get from app context
+    if _app_context is not None:
+        return _app_context.bundle_manager
+
+    # Legacy fallback - create a new instance
     global _bundle_manager
-    if _bundle_manager is None:
+    if "_bundle_manager" not in globals() or _bundle_manager is None:
         _bundle_manager = BundleManager(bundle_dir)
     return _bundle_manager
 
 
 def get_kubectl_executor() -> KubectlExecutor:
-    """Get the kubectl executor instance."""
+    """
+    Get the kubectl executor instance.
+
+    In the lifecycle context version, this returns the executor from the context.
+    In the legacy version, this creates a new executor if needed.
+    """
+    # First try to get from app context
+    if _app_context is not None:
+        return _app_context.kubectl_executor
+
+    # Legacy fallback - create a new instance
     global _kubectl_executor
-    if _kubectl_executor is None:
+    if "_kubectl_executor" not in globals() or _kubectl_executor is None:
         _kubectl_executor = KubectlExecutor(get_bundle_manager())
     return _kubectl_executor
 
 
 def get_file_explorer() -> FileExplorer:
-    """Get the file explorer instance."""
+    """
+    Get the file explorer instance.
+
+    In the lifecycle context version, this returns the explorer from the context.
+    In the legacy version, this creates a new explorer if needed.
+    """
+    # First try to get from app context
+    if _app_context is not None:
+        return _app_context.file_explorer
+
+    # Legacy fallback - create a new instance
     global _file_explorer
-    if _file_explorer is None:
+    if "_file_explorer" not in globals() or _file_explorer is None:
         _file_explorer = FileExplorer(get_bundle_manager())
     return _file_explorer
 
@@ -214,10 +255,7 @@ async def list_available_bundles(args: ListAvailableBundlesArgs) -> List[TextCon
             bundle_list.append(bundle_entry)
 
         # Create response object
-        response_obj = {
-            "bundles": bundle_list,
-            "total": len(bundle_list)
-        }
+        response_obj = {"bundles": bundle_list, "total": len(bundle_list)}
 
         # Get example bundle for usage instructions
         example_bundle = next((b for b in bundles if b.valid), bundles[0] if bundles else None)
@@ -585,21 +623,35 @@ def initialize_with_bundle_dir(bundle_dir: Optional[Path] = None) -> None:
     """
     Initialize the bundle manager with a specific directory.
 
+    This function is used for backwards compatibility. In the new lifecycle context
+    pattern, the bundle manager is automatically initialized with the directory
+    during lifespan startup.
+
     Args:
         bundle_dir: The directory to use for bundle storage
     """
-    get_bundle_manager(bundle_dir)
+    # Note: This is now a no-op for the lifecycle context
+    # The actual initialization happens in the lifespan context
+    # We keep this for backwards compatibility
+    if get_app_context() is None:
+        # Only initialize directly if not using the lifecycle context
+        get_bundle_manager(bundle_dir)
 
 
 # Signal handling and shutdown functionality
 
+
 async def cleanup_resources() -> None:
     """
     Clean up all resources when the server is shutting down.
-    
+
     This function:
     1. Sets the global shutdown flag to prevent new operations
     2. Cleans up the bundle manager resources
+
+    Note: Most cleanup is now handled by the lifespan context manager,
+    but this function remains for compatibility and explicit cleanup
+    when the server is shut down manually.
     """
     global _is_shutting_down
 
@@ -610,11 +662,20 @@ async def cleanup_resources() -> None:
     _is_shutting_down = True
     logger.info("Server shutdown initiated, cleaning up resources...")
 
-    # Clean up the bundle manager if it exists
-    if _bundle_manager:
+    # Most cleanup is now handled by the lifespan context,
+    # but we still clean up the bundle manager here for additional safety
+    app_context = get_app_context()
+    if app_context and hasattr(app_context, "bundle_manager"):
         try:
             logger.info("Cleaning up bundle manager resources")
-            await _bundle_manager.cleanup()
+            await app_context.bundle_manager.cleanup()
+        except Exception as e:
+            logger.error(f"Error during bundle manager cleanup: {e}")
+    # Fallback for legacy mode
+    elif "_bundle_manager" in globals() and globals()["_bundle_manager"]:
+        try:
+            logger.info("Cleaning up bundle manager resources (legacy mode)")
+            await globals()["_bundle_manager"].cleanup()
         except Exception as e:
             logger.error(f"Error during bundle manager cleanup: {e}")
 
@@ -624,7 +685,7 @@ async def cleanup_resources() -> None:
 def register_signal_handlers() -> None:
     """
     Register signal handlers for graceful shutdown.
-    
+
     This function sets up handlers for common termination signals to ensure
     proper cleanup of resources when the server is stopped.
     """
@@ -638,6 +699,7 @@ def register_signal_handlers() -> None:
 
     def signal_handler(sig_name: str):
         """Create a signal handler that triggers cleanup."""
+
         def handler():
             logger.info(f"Received {sig_name}, initiating graceful shutdown")
             if not loop.is_closed():
@@ -646,13 +708,14 @@ def register_signal_handlers() -> None:
 
                 # Give cleanup time to execute, then stop the event loop
                 loop.call_later(1.0, loop.stop)
+
         return handler
 
     # Register handlers for typical termination signals
     if sys.platform != "win32":  # POSIX signals
         for sig_name, sig_num in (
-            ("SIGINT", signal.SIGINT),   # Keyboard interrupt (Ctrl+C)
-            ("SIGTERM", signal.SIGTERM), # Termination signal (kill)
+            ("SIGINT", signal.SIGINT),  # Keyboard interrupt (Ctrl+C)
+            ("SIGTERM", signal.SIGTERM),  # Termination signal (kill)
         ):
             try:
                 loop.add_signal_handler(sig_num, signal_handler(sig_name))
@@ -680,7 +743,7 @@ except Exception as e:
 def shutdown() -> None:
     """
     Trigger the cleanup process synchronously.
-    
+
     This function can be called directly to initiate the shutdown sequence from
     non-async contexts like __main__.
     """
