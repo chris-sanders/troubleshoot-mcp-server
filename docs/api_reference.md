@@ -30,7 +30,12 @@ The MCP Server communicates using the Model Context Protocol (MCP), a JSON-based
 
 ```json
 {
-  "content": "response content or object"
+  "content": [
+    {
+      "type": "text",
+      "text": "Response content in text format"
+    }
+  ]
 }
 ```
 
@@ -49,14 +54,18 @@ The MCP Server communicates using the Model Context Protocol (MCP), a JSON-based
 
 These tools enable management of Kubernetes support bundles.
 
-### bundle__list
+### initialize_bundle
 
-Lists available support bundles.
+Initializes (downloads and extracts) a support bundle for use.
 
 **Request:**
 ```json
 {
-  "name": "bundle__list"
+  "name": "initialize_bundle",
+  "input": {
+    "source": "https://vendor.replicated.com/troubleshoot/analyze/2024-04-11@08:15",
+    "force": false
+  }
 }
 ```
 
@@ -65,48 +74,10 @@ Lists available support bundles.
 {
   "content": [
     {
-      "id": "bundle-123",
-      "name": "cluster-1-bundle",
-      "created_at": "2025-04-10T15:30:00Z",
-      "size": "145MB"
-    },
-    {
-      "id": "bundle-456",
-      "name": "cluster-2-bundle",
-      "created_at": "2025-04-11T12:15:00Z",
-      "size": "180MB"
+      "type": "text",
+      "text": "Bundle initialized successfully:\n```json\n{\n  \"path\": \"/data/bundles/bundle-2024-04-11-08-15\",\n  \"kubeconfig_path\": \"/tmp/kubeconfig-bundle-2024-04-11-08-15\",\n  \"source\": \"https://vendor.replicated.com/troubleshoot/analyze/2024-04-11@08:15\",\n  \"api_server_pid\": 12345,\n  \"initialized_at\": \"2025-04-12T10:15:30Z\"\n}\n```"
     }
   ]
-}
-```
-
-**Errors:**
-- `AuthenticationError`: If the SBCTL_TOKEN is invalid or missing
-- `ApiError`: If the support bundle service is unavailable
-
-### bundle__initialize
-
-Initializes (downloads and extracts) a support bundle for use.
-
-**Request:**
-```json
-{
-  "name": "bundle__initialize",
-  "input": {
-    "bundle_id": "bundle-123"
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "content": {
-    "path": "/path/to/extracted/bundle",
-    "id": "bundle-123",
-    "name": "cluster-1-bundle",
-    "extracted_size": "450MB"
-  }
 }
 ```
 
@@ -116,92 +87,47 @@ Initializes (downloads and extracts) a support bundle for use.
 - `BundleExtractionError`: If the bundle could not be extracted
 - `StorageError`: If there is insufficient disk space
 
-### bundle__info
-
-Gets information about the currently initialized bundle.
-
-**Request:**
-```json
-{
-  "name": "bundle__info"
-}
-```
-
-**Response:**
-```json
-{
-  "content": {
-    "id": "bundle-123",
-    "name": "cluster-1-bundle",
-    "path": "/path/to/extracted/bundle",
-    "created_at": "2025-04-10T15:30:00Z",
-    "kubernetes_version": "1.27.3",
-    "node_count": 5,
-    "resource_count": {
-      "pods": 42,
-      "deployments": 15,
-      "services": 18
-    }
-  }
-}
-```
-
-**Errors:**
-- `NoBundleInitializedError`: If no bundle has been initialized yet
-
 ## Kubectl Commands
 
 These tools allow execution of kubectl commands against the initialized support bundle.
 
-### kubectl__execute
+### kubectl
 
 Executes a kubectl command against the initialized bundle.
 
 **Request:**
 ```json
 {
-  "name": "kubectl__execute",
+  "name": "kubectl",
   "input": {
-    "command": "get pods -n kube-system"
+    "command": "get pods -n kube-system",
+    "timeout": 30,
+    "json_output": true
   }
-}
-```
-
-**Response (text output):**
-```json
-{
-  "content": "NAME                                     READY   STATUS    RESTARTS   AGE\ncoredns-558bd4d5db-abcde                 1/1     Running   0          5d\nkube-apiserver-master1                   1/1     Running   0          5d\nkube-controller-manager-master1          1/1     Running   0          5d\nkube-proxy-abcde                         1/1     Running   0          5d\nkube-scheduler-master1                   1/1     Running   0          5d"
 }
 ```
 
 **Response (JSON output):**
 ```json
 {
-  "content": {
-    "apiVersion": "v1",
-    "items": [
-      {
-        "apiVersion": "v1",
-        "kind": "Pod",
-        "metadata": {
-          "name": "coredns-558bd4d5db-abcde",
-          "namespace": "kube-system"
-        },
-        "spec": {
-          "containers": [
-            {
-              "name": "coredns",
-              "image": "k8s.gcr.io/coredns:1.8.0"
-            }
-          ]
-        },
-        "status": {
-          "phase": "Running"
-        }
-      }
-    ],
-    "kind": "List"
-  }
+  "content": [
+    {
+      "type": "text",
+      "text": "kubectl command executed successfully:\n```json\n{\n  \"apiVersion\": \"v1\",\n  \"items\": [\n    {\n      \"apiVersion\": \"v1\",\n      \"kind\": \"Pod\",\n      \"metadata\": {\n        \"name\": \"coredns-558bd4d5db-abcde\",\n        \"namespace\": \"kube-system\"\n      },\n      \"spec\": {\n        \"containers\": [\n          {\n            \"name\": \"coredns\",\n            \"image\": \"k8s.gcr.io/coredns:1.8.0\"\n          }\n        ]\n      },\n      \"status\": {\n        \"phase\": \"Running\"\n      }\n    }\n  ],\n  \"kind\": \"List\"\n}\n```\n\nCommand metadata:\n```json\n{\n  \"command\": \"kubectl get pods -n kube-system -o json\",\n  \"exit_code\": 0,\n  \"duration_ms\": 123\n}\n```"
+    }
+  ]
+}
+```
+
+**Response (text output):**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "kubectl command executed successfully:\n```\nNAME                                     READY   STATUS    RESTARTS   AGE\ncoredns-558bd4d5db-abcde                 1/1     Running   0          5d\nkube-apiserver-master1                   1/1     Running   0          5d\nkube-controller-manager-master1          1/1     Running   0          5d\nkube-proxy-abcde                         1/1     Running   0          5d\nkube-scheduler-master1                   1/1     Running   0          5d\n```\n\nCommand metadata:\n```json\n{\n  \"command\": \"kubectl get pods -n kube-system\",\n  \"exit_code\": 0,\n  \"duration_ms\": 123\n}\n```"
+    }
+  ]
 }
 ```
 
@@ -214,16 +140,17 @@ Executes a kubectl command against the initialized bundle.
 
 These tools enable exploration and analysis of files within the support bundle.
 
-### files__list_directory
+### list_files
 
 Lists the contents of a directory in the bundle.
 
 **Request:**
 ```json
 {
-  "name": "files__list_directory",
+  "name": "list_files",
   "input": {
-    "path": "/kubernetes/pods"
+    "path": "/kubernetes/pods",
+    "recursive": false
   }
 }
 ```
@@ -233,22 +160,8 @@ Lists the contents of a directory in the bundle.
 {
   "content": [
     {
-      "name": "kube-system",
-      "type": "directory",
-      "size": null,
-      "modified": "2025-04-10T15:30:00Z"
-    },
-    {
-      "name": "default",
-      "type": "directory",
-      "size": null,
-      "modified": "2025-04-10T15:30:00Z"
-    },
-    {
-      "name": "kube-apiserver-master1.yaml",
-      "type": "file",
-      "size": 2456,
-      "modified": "2025-04-10T15:30:00Z"
+      "type": "text",
+      "text": "Listed files in /kubernetes/pods non-recursively:\n```json\n[\n  {\n    \"name\": \"kube-system\",\n    \"path\": \"/kubernetes/pods/kube-system\",\n    \"type\": \"directory\",\n    \"size\": null,\n    \"modified\": \"2025-04-10T15:30:00Z\",\n    \"accessed\": \"2025-04-11T12:45:30Z\",\n    \"is_binary\": false\n  },\n  {\n    \"name\": \"default\",\n    \"path\": \"/kubernetes/pods/default\",\n    \"type\": \"directory\",\n    \"size\": null,\n    \"modified\": \"2025-04-10T15:30:00Z\",\n    \"accessed\": \"2025-04-11T12:45:30Z\",\n    \"is_binary\": false\n  },\n  {\n    \"name\": \"kube-apiserver-master1.yaml\",\n    \"path\": \"/kubernetes/pods/kube-apiserver-master1.yaml\",\n    \"type\": \"file\",\n    \"size\": 2456,\n    \"modified\": \"2025-04-10T15:30:00Z\",\n    \"accessed\": \"2025-04-11T12:45:30Z\",\n    \"is_binary\": false\n  }\n]\n```\n\nDirectory metadata:\n```json\n{\n  \"path\": \"/kubernetes/pods\",\n  \"recursive\": false,\n  \"total_files\": 1,\n  \"total_dirs\": 2\n}\n```"
     }
   ]
 }
@@ -260,16 +173,18 @@ Lists the contents of a directory in the bundle.
 - `NotADirectoryError`: If the path is not a directory
 - `SecurityError`: If the path is outside the bundle or otherwise restricted
 
-### files__read_file
+### read_file
 
 Reads the contents of a file in the bundle.
 
 **Request:**
 ```json
 {
-  "name": "files__read_file",
+  "name": "read_file",
   "input": {
-    "path": "/kubernetes/pods/kube-system/coredns-558bd4d5db-abcde.yaml"
+    "path": "/kubernetes/pods/kube-system/coredns-558bd4d5db-abcde.yaml",
+    "start_line": 0,
+    "end_line": null
   }
 }
 ```
@@ -277,7 +192,12 @@ Reads the contents of a file in the bundle.
 **Response:**
 ```json
 {
-  "content": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: coredns-558bd4d5db-abcde\n  namespace: kube-system\nspec:\n  containers:\n  - name: coredns\n    image: k8s.gcr.io/coredns:1.8.0\n    ports:\n    - containerPort: 53\n      name: dns\n      protocol: UDP\n    - containerPort: 53\n      name: dns-tcp\n      protocol: TCP\n    resources:\n      limits:\n        memory: 170Mi\n      requests:\n        cpu: 100m\n        memory: 70Mi\nstatus:\n  phase: Running"
+  "content": [
+    {
+      "type": "text",
+      "text": "Read text file /kubernetes/pods/kube-system/coredns-558bd4d5db-abcde.yaml (lines 1-17 of 17):\n```\n   1 | apiVersion: v1\n   2 | kind: Pod\n   3 | metadata:\n   4 |   name: coredns-558bd4d5db-abcde\n   5 |   namespace: kube-system\n   6 | spec:\n   7 |   containers:\n   8 |   - name: coredns\n   9 |     image: k8s.gcr.io/coredns:1.8.0\n  10 |     ports:\n  11 |     - containerPort: 53\n  12 |       name: dns\n  13 |       protocol: UDP\n  14 |     - containerPort: 53\n  15 |       name: dns-tcp\n  16 |       protocol: TCP\n  17 | status:\n```"
+    }
+  ]
 }
 ```
 
@@ -287,17 +207,21 @@ Reads the contents of a file in the bundle.
 - `NotAFileError`: If the path is not a file
 - `SecurityError`: If the path is outside the bundle or otherwise restricted
 
-### files__search_files
+### grep_files
 
 Searches for files containing a specific pattern.
 
 **Request:**
 ```json
 {
-  "name": "files__search_files",
+  "name": "grep_files",
   "input": {
     "pattern": "OOMKilled",
-    "path": "/kubernetes/logs"
+    "path": "/kubernetes/logs",
+    "recursive": true,
+    "glob_pattern": "*.log",
+    "case_sensitive": false,
+    "max_results": 1000
   }
 }
 ```
@@ -306,9 +230,10 @@ Searches for files containing a specific pattern.
 ```json
 {
   "content": [
-    "/kubernetes/logs/kube-system/mysql-backup-78945d95b-abcde.log:15: Container was OOMKilled due to memory pressure",
-    "/kubernetes/logs/monitoring/prometheus-server-558874d9c-fghij.log:278: Previous container was OOMKilled, restarting with increased memory limits",
-    "/kubernetes/events.log:42: Pod monitoring/grafana-6584c8d677-abcde was evicted due to OOMKilled"
+    {
+      "type": "text",
+      "text": "Found 3 matches for case-insensitive pattern 'OOMKilled' in /kubernetes/logs (matching *.log):\n\n**File: /kubernetes/logs/kube-system/mysql-backup-78945d95b-abcde.log**\n```\n  15 | Container was OOMKilled due to memory pressure\n```\n\n**File: /kubernetes/logs/monitoring/prometheus-server-558874d9c-fghij.log**\n```\n 278 | Previous container was OOMKilled, restarting with increased memory limits\n```\n\n**File: /kubernetes/events.log**\n```\n  42 | Pod monitoring/grafana-6584c8d677-abcde was evicted due to OOMKilled\n```\n\nSearch metadata:\n```json\n{\n  \"pattern\": \"OOMKilled\",\n  \"path\": \"/kubernetes/logs\",\n  \"glob_pattern\": \"*.log\",\n  \"total_matches\": 3,\n  \"files_searched\": 32,\n  \"recursive\": true,\n  \"case_sensitive\": false,\n  \"truncated\": false\n}\n```"
+    }
   ]
 }
 ```
