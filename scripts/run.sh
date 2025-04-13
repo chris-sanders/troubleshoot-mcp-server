@@ -92,9 +92,6 @@ else
   cat | docker run ${INTERACTIVE} \
     -v "${BUNDLE_DIR}:/data/bundles" \
     -e SBCTL_TOKEN="${SBCTL_TOKEN:-}" \
-    -e MCP_BUNDLE_STORAGE="/data/bundles" \
-    -e MCP_LOG_LEVEL="${LOG_LEVEL}" \
-    -e MCP_KEEP_ALIVE="true" \
     --rm \
     --name "$CONTAINER_NAME" \
     "${IMAGE_NAME}:${IMAGE_TAG}" ${VERBOSE} ${ARGS}
