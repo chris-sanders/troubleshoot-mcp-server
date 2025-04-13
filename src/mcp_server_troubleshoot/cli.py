@@ -10,7 +10,7 @@ import argparse
 import os
 
 from .server import mcp, initialize_with_bundle_dir
-from .config import expand_client_config, load_config_from_env
+from .config import get_recommended_client_config
 
 logger = logging.getLogger(__name__)
 
@@ -59,25 +59,18 @@ def parse_args():
     parser.add_argument("--bundle-dir", type=Path, help="Directory to store bundles")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     parser.add_argument(
-        "--expand-config",
+        "--show-config",
         action="store_true",
-        help="Expand MCP client config with defaults and print to stdout",
+        help="Show recommended MCP client configuration",
     )
 
     return parser.parse_args()
 
 
-def handle_expand_config():
-    """Handle the expand-config command by reading from env and printing expanded config."""
-    config = load_config_from_env()
-    if not config:
-        logger.error("No config found to expand. Set MCP_CONFIG_PATH environment variable.")
-        sys.exit(1)
-
-    expanded_config = expand_client_config(config)
-
-    # Print the expanded config to stdout for the client to consume
-    json.dump(expanded_config, sys.stdout)
+def handle_show_config():
+    """Output recommended client configuration."""
+    config = get_recommended_client_config()
+    json.dump(config, sys.stdout, indent=2)
     sys.exit(0)
 
 
@@ -90,9 +83,9 @@ def main():
     args = parse_args()
 
     # Handle special commands first
-    if args.expand_config:
-        handle_expand_config()
-        return  # This should never be reached as handle_expand_config exits
+    if args.show_config:
+        handle_show_config()
+        return  # This should never be reached as handle_show_config exits
 
     # Set up logging based on whether we're in MCP mode
     mcp_mode = not sys.stdin.isatty()
