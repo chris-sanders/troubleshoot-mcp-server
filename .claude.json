@@ -1,0 +1,26 @@
+{
+  "allowedTools": [
+    "Bash(black:*)",
+    "Bash(git add:*)",
+    "Bash(git commit:*)",
+    "Bash(git push:*)",
+    "Bash(grep:*)",
+    "Bash(ls:*)",
+    "Bash(pytest:*)",
+    "Bash(ruff check:*)",
+    "Bash(mypy:*)",
+    "Edit",
+    "GlobTool",
+    "GrepTool",
+    "LS",
+    "View",
+    "mcp__github__add_issue_comment",
+    "mcp__github__create_pull_request",
+    "mcp__github__get_issue_comments",
+    "mcp__github__get_pull_request",
+    "mcp__github__get_pull_request_comments",
+    "mcp__github__get_pull_request_reviews",
+    "mcp__github__list_pull_requests"
+  ],
+  "hasTrustDialogAccepted": true
+}
