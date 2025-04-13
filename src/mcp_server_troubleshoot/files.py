@@ -285,31 +285,34 @@ class FileExplorer:
         """
         bundle = self.bundle_manager.get_active_bundle()
         if bundle is None:
-            raise FileSystemError("No bundle is active")
-            
+            raise FileSystemError(
+                "No bundle is active. Please initialize a bundle first using the initialize_bundle tool. "
+                "You can use the list_available_bundles tool to see available bundles."
+            )
+
         # Check if we should use the extracted directory for file operations
         extract_dir = bundle.path / "extracted"
         if extract_dir.exists() and extract_dir.is_dir():
             # Check if there are actual files in the extracted directory
             support_bundle_dirs = list(extract_dir.glob("support-bundle-*"))
-            
+
             # First check for support-bundle-* directories
             if support_bundle_dirs:
                 support_bundle_dir = support_bundle_dirs[0]  # Use the first one found
                 if support_bundle_dir.exists() and support_bundle_dir.is_dir():
                     logger.debug(f"Using extracted bundle subdirectory: {support_bundle_dir}")
                     return support_bundle_dir
-            
+
             # If no support-bundle-* directory, check if the extracted directory itself has files
             any_files = False
             for _ in extract_dir.glob("*"):
                 any_files = True
                 break
-                
+
             if any_files:
                 logger.debug(f"Using extracted bundle directory: {extract_dir}")
                 return extract_dir
-                
+
         return bundle.path
 
     def _normalize_path(self, path: str) -> Path:
@@ -625,7 +628,7 @@ class FileExplorer:
             if not full_path.is_dir():
                 # If the path is a file, use it directly
                 files_to_search = [full_path]
-                
+
                 # Check if the filename matches the pattern
                 filename = full_path.name
                 if regex.search(filename):
@@ -663,7 +666,7 @@ class FileExplorer:
 
                 rel_path = str(file_path.relative_to(bundle_path))
                 filename = file_path.name
-                
+
                 # Find all matches of the pattern in the filename
                 for match in regex.finditer(filename):
                     matches.append(
@@ -676,7 +679,7 @@ class FileExplorer:
                         )
                     )
                     total_matches += 1
-                    
+
                     # Stop if we've hit the max results
                     if total_matches >= max_results:
                         truncated = True
