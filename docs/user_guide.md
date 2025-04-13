@@ -43,32 +43,9 @@ See the [Docker documentation](../mcp-server-troubleshoot/DOCKER.md) for more de
 
 #### Using with MCP Clients
 
-To use the Docker container with MCP clients like Claude or other AI models, add it to your client's configuration:
+To use the Docker container with MCP clients like Claude or other AI models, add it to your client's configuration.
 
-```json
-{
-  "mcpServers": {
-    "troubleshoot": {
-      "type": "stdio",
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-v", 
-        "/path/to/your/bundles:/data/bundles",
-        "-e",
-        "SBCTL_TOKEN",
-        "ghcr.io/user/mcp-server-troubleshoot:latest",
-        "mcp-server-troubleshoot-serve"
-      ],
-      "env": {}
-    }
-  }
-}
-```
-
-This allows AI models to interact with Kubernetes support bundles through the MCP protocol.
+See the [Docker documentation](../DOCKER.md#configuration-with-mcp-clients) for detailed MCP client configuration instructions.
 
 ### Manual Installation
 

@@ -2,6 +2,7 @@
 CLI entry points for the MCP server.
 """
 
+import json
 import logging
 import sys
 from pathlib import Path
@@ -9,6 +10,7 @@ import argparse
 import os
 
 from .server import mcp, initialize_with_bundle_dir
+from .config import get_recommended_client_config
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +58,20 @@ def parse_args():
     parser = argparse.ArgumentParser(description="MCP server for Kubernetes support bundles")
     parser.add_argument("--bundle-dir", type=Path, help="Directory to store bundles")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
+    parser.add_argument(
+        "--show-config",
+        action="store_true",
+        help="Show recommended MCP client configuration",
+    )
 
     return parser.parse_args()
+
+
+def handle_show_config():
+    """Output recommended client configuration."""
+    config = get_recommended_client_config()
+    json.dump(config, sys.stdout, indent=2)
+    sys.exit(0)
 
 
 def main():
@@ -67,6 +81,11 @@ def main():
     as an MCP server that responds to JSON-RPC over stdio.
     """
     args = parse_args()
+
+    # Handle special commands first
+    if args.show_config:
+        handle_show_config()
+        return  # This should never be reached as handle_show_config exits
 
     # Set up logging based on whether we're in MCP mode
     mcp_mode = not sys.stdin.isatty()

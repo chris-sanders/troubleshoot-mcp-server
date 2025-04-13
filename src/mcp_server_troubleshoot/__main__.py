@@ -4,6 +4,7 @@ This comment was added to test Docker cache invalidation.
 """
 
 import argparse
+import json
 import logging
 import os
 import sys
@@ -11,6 +12,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from .server import mcp, initialize_with_bundle_dir
+from .config import get_recommended_client_config
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,13 @@ def setup_logging(verbose: bool = False, mcp_mode: bool = False) -> None:
             handler.stream = sys.stderr
 
 
+def handle_show_config():
+    """Output recommended client configuration."""
+    config = get_recommended_client_config()
+    json.dump(config, sys.stdout, indent=2)
+    sys.exit(0)
+
+
 def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     """
     Parse command line arguments.
@@ -66,6 +75,9 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="MCP server for Kubernetes support bundles")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
     parser.add_argument("--bundle-dir", type=str, help="Directory to store support bundles")
+    parser.add_argument(
+        "--show-config", action="store_true", help="Show recommended MCP client configuration"
+    )
     return parser.parse_args(args)
 
 
@@ -77,6 +89,11 @@ def main(args: Optional[List[str]] = None) -> None:
         args: Command line arguments (defaults to sys.argv[1:])
     """
     parsed_args = parse_args(args)
+
+    # Handle special commands first
+    if parsed_args.show_config:
+        handle_show_config()
+        return  # This should never be reached as handle_show_config exits
 
     # Detect if we're running in MCP mode (stdin is not a terminal)
     mcp_mode = not sys.stdin.isatty()

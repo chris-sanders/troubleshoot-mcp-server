@@ -36,9 +36,6 @@ export SBCTL_TOKEN="your_token_here"
 # You can also pass command-line options
 ./scripts/run.sh --verbose
 
-# Run in MCP server mode for use with MCP clients (using stdio)
-./scripts/run.sh --mcp
-
 # Specify a custom bundle directory
 ./scripts/run.sh --bundle-dir=/path/to/bundles
 ```
@@ -49,19 +46,12 @@ Alternatively, you can run the container manually:
 # Create a directory for bundles
 mkdir -p ./bundles
 
-# Run the container with the default entrypoint
-docker run -it --rm \
-  -v "$(pwd)/bundles:/data/bundles" \
-  -e SBCTL_TOKEN="your_token_here" \
-  -e MCP_BUNDLE_STORAGE="/data/bundles" \
-  mcp-server-troubleshoot:latest
-
-# Run the container with the MCP server stdio mode for use with MCP clients
+# Run the container
 docker run -i --rm \
   -v "$(pwd)/bundles:/data/bundles" \
   -e SBCTL_TOKEN="your_token_here" \
   -e MCP_BUNDLE_STORAGE="/data/bundles" \
-  mcp-server-troubleshoot:latest python -m mcp_server_troubleshoot.cli
+  mcp-server-troubleshoot:latest
 ```
 
 ## Configuration
@@ -76,6 +66,7 @@ The container can be configured using the following:
 
 - `SBCTL_TOKEN`: Authentication token for accessing protected bundles.
 - `MCP_BUNDLE_STORAGE`: Directory to store and manage bundles (defaults to `/data/bundles`).
+- `MCP_LOG_LEVEL`: Set the logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
 
 ## Testing the Container
 
@@ -101,90 +92,67 @@ These tests:
 
 ## Configuration with MCP Clients
 
-To use the Docker container with MCP clients (such as Claude or other AI models), add the server configuration to your client's settings:
+To use the Docker container with MCP clients (such as Claude or other AI models), add the server configuration to your client's settings.
 
-### Claude/Anthropic MCP Configuration
+### MCP Client Configuration
 
-In the `.mcpconfig.json` file (or corresponding environment variables):
+You can get the recommended configuration by running:
 
-```json
-{
-  "mcpServers": {
-    "troubleshoot": {
-      "type": "stdio",
-      "command": "/path/to/scripts/run.sh",
-      "args": [
-        "--mcp"
-      ],
-      "env": {
-        "SBCTL_TOKEN": "${SBCTL_TOKEN}"
-      }
-    }
-  }
-}
+```bash
+docker run --rm mcp-server-troubleshoot:latest --show-config
 ```
 
-Or if you prefer using docker directly:
+The output will provide a ready-to-use configuration for MCP clients:
 
 ```json
 {
   "mcpServers": {
     "troubleshoot": {
-      "type": "stdio",
       "command": "docker",
       "args": [
         "run",
         "-i",
         "--rm",
         "-v", 
-        "${LOCAL_BUNDLE_DIRECTORY}:/data/bundles",
+        "${HOME}/bundles:/data/bundles",
         "-e",
         "SBCTL_TOKEN=${SBCTL_TOKEN}",
-        "-e",
-        "MCP_BUNDLE_STORAGE=/data/bundles",
-        "mcp-server-troubleshoot:latest",
-        "python",
-        "-m",
-        "mcp_server_troubleshoot.cli"
-      ],
-      "env": {}
+        "mcp-server-troubleshoot:latest"
+      ]
     }
   }
 }
 ```
 
-Replace `${LOCAL_BUNDLE_DIRECTORY}` with the actual path to your bundles directory. Make sure the `SBCTL_TOKEN` environment variable is set in your environment if needed.
+This configuration assumes:
 
-### Other MCP Clients
+1. You have the `SBCTL_TOKEN` environment variable set in your environment
+2. You want to store bundles in `${HOME}/bundles` on your host machine
+3. You're using Docker as your container runtime
 
-For other MCP clients, the configuration will follow a similar pattern:
-
-1. Set the server type to `stdio`
-2. Use `docker run -i --rm` as the command
-3. Mount your bundles directory to `/data/bundles` in the container
-4. Pass required environment variables like `SBCTL_TOKEN`
+Replace `${HOME}/bundles` with the actual path to your bundles directory if needed.
 
 ## Usage Examples
 
 ### Initialize a Bundle
 
 ```bash
-# Using the MCP inspector to send a request to initialize a bundle
-echo '{"jsonrpc":"2.0","id":"1","method":"call_tool","params":{"name":"initialize_bundle","arguments":{"source":"/data/bundles/bundle.tar.gz"}}}' | ./scripts/run.sh --mcp
+# Using echo to send a request to initialize a bundle
+echo '{"jsonrpc":"2.0","id":"1","method":"call_tool","params":{"name":"initialize_bundle","arguments":{"source":"/data/bundles/bundle.tar.gz"}}}' | ./scripts/run.sh
 ```
 
 ### Execute kubectl Commands
 
 ```bash
-# Using the MCP inspector to send a request to execute a kubectl command
-echo '{"jsonrpc":"2.0","id":"1","method":"call_tool","params":{"name":"kubectl","arguments":{"command":"get pods"}}}' | ./scripts/run.sh --mcp
+# Using echo to send a request to execute a kubectl command
+echo '{"jsonrpc":"2.0","id":"1","method":"call_tool","params":{"name":"kubectl","arguments":{"command":"get pods"}}}' | ./scripts/run.sh
 ```
 
 ### Explore Files
 
 ```bash
-# Using the MCP inspector to send a request to list files
-echo '{"jsonrpc":"2.0","id":"1","method":"call_tool","params":{"name":"list_files","arguments":{"path":"/"}}}' | ./scripts/run.sh --mcp
+# Using echo to send a request to list files
+echo '{"jsonrpc":"2.0","id":"1","method":"call_tool","params":{"name":"list_files","arguments":{"path":"/"}}}' | ./scripts/run.sh
 ```
 
 ### Using with an MCP Client
