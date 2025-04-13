@@ -190,15 +190,17 @@ def test_signal_handler():
 
 def test_setup_signal_handlers():
     """Test signal handler setup."""
-    with patch("signal.signal") as mock_signal:
-        # Call the setup function
-        setup_signal_handlers()
+    # Temporarily remove PYTEST_CURRENT_TEST from the environment
+    with patch.dict(os.environ, {}, clear=True):
+        with patch("signal.signal") as mock_signal:
+            # Call the setup function
+            setup_signal_handlers()
 
-        # Verify that signal.signal was called for both signals
-        assert mock_signal.call_count >= 2
+            # Verify that signal.signal was called for both signals
+            assert mock_signal.call_count >= 2
 
-        # Check that the handlers were registered
-        calls = [call[0] for call in mock_signal.call_args_list]
-        signals = [args[0] for args in calls]
-        assert signal.SIGTERM in signals
-        assert signal.SIGINT in signals
+            # Check that the handlers were registered
+            calls = [call[0] for call in mock_signal.call_args_list]
+            signals = [args[0] for args in calls]
+            assert signal.SIGTERM in signals
+            assert signal.SIGINT in signals
