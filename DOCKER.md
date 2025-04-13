@@ -101,21 +101,43 @@ These tests:
 
 ## Configuration with MCP Clients
 
-To use the Docker container with MCP clients (such as Claude or other AI models), add the server configuration to your client's settings:
+To use the Docker container with MCP clients (such as Claude or other AI models), add the server configuration to your client's settings.
 
-### Claude/Anthropic MCP Configuration
+### Minimal Client Configuration
 
-In the `.mcpconfig.json` file (or corresponding environment variables):
+The MCP server now supports simplified configurations that are automatically expanded with smart defaults:
 
 ```json
 {
   "mcpServers": {
     "troubleshoot": {
-      "type": "stdio",
-      "command": "/path/to/scripts/run.sh",
+      "command": "docker",
       "args": [
-        "--mcp"
-      ],
+        "run",
+        "-i",
+        "mcp-server-troubleshoot:latest"
+      ]
+    }
+  }
+}
+```
+
+This minimal configuration is all you need to get started. The server will automatically add appropriate defaults for:
+
+- Volume mounts
+- Environment variables
+- Docker flags
+- CLI arguments
+
+### Standard Configuration Options
+
+#### Using the run.sh Script
+
+```json
+{
+  "mcpServers": {
+    "troubleshoot": {
+      "command": "/path/to/scripts/run.sh",
       "env": {
         "SBCTL_TOKEN": "${SBCTL_TOKEN}"
       }
@@ -124,13 +146,12 @@ In the `.mcpconfig.json` file (or corresponding environment variables):
 }
 ```
 
-Or if you prefer using docker directly:
+#### Using Docker Directly
 
 ```json
 {
   "mcpServers": {
     "troubleshoot": {
-      "type": "stdio",
       "command": "docker",
       "args": [
         "run",
@@ -142,12 +163,10 @@ Or if you prefer using docker directly:
         "SBCTL_TOKEN=${SBCTL_TOKEN}",
         "-e",
         "MCP_BUNDLE_STORAGE=/data/bundles",
-        "mcp-server-troubleshoot:latest",
-        "python",
-        "-m",
-        "mcp_server_troubleshoot.cli"
-      ],
-      "env": {}
+        "-e",
+        "MCP_KEEP_ALIVE=true",
+        "mcp-server-troubleshoot:latest"
+      ]
     }
   }
 }
@@ -155,14 +174,59 @@ Or if you prefer using docker directly:
 
 Replace `${LOCAL_BUNDLE_DIRECTORY}` with the actual path to your bundles directory. Make sure the `SBCTL_TOKEN` environment variable is set in your environment if needed.
 
+### Enhanced Configuration Options
+
+#### Custom Bundle Directory
+
+To specify a custom bundle directory without listing all the Docker arguments:
+
+```json
+{
+  "mcpServers": {
+    "troubleshoot": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "mcp-server-troubleshoot:latest"
+      ],
+      "bundleDir": "/path/to/your/bundles"
+    }
+  }
+}
+```
+
+#### Environment Variables
+
+To pass environment variables to the server:
+
+```json
+{
+  "mcpServers": {
+    "troubleshoot": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "mcp-server-troubleshoot:latest"
+      ],
+      "env": {
+        "SBCTL_TOKEN": "your-secret-token",
+        "MCP_LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}
+```
+
 ### Other MCP Clients
 
 For other MCP clients, the configuration will follow a similar pattern:
 
-1. Set the server type to `stdio`
-2. Use `docker run -i --rm` as the command
-3. Mount your bundles directory to `/data/bundles` in the container
-4. Pass required environment variables like `SBCTL_TOKEN`
+1. Use `docker` as the command
+2. Include at minimum `run -i mcp-server-troubleshoot:latest` in the args
+3. Optionally specify a `bundleDir` to mount
+4. Optionally provide environment variables via the `env` object
 
 ## Usage Examples
 

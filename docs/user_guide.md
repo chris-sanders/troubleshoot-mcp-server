@@ -43,32 +43,99 @@ See the [Docker documentation](../mcp-server-troubleshoot/DOCKER.md) for more de
 
 #### Using with MCP Clients
 
-To use the Docker container with MCP clients like Claude or other AI models, add it to your client's configuration:
+To use the Docker container with MCP clients like Claude or other AI models, add it to your client's configuration.
+
+##### Minimal Configuration
+
+The MCP server supports simplified configurations that are automatically expanded with smart defaults:
 
 ```json
 {
   "mcpServers": {
     "troubleshoot": {
-      "type": "stdio",
       "command": "docker",
       "args": [
         "run",
         "-i",
-        "--rm",
-        "-v", 
-        "/path/to/your/bundles:/data/bundles",
-        "-e",
-        "SBCTL_TOKEN",
-        "ghcr.io/user/mcp-server-troubleshoot:latest",
-        "mcp-server-troubleshoot-serve"
-      ],
-      "env": {}
+        "mcp-server-troubleshoot:latest"
+      ]
     }
   }
 }
 ```
 
-This allows AI models to interact with Kubernetes support bundles through the MCP protocol.
+##### Standard Configuration
+
+For more control, you can use the standard configuration:
+
+```json
+{
+  "mcpServers": {
+    "troubleshoot": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "-v", 
+        "/path/to/your/bundles:/data/bundles",
+        "-e",
+        "SBCTL_TOKEN=${SBCTL_TOKEN}",
+        "-e",
+        "MCP_BUNDLE_STORAGE=/data/bundles",
+        "-e", 
+        "MCP_KEEP_ALIVE=true",
+        "--rm",
+        "mcp-server-troubleshoot:latest"
+      ]
+    }
+  }
+}
+```
+
+##### Using a Custom Bundle Directory
+
+To specify a custom bundle directory:
+
+```json
+{
+  "mcpServers": {
+    "troubleshoot": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "mcp-server-troubleshoot:latest"
+      ],
+      "bundleDir": "/path/to/your/bundles"
+    }
+  }
+}
+```
+
+##### Using Environment Variables
+
+You can pass environment variables to the server:
+
+```json
+{
+  "mcpServers": {
+    "troubleshoot": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "mcp-server-troubleshoot:latest"
+      ],
+      "env": {
+        "SBCTL_TOKEN": "your-secret-token",
+        "MCP_LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}
+```
+
+These configurations allow AI models to interact with Kubernetes support bundles through the MCP protocol.
 
 ### Manual Installation
 

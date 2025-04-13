@@ -8,6 +8,7 @@ BUNDLE_DIR="$(pwd)/tests/fixtures"
 INTERACTIVE="-i"  # Default is MCP mode (-i)
 VERBOSE=""
 DEBUG_MODE=false
+MCP_MODE=true
 
 # Parse command-line options
 ARGS=""
@@ -17,6 +18,7 @@ while [ $# -gt 0 ]; do
       # Interactive debug mode with terminal
       INTERACTIVE="-it"
       DEBUG_MODE=true
+      MCP_MODE=false
       shift
       ;;
     --verbose)
@@ -30,6 +32,10 @@ while [ $# -gt 0 ]; do
     --bundle-dir)
       BUNDLE_DIR="$2"
       shift 2
+      ;;
+    --no-mcp)
+      MCP_MODE=false
+      shift
       ;;
     *)
       if [ -z "$ARGS" ]; then
@@ -67,7 +73,17 @@ fi
 # Create a unique container name
 CONTAINER_NAME="mcp-server-$(date +%s)-$RANDOM"
 
-# Run the container
+# Prepare arguments for MCP mode
+if [ "$MCP_MODE" = true ]; then
+  # Add the MCP mode flag for the CLI module
+  if [ -z "$ARGS" ]; then
+    ARGS="--mcp"
+  else
+    ARGS="--mcp $ARGS"
+  fi
+fi
+
+# Run the container with the new entrypoint
 if [ "$DEBUG_MODE" = true ]; then
   # Run in interactive debug mode
   docker run ${INTERACTIVE} --rm \
@@ -76,8 +92,7 @@ if [ "$DEBUG_MODE" = true ]; then
     -e MCP_BUNDLE_STORAGE="/data/bundles" \
     -e MCP_LOG_LEVEL="${LOG_LEVEL}" \
     --name "$CONTAINER_NAME" \
-    --entrypoint python \
-    "${IMAGE_NAME}:${IMAGE_TAG}" -u -m mcp_server_troubleshoot.cli ${VERBOSE} ${ARGS}
+    "${IMAGE_NAME}:${IMAGE_TAG}" ${VERBOSE} ${ARGS}
 else
   # Run in MCP mode (default)
   # Pipe stdin to the container and don't use terminal
@@ -89,6 +104,5 @@ else
     -e MCP_KEEP_ALIVE="true" \
     --rm \
     --name "$CONTAINER_NAME" \
-    --entrypoint python \
-    "${IMAGE_NAME}:${IMAGE_TAG}" -u -m mcp_server_troubleshoot.cli ${VERBOSE} ${ARGS}
+    "${IMAGE_NAME}:${IMAGE_TAG}" ${VERBOSE} ${ARGS}
 fi

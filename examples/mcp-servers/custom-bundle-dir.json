@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "troubleshoot": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "mcp-server-troubleshoot:latest"
+      ],
+      "bundleDir": "${HOME}/k8s-bundles"
+    }
+  }
+}

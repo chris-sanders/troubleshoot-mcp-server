@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "troubleshoot": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "mcp-server-troubleshoot:latest"
+      ],
+      "env": {
+        "SBCTL_TOKEN": "${SBCTL_TOKEN}",
+        "MCP_LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}
