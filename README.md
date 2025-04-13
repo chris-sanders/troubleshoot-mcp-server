@@ -21,13 +21,13 @@ The easiest way to get started is using Docker:
 
 ```bash
 # Build the image
-./build.sh
+./mcp-server-troubleshoot/scripts/build.sh
 
 # Run the server
-./run.sh /path/to/bundles your-token
+./mcp-server-troubleshoot/scripts/run.sh /path/to/bundles your-token
 ```
 
-See the [Docker documentation](DOCKER.md) for more details.
+See the [Docker documentation](mcp-server-troubleshoot/DOCKER.md) for more details.
 
 ### Manual Installation
 
@@ -36,10 +36,10 @@ See the [Docker documentation](DOCKER.md) for more details.
 
 ```bash
 # Using uv (recommended)
-uv pip install -e .
+uv pip install -e ./mcp-server-troubleshoot
 
 # Or using pip
-pip install -e .
+pip install -e ./mcp-server-troubleshoot
 ```
 
 3. Set up your authentication token:
@@ -63,7 +63,7 @@ For comprehensive documentation, see:
 - [Developer Guide](docs/developer_guide.md): Information for developers
 - [Example Prompts](docs/examples/prompt_examples.md): Sample AI prompts and responses
 - [Troubleshooting Guide](docs/troubleshooting.md): Solutions for common issues
-- [Docker Guide](DOCKER.md): Container usage and configuration
+- [Docker Guide](mcp-server-troubleshoot/DOCKER.md): Container usage and configuration
 - [System Architecture](docs/architecture.md): Overall system design
 
 ## Tools
@@ -72,73 +72,68 @@ The MCP server provides the following tools for AI models:
 
 ### Bundle Management
 
-- `bundle__list`: List available support bundles
-- `bundle__initialize`: Initialize a support bundle for use
-- `bundle__info`: Get information about the current bundle
+- `initialize_bundle`: Initialize a support bundle for use
 
 ### Kubectl Commands
 
-- `kubectl__execute`: Execute kubectl commands against the bundle
+- `kubectl`: Execute kubectl commands against the bundle
 
 ### File Operations
 
-- `files__list_directory`: List files and directories
-- `files__read_file`: Read file contents
-- `files__search_files`: Search for patterns in files
+- `list_files`: List files and directories
+- `read_file`: Read file contents
+- `grep_files`: Search for patterns in files
 
 ## Example Usage
 
 AI models can interact with the server using the MCP protocol:
 
 ```json
-// Request to list directories
+// Request to list files
 {
-  "name": "files__list_directory",
+  "name": "list_files",
   "input": {
-    "path": "/kubernetes/pods"
+    "path": "/kubernetes/pods",
+    "recursive": false
   }
 }
 
-// Response
+// Response (simplified)
 {
-  "content": [
-    {
-      "name": "kube-system",
-      "type": "directory",
-      "size": null,
-      "modified": "2025-04-10T12:30:45Z"
-    },
-    {
-      "name": "pod-definition.yaml",
-      "type": "file",
-      "size": 1254,
-      "modified": "2025-04-10T12:30:45Z"
-    }
-  ]
+  "content": "Listed files in /kubernetes/pods non-recursively:\n```json\n[\n  {\n    \"name\": \"kube-system\",\n    \"path\": \"/kubernetes/pods/kube-system\",\n    \"type\": \"directory\",\n    \"size\": null,\n    \"modified\": \"2025-04-10T12:30:45Z\"\n  },\n  {\n    \"name\": \"pod-definition.yaml\",\n    \"path\": \"/kubernetes/pods/pod-definition.yaml\",\n    \"type\": \"file\",\n    \"size\": 1254,\n    \"modified\": \"2025-04-10T12:30:45Z\"\n  }\n]\n```\nDirectory metadata:\n```json\n{\n  \"path\": \"/kubernetes/pods\",\n  \"recursive\": false,\n  \"total_files\": 1,\n  \"total_dirs\": 1\n}\n```"
 }
 ```
 
 ## Project Structure
 
 ```
-mcp-server-troubleshoot/
-├── docs/                 # Documentation
-│   ├── architecture.md   # System architecture overview
-│   ├── api_reference.md  # API reference documentation
-│   ├── user_guide.md     # User guide
-│   ├── developer_guide.md # Developer guide
-│   ├── troubleshooting.md # Troubleshooting guide
-│   ├── examples/         # Example prompts and usage
-│   ├── agentic/          # AI agent documentation
-│   └── components/       # Component design docs
-├── tasks/                # Task definitions
-│   ├── ready/            # Tasks ready to be worked on
-│   ├── started/          # Tasks currently in progress
-│   ├── review/           # Tasks pending review
-│   └── completed/        # Tasks that have been completed
-├── src/                  # Source code
-├── tests/                # Test files
-└── README.md             # This file
+├── docs/                      # Documentation
+│   ├── agentic/               # AI agent documentation
+│   ├── components/            # Component design docs
+│   └── examples/              # Example prompts and usage
+├── examples/                  # Example configurations
+│   └── mcp-servers/           # MCP server example configs
+├── mcp-server-troubleshoot/   # Main package
+│   ├── scripts/               # Utility scripts
+│   │   ├── build.sh           # Docker build script
+│   │   └── run.sh             # Docker run script
+│   ├── src/                   # Source code
+│   │   └── mcp_server_troubleshoot/
+│   │       ├── __init__.py
+│   │       ├── __main__.py    # Entry point
+│   │       ├── bundle.py      # Bundle management
+│   │       ├── cli.py         # CLI interface
+│   │       ├── files.py       # File operations
+│   │       ├── kubectl.py     # Kubectl command execution
+│   │       └── server.py      # MCP server implementation
+│   └── tests/                 # Test files
+│       ├── e2e/               # End-to-end tests
+│       ├── fixtures/          # Test fixtures 
+│       ├── integration/       # Integration tests
+│       └── unit/              # Unit tests
+└── tasks/                     # Task definitions
+    ├── completed/             # Completed tasks
+    └── review/                # Tasks under review
 ```
 
 ## Requirements
