@@ -47,7 +47,7 @@ Alternatively, you can run the container manually:
 mkdir -p ./bundles
 
 # Run the container
-docker run -i \
+docker run -i --rm \
   -v "$(pwd)/bundles:/data/bundles" \
   -e SBCTL_TOKEN="your_token_here" \
   -e MCP_BUNDLE_STORAGE="/data/bundles" \
@@ -112,6 +112,7 @@ The output will provide a ready-to-use configuration for MCP clients:
       "args": [
         "run",
         "-i",
+        "--rm",
         "-v", 
         "${HOME}/bundles:/data/bundles",
         "-e",

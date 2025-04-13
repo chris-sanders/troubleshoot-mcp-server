@@ -34,6 +34,7 @@ def get_recommended_client_config() -> Dict[str, Any]:
                 "args": [
                     "run",
                     "-i",
+                    "--rm",
                     "-v",
                     "${HOME}/bundles:/data/bundles",
                     "-e",

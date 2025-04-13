@@ -5,6 +5,7 @@
       "args": [
         "run",
         "-i",
+        "--rm",
         "-v", 
         "${HOME}/bundles:/data/bundles",
         "-e",

@@ -22,5 +22,6 @@ def test_config_provides_recommended_defaults():
     # Check for important flags and arguments
     args = config["mcpServers"]["troubleshoot"]["args"]
     assert "-i" in args
+    assert "--rm" in args
     assert any("SBCTL_TOKEN" in arg for arg in args)
     assert any("/data/bundles" in arg for arg in args)
