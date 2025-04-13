@@ -52,13 +52,18 @@ def get_file_explorer() -> FileExplorer:
 @mcp.tool()
 async def initialize_bundle(args: InitializeBundleArgs) -> List[TextContent]:
     """
-    Initialize a Kubernetes support bundle for analysis.
+    Initialize a Kubernetes support bundle for analysis. This tool loads a bundle 
+    and makes it available for exploration with other tools.
 
     Args:
-        args: The initialization arguments containing source and force flag
+        args: Arguments containing:
+            source: (string, required) The source of the bundle (URL or local file path)
+            force: (boolean, optional) Whether to force re-initialization if a bundle 
+                is already active. Defaults to False.
 
     Returns:
-        A list of content items to return to the model
+        Metadata about the initialized bundle including path and kubeconfig location.
+        If the API server is not available, also returns diagnostic information.
     """
     bundle_manager = get_bundle_manager()
     
@@ -131,13 +136,21 @@ async def initialize_bundle(args: InitializeBundleArgs) -> List[TextContent]:
 @mcp.tool()
 async def kubectl(args: KubectlCommandArgs) -> List[TextContent]:
     """
-    Execute kubectl commands against the initialized bundle's API server.
+    Execute kubectl commands against the initialized bundle's API server. Allows
+    running Kubernetes CLI commands to explore resources in the support bundle.
 
     Args:
-        args: The kubectl command arguments
+        args: Arguments containing:
+            command: (string, required) The kubectl command to execute (e.g., "get pods",
+                "get nodes -o wide", "describe deployment nginx")
+            timeout: (integer, optional) Timeout in seconds for the command. Defaults to 30.
+            json_output: (boolean, optional) Whether to format the output as JSON. 
+                Defaults to True. Set to False for plain text output.
 
     Returns:
-        A list of content items to return to the model
+        The formatted output from the kubectl command, along with execution metadata
+        including exit code and execution time. Returns error and diagnostic 
+        information if the command fails or API server is not available.
     """
     bundle_manager = get_bundle_manager()
     
@@ -231,13 +244,20 @@ async def kubectl(args: KubectlCommandArgs) -> List[TextContent]:
 @mcp.tool()
 async def list_files(args: ListFilesArgs) -> List[TextContent]:
     """
-    List files and directories within the support bundle.
+    List files and directories within the support bundle. This tool lets you
+    explore the directory structure of the initialized bundle.
 
     Args:
-        args: The list files arguments
+        args: Arguments containing:
+            path: (string, required) The path within the bundle to list. Use "" or "/" 
+                for root directory. Path cannot contain directory traversal (e.g., "../").
+            recursive: (boolean, optional) Whether to list files and directories recursively.
+                Defaults to False. Set to True to show nested files.
 
     Returns:
-        A list of content items to return to the model
+        A JSON list of entries with file/directory information including name, path, type
+        (file or dir), size, access time, modification time, and whether binary.
+        Also returns metadata about the directory listing like total file and directory counts.
     """
     try:
         result = await get_file_explorer().list_files(args.path, args.recursive)
@@ -284,12 +304,20 @@ async def list_files(args: ListFilesArgs) -> List[TextContent]:
 async def read_file(args: ReadFileArgs) -> List[TextContent]:
     """
     Read a file within the support bundle with optional line range filtering.
+    Displays file content with line numbers.
 
     Args:
-        args: The read file arguments
+        args: Arguments containing:
+            path: (string, required) The path to the file within the bundle to read.
+                Path cannot contain directory traversal (e.g., "../").
+            start_line: (integer, optional) The line number to start reading from (0-indexed).
+                Defaults to 0 (the first line).
+            end_line: (integer or null, optional) The line number to end reading at 
+                (0-indexed, inclusive). Defaults to null, which means read to the end of the file.
 
     Returns:
-        A list of content items to return to the model
+        The content of the file with line numbers. For text files, displays the 
+        specified line range with line numbers. For binary files, displays a hex dump.
     """
     try:
         result = await get_file_explorer().read_file(args.path, args.start_line, args.end_line)
@@ -334,13 +362,27 @@ async def read_file(args: ReadFileArgs) -> List[TextContent]:
 @mcp.tool()
 async def grep_files(args: GrepFilesArgs) -> List[TextContent]:
     """
-    Search for patterns in files within the support bundle.
+    Search for patterns in files within the support bundle. Searches both file content
+    and filenames, making it useful for finding keywords, error messages, or identifying files.
 
     Args:
-        args: The grep files arguments
+        args: Arguments containing:
+            pattern: (string, required) The pattern to search for. Supports regex syntax.
+            path: (string, required) The path within the bundle to search. Use "" or "/"
+                to search from root. Path cannot contain directory traversal (e.g., "../").
+            recursive: (boolean, optional) Whether to search recursively in subdirectories.
+                Defaults to True.
+            glob_pattern: (string or null, optional) File pattern to filter which files
+                to search (e.g., "*.yaml", "*.{json,log}"). Defaults to null (search all files).
+            case_sensitive: (boolean, optional) Whether the search is case-sensitive.
+                Defaults to False (case-insensitive search).
+            max_results: (integer, optional) Maximum number of results to return.
+                Defaults to 1000.
 
     Returns:
-        A list of content items to return to the model
+        Matches found in file contents and filenames, grouped by file.
+        Also includes search metadata such as the number of files searched
+        and the total number of matches found.
     """
     try:
         result = await get_file_explorer().grep_files(

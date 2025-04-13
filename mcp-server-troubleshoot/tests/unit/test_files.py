@@ -366,7 +366,7 @@ async def test_file_explorer_grep_files():
         assert result.pattern == "file"
         assert result.path == "dir1"
         assert result.glob_pattern == "*.txt"
-        assert result.total_matches == 2  # One in each file in dir1
+        assert result.total_matches == 4  # Two from filenames + one in each file content
 
         # Test searching case-sensitively
         result = await explorer.grep_files("LINE", "dir1", True, None, True)
@@ -388,6 +388,62 @@ async def test_file_explorer_grep_files():
         # Clean up
         import shutil
 
+        shutil.rmtree(bundle_dir)
+
+
+@pytest.mark.asyncio
+async def test_file_explorer_grep_files_with_kubeconfig():
+    """Test searching for kubeconfig patterns specifically."""
+    bundle_dir = setup_test_bundle()
+    try:
+        # Create a kubeconfig file to search for
+        kubeconfig_path = bundle_dir / "kubeconfig"
+        kubeconfig_path.write_text("apiVersion: v1\nkind: Config\nclusters:\n- name: test-cluster\n")
+
+        # Also create a file with the word "kubeconfig" in its contents
+        kubeconfig_ref_file = bundle_dir / "dir1" / "reference.txt"
+        kubeconfig_ref_file.write_text("This file refers to a kubeconfig file.\nIt contains the word multiple times.\nkubeconfig is important.")
+
+        # Mock the bundle manager
+        bundle_manager = Mock(spec=BundleManager)
+        bundle = BundleMetadata(
+            id="test",
+            source="test",
+            path=bundle_dir,
+            kubeconfig_path=Path("/test/kubeconfig"),
+            initialized=True,
+        )
+        bundle_manager.get_active_bundle.return_value = bundle
+
+        # Create the explorer
+        explorer = FileExplorer(bundle_manager)
+
+        # Test searching for "kubeconfig" (case insensitive)
+        result = await explorer.grep_files("kubeconfig", "", True, None, False)
+
+        # Verify the result - should find matches in both file content and filenames
+        assert isinstance(result, GrepResult)
+        assert result.pattern == "kubeconfig"
+        assert result.path == ""
+        
+        # Should find at least 3 matches - in the reference file and potentially in the kubeconfig file itself
+        print(f"Matches found: {len(result.matches)}")
+        for match in result.matches:
+            print(f"Match in {match.path}: {match.line}")
+            
+        assert result.total_matches >= 3, f"Expected at least 3 matches but found {result.total_matches}"
+        assert len(result.matches) >= 3
+        
+        # Make sure we actually searched the right files
+        assert result.files_searched > 0
+        
+        # There should be at least one match in the reference file we created
+        ref_file_matches = [m for m in result.matches if "reference.txt" in m.path]
+        assert len(ref_file_matches) > 0, "Should find matches in reference.txt"
+
+    finally:
+        # Clean up
+        import shutil
         shutil.rmtree(bundle_dir)
 
 
