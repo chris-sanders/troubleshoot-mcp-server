@@ -6,30 +6,32 @@ build-backend = "setuptools.build_meta"
 name = "mcp-server-troubleshoot"
 version = "0.1.0"
 description = "MCP server for Kubernetes support bundles"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "mcp>=0.5.0",  # Required for FastMCP
+    # Core dependencies with version constraints
+    "mcp>=0.5.0",
     "pydantic>=2.0.0",
-    "aiohttp",
+    "aiohttp>=3.8.0",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.27.1",
+    "typer>=0.9.0",
+    "pyyaml>=6.0"  # Required for kubeconfig parsing
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-asyncio",
+    "pytest-timeout",
+    "pytest-cov",
     "black",
     "ruff",
     "mypy",
-]
-yaml = [
-    "pyyaml>=6.0",  # Optional for better kubeconfig parsing
-]
-all = [
-    "pyyaml>=6.0", 
 ]
 
 [tool.setuptools.packages.find]
@@ -48,6 +50,11 @@ mcp-server-troubleshoot-serve = "mcp_server_troubleshoot.cli:main"
 testpaths = ["tests"]
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
+asyncio_default_test_loop_scope = "function"
+filterwarnings = [
+    "ignore::pytest_asyncio.plugin.PytestDeprecationWarning",
+    "ignore::DeprecationWarning"
+]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"

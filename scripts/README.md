@@ -4,6 +4,12 @@ This directory contains utility scripts for the MCP server for Kubernetes suppor
 
 ## Available Scripts
 
+### Development Scripts
+- `setup_env.sh`: Creates and configures a clean development environment
+  - Install with dev dependencies: `./scripts/setup_env.sh`
+  - Install all dependencies: `./scripts/setup_env.sh --all`
+  - Recreate environment: `./scripts/setup_env.sh --force-recreate`
+
 ### Docker Scripts
 - `build.sh`: Builds the Docker container image
 - `run.sh`: Runs the MCP server in a Docker container
@@ -20,6 +26,9 @@ This directory contains utility scripts for the MCP server for Kubernetes suppor
 All scripts should be run from the project root directory:
 
 ```bash
+# Set up development environment
+./scripts/setup_env.sh
+
 # Build the Docker image
 ./scripts/build.sh
 

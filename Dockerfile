@@ -1,4 +1,4 @@
-FROM python:3.11-slim AS builder
+FROM python:3.13-slim AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -17,12 +17,12 @@ WORKDIR /app
 # Copy project files
 COPY . .
 
-# Install Python dependencies including optional ones
-RUN pip install --no-cache-dir -e ".[all]" && \
-    pip install --no-cache-dir -e ".[all]"
+# Install Python dependencies
+# Do not rely on virtualenv for package installation
+RUN cd /app && uv pip install --no-cache-dir -e "." --system
 
 # Second stage for runtime
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -69,7 +69,7 @@ VOLUME /data/bundles
 WORKDIR /app
 
 # Copy installed packages from builder stage
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /app /app
 
 # Create entrypoint wrapper script

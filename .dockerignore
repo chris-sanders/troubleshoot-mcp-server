@@ -1,4 +1,45 @@
-# Created during test run
+# Python virtual environments
+.venv/
 venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+env/
+*.so
+.python-version
+
+# Git and version control
+.git/
+.gitignore
+.github/
+
+# Editor and IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Testing and temporary files
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.cache/
+.ruff_cache/
+__pycache__/
+.mypy_cache/
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+wheels/
+
+# Project specific
+tests/fixtures/support-bundle*.tar.gz
+support-bundle*.tar.gz

@@ -31,15 +31,23 @@ See the [Docker documentation](DOCKER.md) for more details.
 
 ### Manual Installation
 
-1. Ensure you have Python 3.11+ installed
-2. Install the package:
+1. Ensure you have Python 3.10+ installed (3.13 recommended)
+2. Create a virtual environment with UV (recommended):
 
 ```bash
-# Using uv (recommended)
-uv pip install -e .
+# Automatically creates and sets up environment with best available Python
+./scripts/setup_env.sh
 
-# Or using pip
-pip install -e .
+# OR create manually with UV
+uv venv -p python3.13 .venv
+source .venv/bin/activate
+```
+
+3. Install the package:
+
+```bash
+# Using uv
+uv pip install -e ".[dev]"  # For development with testing tools
 ```
 
 3. Set up your authentication token:
@@ -146,9 +154,15 @@ For development, install the package in editable mode with development dependenc
 git clone https://github.com/your-username/mcp-server-troubleshoot.git
 cd mcp-server-troubleshoot
 
+# Create a virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
 # Install with development dependencies
 uv pip install -e ".[dev]"
 ```
+
+For detailed guidance on dependency management, see our [Dependency Management Guide](docs/development/dependency_management.md).
 
 ### Code Style
 

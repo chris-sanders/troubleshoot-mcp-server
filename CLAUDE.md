@@ -9,11 +9,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Understand system architecture from `docs/architecture.md` before coding
 
 ## Build & Test Commands
-- Install dependencies: `uv pip install -e .`
+- Setup dev environment: `./scripts/setup_env.sh`
+- Create virtual environment with UV: `uv venv -p python3.13 .venv && source .venv/bin/activate`
+- Install dependencies: `uv pip install -e ".[dev]"`
 - Run tests: `pytest`
+- Run test categories: `pytest -m unit`, `pytest -m integration`, `pytest -m e2e`
 - Run single test: `pytest path/to/test.py::TestClass::test_function -v`
+- Run with coverage: `pytest --cov=src`
 - Lint code: `ruff check .`
 - Format code: `black .`
+- Type check: `mypy src`
 
 ## Code Style Guidelines
 - Python: Follow PEP 8 and use type annotations
