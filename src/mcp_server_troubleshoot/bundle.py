@@ -99,13 +99,15 @@ class InitializeBundleArgs(BaseModel):
         except Exception:
             pass
 
-        # Check if it's a local file
+        # Check if it's a local file - for validation, we only check if it's absolute path
+        # If it's a relative path, it will be checked in the initialize_bundle method
         path = Path(v)
-        if not path.exists():
-            raise ValueError(f"Bundle source not found: {v}")
+        if path.is_absolute():
+            if not path.exists():
+                raise ValueError(f"Bundle source not found: {v}")
 
-        if not path.is_file():
-            raise ValueError(f"Bundle source must be a file: {v}")
+            if not path.is_file():
+                raise ValueError(f"Bundle source must be a file: {v}")
 
         return v
 
@@ -210,9 +212,37 @@ class BundleManager:
             if source.startswith(("http://", "https://")):
                 bundle_path = await self._download_bundle(source)
             else:
+                # First, check if it's a full path
                 bundle_path = Path(source)
+
+                # If the path doesn't exist, check if it's a relative path in the bundle directory
+                if not bundle_path.exists() and not bundle_path.is_absolute():
+                    # Try to find it in the bundle directory
+                    possible_path = self.bundle_dir / source
+                    logger.info(f"Path {bundle_path} not found, trying {possible_path}")
+                    if possible_path.exists():
+                        bundle_path = possible_path
+                    else:
+                        # Also check if there's a bundle with matching relative_path in available bundles
+                        try:
+                            available_bundles = await self.list_available_bundles(
+                                include_invalid=True
+                            )
+                            for bundle in available_bundles:
+                                if bundle.relative_path == source or bundle.name == source:
+                                    logger.info(
+                                        f"Found matching bundle by relative path: {bundle.path}"
+                                    )
+                                    bundle_path = Path(bundle.path)
+                                    break
+                        except Exception as e:
+                            logger.warning(f"Error searching for bundle by relative path: {e}")
+
+                # If we still can't find it, raise an error
                 if not bundle_path.exists():
-                    raise BundleNotFoundError(f"Bundle not found: {source}")
+                    raise BundleNotFoundError(
+                        f"Bundle not found: {source} (tried both as absolute path and in bundle directory {self.bundle_dir})"
+                    )
 
             # Generate a unique ID for the bundle
             bundle_id = self._generate_bundle_id(source)
