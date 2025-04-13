@@ -73,15 +73,8 @@ fi
 # Create a unique container name
 CONTAINER_NAME="mcp-server-$(date +%s)-$RANDOM"
 
-# Prepare arguments for MCP mode
-if [ "$MCP_MODE" = true ]; then
-  # Add the MCP mode flag for the CLI module
-  if [ -z "$ARGS" ]; then
-    ARGS="--mcp"
-  else
-    ARGS="--mcp $ARGS"
-  fi
-fi
+# MCP mode is detected automatically by the CLI
+# No additional arguments needed
 
 # Run the container with the new entrypoint
 if [ "$DEBUG_MODE" = true ]; then

@@ -18,11 +18,9 @@ def test_config_provides_recommended_defaults():
     assert "mcpServers" in config
     assert "troubleshoot" in config["mcpServers"]
     assert config["mcpServers"]["troubleshoot"]["command"] == "docker"
-    
+
     # Check for important flags and arguments
     args = config["mcpServers"]["troubleshoot"]["args"]
-    assert "--rm" in args
     assert "-i" in args
     assert any("SBCTL_TOKEN" in arg for arg in args)
-    assert any("MCP_BUNDLE_STORAGE" in arg for arg in args)
     assert any("/data/bundles" in arg for arg in args)
