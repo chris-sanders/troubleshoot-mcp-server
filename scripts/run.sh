@@ -5,22 +5,13 @@ set -e
 IMAGE_NAME="mcp-server-troubleshoot"
 IMAGE_TAG="latest"
 BUNDLE_DIR="$(pwd)/tests/fixtures"
-INTERACTIVE="-i"  # Default is MCP mode (-i)
+INTERACTIVE="-i"  # Default is interactive mode (-i)
 VERBOSE=""
-DEBUG_MODE=false
-MCP_MODE=true
 
 # Parse command-line options
 ARGS=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    --debug)
-      # Interactive debug mode with terminal
-      INTERACTIVE="-it"
-      DEBUG_MODE=true
-      MCP_MODE=false
-      shift
-      ;;
     --verbose)
       VERBOSE="--verbose"
       shift
@@ -32,10 +23,6 @@ while [ $# -gt 0 ]; do
     --bundle-dir)
       BUNDLE_DIR="$2"
       shift 2
-      ;;
-    --no-mcp)
-      MCP_MODE=false
-      shift
       ;;
     *)
       if [ -z "$ARGS" ]; then
@@ -51,58 +38,21 @@ done
 # Create bundle directory if it doesn't exist
 mkdir -p "${BUNDLE_DIR}"
 
-# Set log level based on debug mode
+# Set log level
 LOG_LEVEL="ERROR"
-if [ "$DEBUG_MODE" = true ]; then
+if [ "$VERBOSE" = "--verbose" ]; then
   LOG_LEVEL="DEBUG"
-  # In debug mode, we can echo to stdout
-  echo "Running in DEBUG mode with terminal access"
-  echo "Using bundle directory: ${BUNDLE_DIR}"
-  
-  # Check if SBCTL_TOKEN is set
-  if [ -z "${SBCTL_TOKEN}" ]; then
-    echo "Warning: SBCTL_TOKEN is not set. Some operations may fail."
-    echo "Set it with: export SBCTL_TOKEN=your_token_here"
-  fi
-else
-  # In MCP mode, only print to stderr
-  >&2 echo "Starting MCP server"
-  >&2 echo "Using bundle directory: $BUNDLE_DIR"
 fi
 
 # Create a unique container name
 CONTAINER_NAME="mcp-server-$(date +%s)-$RANDOM"
 
-# Prepare arguments for MCP mode
-if [ "$MCP_MODE" = true ]; then
-  # Add the MCP mode flag for the CLI module
-  if [ -z "$ARGS" ]; then
-    ARGS="--mcp"
-  else
-    ARGS="--mcp $ARGS"
-  fi
-fi
-
-# Run the container with the new entrypoint
-if [ "$DEBUG_MODE" = true ]; then
-  # Run in interactive debug mode
-  docker run ${INTERACTIVE} --rm \
-    -v "${BUNDLE_DIR}:/data/bundles" \
-    -e SBCTL_TOKEN="${SBCTL_TOKEN:-}" \
-    -e MCP_BUNDLE_STORAGE="/data/bundles" \
-    -e MCP_LOG_LEVEL="${LOG_LEVEL}" \
-    --name "$CONTAINER_NAME" \
-    "${IMAGE_NAME}:${IMAGE_TAG}" ${VERBOSE} ${ARGS}
-else
-  # Run in MCP mode (default)
-  # Pipe stdin to the container and don't use terminal
-  cat | docker run ${INTERACTIVE} \
-    -v "${BUNDLE_DIR}:/data/bundles" \
-    -e SBCTL_TOKEN="${SBCTL_TOKEN:-}" \
-    -e MCP_BUNDLE_STORAGE="/data/bundles" \
-    -e MCP_LOG_LEVEL="${LOG_LEVEL}" \
-    -e MCP_KEEP_ALIVE="true" \
-    --rm \
-    --name "$CONTAINER_NAME" \
-    "${IMAGE_NAME}:${IMAGE_TAG}" ${VERBOSE} ${ARGS}
-fi
+# Run the container in MCP mode
+docker run ${INTERACTIVE} --rm \
+  -v "${BUNDLE_DIR}:/data/bundles" \
+  -e SBCTL_TOKEN="${SBCTL_TOKEN:-}" \
+  -e MCP_BUNDLE_STORAGE="/data/bundles" \
+  -e MCP_LOG_LEVEL="${LOG_LEVEL}" \
+  -e MCP_KEEP_ALIVE="true" \
+  --name "$CONTAINER_NAME" \
+  "${IMAGE_NAME}:${IMAGE_TAG}" ${VERBOSE} ${ARGS}
