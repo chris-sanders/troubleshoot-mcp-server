@@ -6,9 +6,9 @@
 **Started**: 2025-04-13
 **Completed**: 2025-04-13
 **Branch**: bundle-cleanup
-**PR**: N/A - local implementation
-**PR URL**: N/A
-**PR Status**: N/A
+**PR**: #13
+**PR URL**: https://github.com/chris-sanders/troubleshoot-mcp-server/pull/13
+**PR Status**: Open - Pending Review
 
 ## Objective
 Implement robust bundle cleanup to ensure proper resource management when a server is shutdown or a different bundle is activated.
