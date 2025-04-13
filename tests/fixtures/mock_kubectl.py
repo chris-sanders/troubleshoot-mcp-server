@@ -34,26 +34,26 @@ def parse_args():
             args_copy.pop(idx)  # Remove json
             # Add --output=json instead
             args_copy.append("--output=json")
-    
+
     parser = argparse.ArgumentParser(description="Mock kubectl implementation")
-    
+
     # Global flags
     parser.add_argument("-o", "--output", help="Output format")
     parser.add_argument("--kubeconfig", help="Path to kubeconfig file")
-    
+
     # Subcommands
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
-    
+
     # Version command
     version_parser = subparsers.add_parser("version", help="Show version info")
     version_parser.add_argument("--client", action="store_true", help="Client version only")
-    
+
     # Get command
     get_parser = subparsers.add_parser("get", help="Display resources")
     get_parser.add_argument("resource", help="Resource type to get")
     get_parser.add_argument("name", nargs="?", help="Resource name")
     get_parser.add_argument("-o", "--output", help="Output format")
-    
+
     return parser.parse_args(args_copy)
 
 
@@ -63,20 +63,20 @@ def get_api_server_url():
     if not kubeconfig_path:
         logger.error("KUBECONFIG environment variable not set")
         return None
-    
+
     try:
         with open(kubeconfig_path, "r") as f:
             config = json.load(f)
-        
+
         if not config.get("clusters") or len(config["clusters"]) == 0:
             logger.error("No clusters defined in kubeconfig")
             return None
-        
+
         server_url = config["clusters"][0]["cluster"].get("server")
         if not server_url:
             logger.error("No server URL defined in kubeconfig")
             return None
-        
+
         return server_url
     except Exception as e:
         logger.error(f"Error reading kubeconfig: {e}")
@@ -95,32 +95,32 @@ def handle_version(args):
             "buildDate": "2025-04-12T00:00:00Z",
             "goVersion": "go1.19.4",
             "compiler": "gc",
-            "platform": "darwin/amd64"
+            "platform": "darwin/amd64",
         }
     }
-    
+
     if args.client:
         print(json.dumps(client_version) if args.output == "json" else "Client Version: v1.26.0")
         return 0
-    
+
     # Try to get server version too
     api_url = get_api_server_url()
     if not api_url:
         print(json.dumps(client_version) if args.output == "json" else "Client Version: v1.26.0")
         print("The connection to the server was refused - did you specify the right host or port?")
         return 1
-    
+
     try:
         response = urllib.request.urlopen(f"{api_url}/version")
         server_version = json.loads(response.read().decode("utf-8"))
-        
-        result = {
-            **client_version,
-            "serverVersion": server_version
-        }
-        
-        print(json.dumps(result) if args.output == "json" else 
-              f"Client Version: v1.26.0\nServer Version: {server_version.get('gitVersion', 'unknown')}")
+
+        result = {**client_version, "serverVersion": server_version}
+
+        print(
+            json.dumps(result)
+            if args.output == "json"
+            else f"Client Version: v1.26.0\nServer Version: {server_version.get('gitVersion', 'unknown')}"
+        )
         return 0
     except URLError as e:
         print(json.dumps(client_version) if args.output == "json" else "Client Version: v1.26.0")
@@ -134,14 +134,14 @@ def handle_get(args):
     if not api_url:
         print("Error: Unable to get API server URL from kubeconfig")
         return 1
-    
+
     try:
         # Check if we want JSON output
         # This can be from --output=json or -o json
         json_output = False
-        if hasattr(args, 'output') and args.output == "json":
+        if hasattr(args, "output") and args.output == "json":
             json_output = True
-        
+
         # Determine the resource type and build the URL
         if args.resource == "nodes":
             url = f"{api_url}/api/v1/nodes"
@@ -158,9 +158,9 @@ def handle_get(args):
         else:
             print(f"Error: Unsupported resource type: {args.resource}")
             return 1
-        
+
         logger.debug(f"Making request to {url}, json_output={json_output}")
-        
+
         # For testing, we'll simulate some basic resource responses
         # This lets us avoid actually hitting the API server
         if args.resource == "nodes":
@@ -174,18 +174,11 @@ def handle_get(args):
                         "apiVersion": "v1",
                         "metadata": {
                             "name": "mock-node-1",
-                            "uid": "00000000-0000-0000-0000-000000000020"
+                            "uid": "00000000-0000-0000-0000-000000000020",
                         },
-                        "status": {
-                            "conditions": [
-                                {
-                                    "type": "Ready",
-                                    "status": "True"
-                                }
-                            ]
-                        }
+                        "status": {"conditions": [{"type": "Ready", "status": "True"}]},
                     }
-                ]
+                ],
             }
         elif args.resource == "pods":
             # Mock pod response
@@ -199,16 +192,16 @@ def handle_get(args):
                         "metadata": {
                             "name": "mock-pod-1",
                             "namespace": "default",
-                            "uid": "00000000-0000-0000-0000-000000000010"
+                            "uid": "00000000-0000-0000-0000-000000000010",
                         },
-                        "status": {"phase": "Running"}
+                        "status": {"phase": "Running"},
                     }
-                ]
+                ],
             }
         else:
             # Default to empty list for other resource types
             data = {"kind": "List", "apiVersion": "v1", "items": []}
-        
+
         # Output the data in the requested format
         if json_output:
             print(json.dumps(data))
@@ -225,7 +218,7 @@ def handle_get(args):
                 name = data.get("metadata", {}).get("name", "unknown")
                 status = "Ready"
                 print(f"{name}\t{status}")
-        
+
         return 0
     except URLError as e:
         print(f"Error communicating with server: {e}")
@@ -241,15 +234,15 @@ def main():
     try:
         # Debug logging to help troubleshoot
         logger.debug(f"Original args: {sys.argv}")
-        
+
         args = parse_args()
         logger.debug(f"Parsed args: {args}")
-        
+
         # Set json_output flag based on args
         json_output = False
         if args.output == "json":
             json_output = True
-        
+
         if args.command == "version":
             return handle_version(args)
         elif args.command == "get":

@@ -45,7 +45,7 @@ class StdioServerProcess:
         """Start the server process with stdio mode."""
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
-        
+
         # Configure MCP server to operate in test mode
         env["PYTEST_CURRENT_TEST"] = "True"  # Signal we're in a test
         env["ENABLE_PERIODIC_CLEANUP"] = "true"
@@ -63,7 +63,7 @@ class StdioServerProcess:
         ]
 
         print(f"Starting server with: {' '.join(server_args)}")
-        
+
         self.process = await asyncio.create_subprocess_exec(
             *server_args,
             stdin=asyncio.subprocess.PIPE,
@@ -71,15 +71,17 @@ class StdioServerProcess:
             stderr=asyncio.subprocess.PIPE,
             env=env,
         )
-        
+
         # Wait for startup and check if process is still running
         await asyncio.sleep(2)
-        
+
         if self.process.returncode is not None:
             # Process already exited - read stderr to get error info
             stderr = await self.process.stderr.read()
             stderr_str = stderr.decode() if stderr else ""
-            raise RuntimeError(f"Server process exited with code {self.process.returncode}: {stderr_str}")
+            raise RuntimeError(
+                f"Server process exited with code {self.process.returncode}: {stderr_str}"
+            )
 
     async def send_request(self, method, params=None):
         """Send a request to the server process."""
@@ -140,7 +142,9 @@ class StdioServerProcess:
 @pytest.mark.e2e
 @pytest.mark.asyncio
 @pytest.mark.timeout(30)  # Add timeout to prevent hanging
-@pytest.mark.skip(reason="The test is hanging due to stdio communication issues in the test environment")
+@pytest.mark.skip(
+    reason="The test is hanging due to stdio communication issues in the test environment"
+)
 async def test_stdio_server_startup_shutdown():
     """Test basic startup and shutdown of the server in stdio mode."""
     server = StdioServerProcess()
@@ -168,7 +172,9 @@ async def test_stdio_server_startup_shutdown():
 @pytest.mark.e2e
 @pytest.mark.asyncio
 @pytest.mark.timeout(30)  # Add timeout to prevent hanging
-@pytest.mark.skip(reason="The test is hanging due to stdio communication issues in the test environment")
+@pytest.mark.skip(
+    reason="The test is hanging due to stdio communication issues in the test environment"
+)
 async def test_stdio_server_bundle_operations(test_bundle):
     """Test bundle operations with the stdio server."""
     server = StdioServerProcess()
@@ -200,7 +206,9 @@ async def test_stdio_server_bundle_operations(test_bundle):
 @pytest.mark.e2e
 @pytest.mark.asyncio
 @pytest.mark.timeout(30)  # Add timeout to prevent hanging
-@pytest.mark.skip(reason="The test is hanging due to stdio communication issues in the test environment")
+@pytest.mark.skip(
+    reason="The test is hanging due to stdio communication issues in the test environment"
+)
 async def test_stdio_server_signal_handling():
     """Test that the server properly handles signals for termination."""
     server = StdioServerProcess()
@@ -239,7 +247,9 @@ async def test_stdio_server_signal_handling():
 @pytest.mark.e2e
 @pytest.mark.asyncio
 @pytest.mark.timeout(30)  # Add timeout to prevent hanging
-@pytest.mark.skip(reason="The test is hanging due to stdio communication issues in the test environment")
+@pytest.mark.skip(
+    reason="The test is hanging due to stdio communication issues in the test environment"
+)
 async def test_temp_dir_cleanup():
     """Test that temporary directories are cleaned up on shutdown."""
     server = StdioServerProcess()

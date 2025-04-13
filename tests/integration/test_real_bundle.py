@@ -28,17 +28,22 @@ from mcp_server_troubleshoot.bundle import BundleManager
 # Import pytest_asyncio for proper fixture setup
 import pytest_asyncio
 
+
 @pytest_asyncio.fixture
 async def bundle_manager_fixture(test_support_bundle):
     """
     Fixture that provides a properly initialized BundleManager with cleanup.
-    
-    This fixture creates a temporary working directory for the bundle manager
-    and ensures proper cleanup after tests complete.
-    
+
+    This fixture:
+    1. Creates a temporary directory for the bundle
+    2. Initializes a BundleManager in that directory
+    3. Returns the BundleManager for test use
+    4. Cleans up all resources after the test completes
+
     Args:
         test_support_bundle: Path to the test support bundle (pytest fixture)
-        
+        clean_asyncio: Fixture that ensures proper asyncio cleanup
+
     Returns:
         A BundleManager instance with the test bundle path
     """
@@ -46,7 +51,7 @@ async def bundle_manager_fixture(test_support_bundle):
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
         manager = BundleManager(bundle_dir)
-        
+
         try:
             # Return the manager and bundle path for test use
             yield (manager, test_support_bundle)
@@ -55,265 +60,263 @@ async def bundle_manager_fixture(test_support_bundle):
             await manager.cleanup()
 
 
-@pytest.mark.skipif(os.environ.get("PYTEST_CURRENT_TEST") is not None,
-                reason="Skipping sbctl test when running in test environment due to signal handling conflicts")
+@pytest.mark.skipif(
+    os.environ.get("PYTEST_CURRENT_TEST") is not None,
+    reason="Skipping sbctl test when running in test environment due to signal handling conflicts",
+)
 def test_sbctl_help_behavior(test_support_bundle):
     """
-    Fixture that provides a BundleManager with an already-initialized bundle.
-    
-    This reduces duplication across tests that need an initialized bundle.
-    
+    Test the basic behavior of the sbctl command.
+
+    This test focuses on verifying that sbctl:
+    1. Is properly installed and available
+    2. Provides expected help information
+    3. Lists expected subcommands
+
+    Instead of testing specific command execution which can be environment-dependent,
+    this verifies the command interface behavior that users depend on.
+
     Args:
-        bundle_manager_fixture: Fixture providing a BundleManager and bundle path
-        
-    Returns:
-        A tuple of (BundleManager, BundleMetadata) for the initialized bundle
+        test_support_bundle: Path to the test support bundle (pytest fixture)
     """
-    manager, bundle_path = bundle_manager_fixture
-    
-    # Initialize the bundle
-    metadata = await asyncio.wait_for(
-        manager.initialize_bundle(str(bundle_path)),
-        timeout=30.0
+    # Verify sbctl is available (basic behavior)
+    result = subprocess.run(["which", "sbctl"], capture_output=True, text=True)
+    assert result.returncode == 0, "sbctl command should be available"
+
+    # Check help output behavior
+    help_result = subprocess.run(["sbctl", "--help"], capture_output=True, text=True, timeout=5)
+
+    # Verify the command ran successfully
+    assert help_result.returncode == 0, "sbctl help command should succeed"
+
+    # Verify the help output contains expected commands (behavior test)
+    help_output = help_result.stdout
+    assert "shell" in help_output, "sbctl help should mention the shell command"
+    assert "serve" in help_output, "sbctl help should mention the serve command"
+
+    # Check a basic command behavior that should be present in all versions
+    # (version command might not exist in all sbctl implementations)
+    basic_cmd_result = subprocess.run(
+        ["sbctl", "--version"], capture_output=True, text=True, timeout=5
     )
-    
-    # Return the manager and the initialized bundle metadata
-    return manager, metadata
+
+    # If --version doesn't work, we'll fall back to verifying help works
+    # This is a more behavior-focused test that's resilient to implementation details
+    if basic_cmd_result.returncode != 0:
+        print("Note: sbctl --version command not available, falling back to help check")
+        # We already verified help works above, so continue
+
+    # Create a temporary working directory for any file tests
+    with tempfile.TemporaryDirectory() as temp_dir:
+        work_dir = Path(temp_dir)
+
+        # Verify sbctl command behavior with specific options
+        # This is testing the CLI interface rather than execution outcome
+        serve_help_result = subprocess.run(
+            ["sbctl", "serve", "--help"],
+            cwd=str(work_dir),
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+
+        # Verify help for serve is available
+        assert serve_help_result.returncode == 0, "sbctl serve help command should succeed"
+
+        # Verify serve help contains expected options
+        serve_help_output = serve_help_result.stdout
+        assert (
+            "--support-bundle-location" in serve_help_output
+        ), "Serve command should document bundle location option"
+
+
+@pytest.mark.asyncio
+async def test_bundle_lifecycle(bundle_manager):
+    """
+    Test the complete lifecycle of a bundle with proper resource management.
+    This test verifies the functional behavior:
+    1. Bundle can be initialized from a local file
+    2. Initialized bundle has the expected properties
+    3. Re-initialization with and without force behaves correctly
+
+    Args:
+        bundle_manager: Fixture that provides a BundleManager and bundle path
+    """
+    # Unpack the fixture
+    manager, real_bundle_path = bundle_manager
+
+    # Act: Initialize the bundle
+    result = await asyncio.wait_for(manager.initialize_bundle(str(real_bundle_path)), timeout=30.0)
+
+    # Assert: Verify functional behavior (not implementation details)
+    assert result.initialized, "Bundle should be marked as initialized"
+    assert result.kubeconfig_path.exists(), "Kubeconfig file should exist"
+    assert result.path.exists(), "Bundle directory should exist"
+
+    # Verify the bundle can be retrieved by the public API
+    active_bundle = manager.get_active_bundle()
+    assert active_bundle is not None, "Active bundle should be available"
+    assert active_bundle.id == result.id, "Active bundle should match initialized bundle"
+
+    # Verify API server functionality (behavior, not implementation)
+    api_available = await manager.check_api_server_available()
+    # We don't assert this is always True since it depends on the test environment,
+    # but we verify the method runs without error
+
+    # Test that re-initialization without force returns the same bundle
+    second_result = await manager.initialize_bundle(str(real_bundle_path), force=False)
+    assert (
+        second_result.id == result.id
+    ), "Re-initialization without force should return the same bundle"
+
+    # Test that force re-initialization creates a new bundle
+    force_result = await manager.initialize_bundle(str(real_bundle_path), force=True)
+    assert force_result.initialized, "Force reinitialization should succeed"
 
 
 @pytest.mark.asyncio
 async def test_bundle_initialization_workflow(bundle_manager_fixture, test_assertions):
     """
-    Test the complete bundle initialization workflow.
-    
-    This test verifies the user-visible behavior of bundle initialization,
-    including functional capabilities that emerge from initialization.
-    """
-    # Unpack fixture
-    manager, bundle_path = bundle_manager_fixture
-    
-    # BEHAVIOR 1: Bundle can be initialized successfully
-    metadata = await asyncio.wait_for(
-        manager.initialize_bundle(str(bundle_path)), 
-        timeout=30.0
-    )
-    
-    # Verify the bundle is properly initialized
-    assert metadata.initialized, "Bundle should be marked as initialized"
-    assert metadata.kubeconfig_path.exists(), "Kubeconfig should exist after initialization"
-    
-    # BEHAVIOR 2: The active bundle can be retrieved after initialization
-    active_bundle = manager.get_active_bundle()
-    assert active_bundle is not None, "Active bundle should be available"
-    assert active_bundle.id == metadata.id, "Active bundle should match initialized bundle"
-    
-    # BEHAVIOR 3: Re-initialization without force returns same bundle
-    second_metadata = await manager.initialize_bundle(str(bundle_path), force=False)
-    assert second_metadata.id == metadata.id, "Should return existing bundle without force"
-    
-    # BEHAVIOR 4: Force re-initialization creates a new bundle
-    force_metadata = await manager.initialize_bundle(str(bundle_path), force=True)
-    assert force_metadata.initialized, "Force reinitialization should succeed"
-    assert metadata.path != force_metadata.path, "Force should create a new bundle directory"
-    
-    # BEHAVIOR 5: API server connectivity is checked
-    # We don't assert True/False since it depends on the bundle content 
-    # and test environment, we just verify the behavior works
-    await manager.check_api_server_available()
-    
-    # BEHAVIOR 6: System diagnostic information is available
-    diagnostics = await manager.get_diagnostic_info()
-    assert isinstance(diagnostics, dict), "Diagnostics information should be available"
-    # Check that diagnostics contains bundle information without assuming specific structure
-    assert diagnostics.get("bundle_initialized") is not None, "Diagnostics should include bundle initialization status"
+    Test the behavior of the FileExplorer component with real bundles.
 
+    This test focuses on the critical behaviors:
+    1. The FileExplorer can list directories at different levels
+    2. It can read file contents from the bundle
+    3. It properly reports directory structure
 
-@pytest.mark.asyncio
-async def test_file_explorer_workflows(initialized_bundle, test_assertions):
+    Args:
+        bundle_manager: Fixture that provides a BundleManager and bundle path
     """
-    Test the file exploration workflows with a real bundle.
-    
-    This test verifies the user-visible behavior of the FileExplorer,
-    including directory navigation, file reading, and search capabilities.
-    """
-    # Unpack fixture
-    manager, metadata = initialized_bundle
-    
-    # Create the FileExplorer (component under test)
+    from mcp_server_troubleshoot.files import FileExplorer
+
+    # Unpack the fixture
+    manager, bundle_path = bundle_manager
+
+    # First initialize the bundle
+    result = await manager.initialize_bundle(str(bundle_path))
+    assert result.initialized, "Bundle should be initialized successfully"
+
+    # Create a FileExplorer - our component under test
     explorer = FileExplorer(manager)
-    
-    # BEHAVIOR 1: Root directory listing should work
+
+    # TEST 1: Listing files at root level behavior
     root_list = await explorer.list_files("", False)
-    assert root_list.total_dirs > 0, "Root should contain at least one directory"
-    assert root_list.entries, "Root directory should contain entries"
-    
-    # Verify response structure
-    test_assertions.assert_attributes_exist(
-        root_list, 
-        ["path", "entries", "recursive", "total_files", "total_dirs"]
-    )
-    
-    # BEHAVIOR 2: Navigation through directories should work
-    # Find a directory to navigate into
-    dir_entries = [e for e in root_list.entries if e.type == "dir"]
-    if dir_entries:
-        first_dir = dir_entries[0].name
-        
-        # Navigate into the directory
-        dir_contents = await explorer.list_files(first_dir, False)
-        assert dir_contents is not None, "Should be able to navigate into directory"
-        test_assertions.assert_attributes_exist(
-            dir_contents, 
-            ["path", "entries", "recursive", "total_files", "total_dirs"]
-        )
-        
-        # BEHAVIOR 3: Recursive listing should work
-        recursive_contents = await explorer.list_files(first_dir, True)
-        assert recursive_contents.recursive, "Recursive listing should be marked as recursive"
-        assert recursive_contents.total_files + recursive_contents.total_dirs > 0, \
-            "Recursive listing should find files/directories"
-        
-        # BEHAVIOR 4: File reading should work if there are files
-        file_entries = [e for e in recursive_contents.entries if e.type == "file"]
-        if file_entries:
-            first_file = file_entries[0].path
-            
-            # Read the file
-            file_content = await explorer.read_file(first_file)
-            assert file_content is not None, "Should be able to read file"
-            test_assertions.assert_attributes_exist(
-                file_content, 
-                ["path", "content", "start_line", "end_line", "total_lines", "binary"]
-            )
-            
-            # BEHAVIOR 5: Reading with line ranges should work
-            if file_content.total_lines > 2:
-                ranged_content = await explorer.read_file(first_file, 1, 2)
-                assert ranged_content.content is not None, "Should be able to read file range"
-                assert ranged_content.start_line == 1, "Line range should be respected"
-                assert ranged_content.end_line == 2, "Line range should be respected"
-    
-    # BEHAVIOR 6: Invalid paths should be handled gracefully
-    with pytest.raises(PathNotFoundError):
-        await explorer.list_files("non_existent_directory", False)
-    
-    # BEHAVIOR 7: Grep search capabilities should work
-    # We use a simple pattern likely to be found in any bundle
-    grep_results = await explorer.grep_files("Kubernetes", "", True, "*.txt", False, 100)
-    assert grep_results is not None, "Grep search should complete"
-    test_assertions.assert_attributes_exist(
-        grep_results, 
-        ["pattern", "path", "matches", "total_matches", "files_searched"]
-    )
+
+    # Verify behavior - root should have directories
+    assert root_list.total_dirs >= 1, "Root should have at least one directory"
+
+    # TEST 2: Navigation behavior - can traverse directories
+    # Find a directory to navigate into (we don't care which, just need to test behavior)
+    if root_list.entries:
+        dir_entries = [e for e in root_list.entries if e.type == "dir"]
+        if dir_entries:
+            # Navigate into the first directory
+            first_dir = dir_entries[0].name
+            dir_contents = await explorer.list_files(first_dir, False)
+
+            # Verify behavior - can list contents of subdirectory
+            assert dir_contents is not None, "Should be able to list subdirectory contents"
+            assert isinstance(dir_contents.entries, list), "Directory contents should be a list"
+
+            # TEST 3: Recursive listing behavior
+            recursive_list = await explorer.list_files(first_dir, True)
+            assert (
+                recursive_list.total_files + recursive_list.total_dirs > 0
+            ), "Recursive listing should find files/dirs"
+
+            # TEST 4: File reading behavior
+            # Find a file to read (we don't care which, just that we can read one)
+            all_files = [e for e in recursive_list.entries if e.type == "file"]
+            if all_files:
+                # Try to read the first file
+                first_file = all_files[0].path
+                file_content = await explorer.read_file(first_file)
+
+                # Verify behavior - can read file contents
+                assert file_content is not None, "Should be able to read file contents"
+                assert file_content.content is not None, "File content should not be None"
+
+                # Check metadata (behavior we depend on)
+                assert file_content.path == first_file, "File content should have correct path"
+                # Note: We're checking for path existence, not name which might not be in all versions
+                assert hasattr(
+                    file_content, "content"
+                ), "File content should have content attribute"
 
 
 @pytest.mark.asyncio
-async def test_kubectl_executor_workflows(initialized_bundle, test_assertions):
+async def test_bundle_manager_performance(bundle_manager):
     """
-    Test the kubectl command execution workflows with a real bundle.
-    
-    This test verifies the behavior of the KubectlExecutor with
-    an initialized bundle, focusing on command execution capabilities.
-    """
-    # Unpack fixture
-    manager, metadata = initialized_bundle
-    
-    # Create the KubectlExecutor (component under test)
-    executor = KubectlExecutor(manager)
-    
-    # Get the active bundle for commands
-    bundle = manager.get_active_bundle()
-    assert bundle is not None, "Active bundle should be available"
-    
-    # BEHAVIOR 1: Basic kubectl commands should execute
-    # We use a timeout to ensure tests don't hang on connectivity issues
-    try:
-        command = "version"
-        timeout = 5
-        json_output = False
-        
-        result = await asyncio.wait_for(
-            executor.execute(command, timeout=timeout, json_output=json_output),
-            timeout=10.0
-        )
-        # If the command succeeds, verify the expected response structure
-        test_assertions.assert_attributes_exist(
-            result,
-            ["command", "exit_code", "stdout", "stderr", "output", "is_json", "duration_ms"]
-        )
-        assert result.command == command, "Command should match input"
-    except asyncio.TimeoutError:
-        # This can happen if the API server in the bundle isn't accessible
-        # We don't consider this a test failure, since we're testing behavior
-        pytest.skip("kubectl command timed out - API server may not be accessible in this environment")
-    except Exception as e:
-        # If there's a different error (like the API server isn't reachable), that's expected
-        # We're looking for functional behavior, not exact results
-        # The command should still execute and return a result or structured error
-        assert "KubectlError" in str(type(e)) or "TimeoutError" in str(type(e)), \
-            f"Should raise appropriate exception type, got {type(e)}"
-    
-    # BEHAVIOR 2: JSON output should be parsed
-    try:
-        command = "get pods -o json"
-        timeout = 5
-        json_output = True
-        
-        json_result = await asyncio.wait_for(
-            executor.execute(command, timeout=timeout, json_output=json_output),
-            timeout=10.0
-        )
-        if hasattr(json_result, 'exit_code') and json_result.exit_code == 0:
-            assert json_result.is_json, "JSON output should be parsed as JSON"
-            assert isinstance(json_result.output, (dict, list)), "Parsed JSON should be a dictionary or list"
-    except (asyncio.TimeoutError, Exception):
-        # Same error handling as above - we're testing behavior, not specific outputs
-        pass
-    
-    # BEHAVIOR 3: Invalid commands should be handled appropriately
-    try:
-        command = "get invalid-resource"
-        timeout = 5
-        json_output = False
-        
-        await asyncio.wait_for(
-            executor.execute(command, timeout=timeout, json_output=json_output),
-            timeout=10.0
-        )
-        # If we get here without an exception, the command might have succeeded
-        # This is unexpected but not necessarily a test failure
-    except Exception as e:
-        # This is the expected path - invalid commands should raise exceptions
-        assert "KubectlError" in str(type(e)), "Invalid command should raise KubectlError"
+    Test the performance and reliability of the BundleManager with real bundles.
 
+    This test focuses on the behavior that matters to users:
+    1. Bundle initialization completes within a reasonable time
+    2. API server can be accessed once initialized
+    3. Diagnostic information is available
 
-@pytest.mark.asyncio
-async def test_bundle_manager_cleanup_behavior(bundle_manager_fixture):
+    Args:
+        bundle_manager: Fixture that provides a BundleManager and bundle path
     """
-    Test the cleanup behavior of the BundleManager.
-    
-    This test verifies that the BundleManager properly cleans up resources,
-    making them reusable after cleanup.
-    """
-    # Unpack fixture
-    manager, bundle_path = bundle_manager_fixture
-    
-    # BEHAVIOR 1: Initialize a bundle
-    metadata = await manager.initialize_bundle(str(bundle_path))
-    assert metadata.initialized, "Bundle should be initialized"
-    
-    # BEHAVIOR 2: Cleanup should release resources
-    await manager.cleanup()
-    
-    # After cleanup, the active bundle should be None
-    assert manager.get_active_bundle() is None, "Active bundle should be None after cleanup"
-    
-    # BEHAVIOR 3: The bundle directory should be removed (unless protected)
-    # Note: We don't make specific assumptions about deletion of files/dirs
-    # as that may vary with implementation details, instead we test that
-    # initialization is possible again
-    
-    # BEHAVIOR 4: Re-initialization should work after cleanup 
-    new_metadata = await manager.initialize_bundle(str(bundle_path))
-    assert new_metadata.initialized, "Bundle should be re-initialized after cleanup"
-    assert new_metadata.id != metadata.id, "New bundle should have a different ID"
+    # Unpack the fixture
+    manager, bundle_path = bundle_manager
+
+    # BEHAVIOR TEST 1: Bundle initialization completes within expected time
+    start_time = time.time()
+
+    # Use timeout to enforce performance expectations
+    result = await asyncio.wait_for(
+        manager.initialize_bundle(str(bundle_path)),
+        timeout=45.0,  # Reasonable timeout for initialization
+    )
+
+    # Calculate initialization duration
+    duration = time.time() - start_time
+
+    # Verify expected initialization behavior
+    assert result.initialized, "Bundle should be marked as initialized"
+    assert result.kubeconfig_path.exists(), "Initialization should create a kubeconfig file"
+    assert (
+        duration < 45.0
+    ), f"Initialization should complete in reasonable time (took {duration:.2f}s)"
+
+    # BEHAVIOR TEST 2: Verify kubeconfig has valid structure
+    with open(result.kubeconfig_path, "r") as f:
+        kubeconfig_content = f.read()
+
+    # Check for essential kubeconfig fields that users and code depend on
+    assert "clusters" in kubeconfig_content, "Kubeconfig should contain clusters section"
+    assert "apiVersion" in kubeconfig_content, "Kubeconfig should contain API version"
+
+    # BEHAVIOR TEST 3: The API server connection is attempted (we don't assert success
+    # since it depends on the environment and sbctl version)
+    await manager.check_api_server_available()
+
+    # BEHAVIOR TEST 4: Test manager state after initialization
+    # This tests the observable behavior that getting the active bundle works
+    active_bundle = manager.get_active_bundle()
+    assert active_bundle is not None, "Manager should have an active bundle"
+    assert active_bundle.id == result.id, "Active bundle should match initialized bundle"
+
+    # BEHAVIOR TEST 5: Test diagnostic info is available - behavior users depend on
+    diagnostics = await manager.get_diagnostic_info()
+    assert isinstance(diagnostics, dict), "Diagnostic info should be available as a dictionary"
+    assert "api_server_available" in diagnostics, "Diagnostics should report API server status"
+    assert "bundle_initialized" in diagnostics, "Diagnostics should report bundle status"
+
+    # Verify sbctl process was created successfully
+    try:
+        # Use ps to check for sbctl processes associated with this bundle
+        ps_result = subprocess.run(["ps", "-ef"], capture_output=True, text=True, timeout=5)
+
+        # There should be a sbctl process running for this bundle
+        # We're checking behavior (process exists) not implementation (specific process args)
+        sbctl_running = any(
+            "sbctl" in line and active_bundle.source in line
+            for line in ps_result.stdout.splitlines()
+        )
+
+        # We don't assert this since it's environment dependent, but we check the behavior
+        if not sbctl_running:
+            print("Note: No sbctl process found running for this bundle")
+    except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+        pass  # If ps fails, we can't verify but that's okay

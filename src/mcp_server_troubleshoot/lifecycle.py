@@ -18,7 +18,7 @@ import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict
 
 from mcp.server.fastmcp import FastMCP
 
@@ -199,7 +199,7 @@ def setup_signal_handlers() -> None:
     if "PYTEST_CURRENT_TEST" in os.environ:
         logger.debug("Running in pytest, skipping signal handler registration")
         return
-        
+
     try:
         # Register handlers for typical termination signals
         for sig_name, sig_num in (

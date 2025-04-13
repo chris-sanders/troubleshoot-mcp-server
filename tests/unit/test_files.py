@@ -120,12 +120,12 @@ def test_grep_files_args_validation():
 async def test_file_explorer_list_files(test_file_setup):
     """
     Test that the file explorer can list files and directories.
-    
+
     This test verifies the behavior:
     1. Root directory listing returns expected directories and files
     2. Recursive listing finds all nested files
     3. Result objects have the correct structure and attributes
-    
+
     Args:
         test_file_setup: Fixture that creates test files for the test
     """
@@ -165,10 +165,10 @@ async def test_file_explorer_list_files(test_file_setup):
     # Test 3: Verify result structure is correct (behavior contracts)
     for entry in result.entries:
         assert isinstance(entry, FileInfo), "Each entry should be a FileInfo"
-        assert hasattr(entry, 'name'), "Entry should have a name"
-        assert hasattr(entry, 'path'), "Entry should have a path"
-        assert hasattr(entry, 'type'), "Entry should have a type"
-        assert hasattr(entry, 'size'), "Entry should have a size"
+        assert hasattr(entry, "name"), "Entry should have a name"
+        assert hasattr(entry, "path"), "Entry should have a path"
+        assert hasattr(entry, "type"), "Entry should have a type"
+        assert hasattr(entry, "size"), "Entry should have a size"
         assert entry.type in ["file", "dir"], "Type should be file or dir"
 
 
@@ -176,12 +176,12 @@ async def test_file_explorer_list_files(test_file_setup):
 async def test_file_explorer_list_files_errors(test_file_setup):
     """
     Test that the file explorer handles listing errors correctly.
-    
+
     This test verifies the behavior when errors occur:
     1. Listing non-existent paths raises PathNotFoundError
     2. Trying to list a file raises an error
     3. Using the explorer without a bundle raises an error
-    
+
     Args:
         test_file_setup: Fixture that provides a test directory with files
     """
@@ -218,12 +218,12 @@ async def test_file_explorer_list_files_errors(test_file_setup):
 async def test_file_explorer_read_file(test_file_setup):
     """
     Test that the file explorer can read files correctly.
-    
+
     This test verifies the behavior:
     1. Text files can be read with correct content
     2. Line ranges can be selected for reading
     3. Binary files are detected properly
-    
+
     Args:
         test_file_setup: Fixture that provides a test directory with files
     """
@@ -257,10 +257,10 @@ async def test_file_explorer_read_file(test_file_setup):
     # Verify behavior expectations for line ranges
     assert result.start_line == 1, "Start line should match requested value"
     assert result.end_line >= 1, "End line should be at least start line"
-    
+
     # Test 3: Reading binary file
     result = await explorer.read_file("binary_file")
-    
+
     # Verify behavior expectations for binary files
     assert result.path == "binary_file", "Path should be preserved in result"
     assert result.binary is True, "Binary file should be marked as binary"
@@ -270,12 +270,12 @@ async def test_file_explorer_read_file(test_file_setup):
 async def test_file_explorer_read_file_errors(test_file_setup):
     """
     Test that the file explorer handles read errors correctly.
-    
+
     This test verifies the behavior:
     1. Reading non-existent files raises appropriate errors
     2. Reading directories raises appropriate errors
     3. Using file explorer without a bundle raises an error
-    
+
     Args:
         test_file_setup: Fixture that provides a test directory with files
     """
@@ -311,13 +311,13 @@ async def test_file_explorer_read_file_errors(test_file_setup):
 async def test_file_explorer_grep_files(test_file_setup):
     """
     Test that the file explorer can search files with different patterns.
-    
+
     This test verifies the behavior:
     1. Global search finds matches across all files
     2. Path-restricted search only looks in specific directories
     3. Glob patterns filter which files are searched
     4. Case sensitivity works as expected
-    
+
     Args:
         test_file_setup: Fixture that creates test files for the test
     """
@@ -350,9 +350,9 @@ async def test_file_explorer_grep_files(test_file_setup):
     for match in result.matches:
         assert "This is" in match.line, "Line should contain the pattern"
         assert match.match == "This is", "Match should be the exact pattern"
-        assert hasattr(match, 'line_number'), "Match should have line number"
-        assert hasattr(match, 'offset'), "Match should have offset"
-        assert hasattr(match, 'path'), "Match should have path"
+        assert hasattr(match, "line_number"), "Match should have line number"
+        assert hasattr(match, "offset"), "Match should have offset"
+        assert hasattr(match, "path"), "Match should have path"
 
     # Test 2: Directory-restricted search with glob pattern
     result = await explorer.grep_files("file", "dir1", True, "*.txt")
@@ -367,10 +367,10 @@ async def test_file_explorer_grep_files(test_file_setup):
     # Our test file specifically has patterns for case sensitivity testing
     # First test with case sensitive search
     case_sensitive = await explorer.grep_files("UPPERCASE", "", True, None, True)
-    
+
     # Now test with case insensitive search
     case_insensitive = await explorer.grep_files("uppercase", "", True, None, False)
-    
+
     # Verify behavior expectations for case sensitivity
     assert case_sensitive.total_matches > 0, "Should find exact case matches"
     assert case_insensitive.total_matches > 0, "Should find case-insensitive matches"
@@ -381,12 +381,12 @@ async def test_file_explorer_grep_files(test_file_setup):
 async def test_file_explorer_grep_files_with_kubeconfig(test_file_setup):
     """
     Test searching for specific patterns across multiple files.
-    
+
     This test verifies the behavior:
     1. Grep can find patterns in both file content and filenames
     2. Multiple matches in the same file are found correctly
     3. Results contain the expected number of matches
-    
+
     Args:
         test_file_setup: Fixture that provides a test directory with files
     """
@@ -424,11 +424,11 @@ async def test_file_explorer_grep_files_with_kubeconfig(test_file_setup):
     assert isinstance(result, GrepResult), "Result should be a GrepResult"
     assert result.pattern == "specific", "Pattern should be preserved"
     assert result.path == "", "Root path should be preserved"
-    
+
     # Should find multiple matches in the reference file
     assert result.total_matches >= 3, "Should find multiple pattern instances"
     assert result.files_searched > 0, "Should report number of files searched"
-    
+
     # There should be matches in our reference file
     ref_file_matches = [m for m in result.matches if "reference.txt" in m.path]
     assert len(ref_file_matches) > 0, "Should find matches in reference.txt"
@@ -438,11 +438,11 @@ async def test_file_explorer_grep_files_with_kubeconfig(test_file_setup):
 async def test_file_explorer_grep_files_errors(test_file_setup):
     """
     Test that the file explorer handles search errors correctly.
-    
+
     This test verifies the behavior:
     1. Searching non-existent paths raises appropriate errors
     2. Using the explorer without a bundle raises an error
-    
+
     Args:
         test_file_setup: Fixture that provides a test directory with files
     """
@@ -473,11 +473,11 @@ async def test_file_explorer_grep_files_errors(test_file_setup):
 def test_file_explorer_is_binary(test_file_setup):
     """
     Test that the file explorer can detect binary files correctly.
-    
+
     This test verifies the behavior of the binary file detection:
     1. Text files are correctly identified as non-binary
     2. Binary files are correctly identified as binary
-    
+
     Args:
         test_file_setup: Fixture that provides a test directory with files
     """
@@ -496,22 +496,26 @@ def test_file_explorer_is_binary(test_file_setup):
     explorer = FileExplorer(bundle_manager)
 
     # Test 1: Text file should not be marked as binary
-    assert not explorer._is_binary(test_file_setup / "dir1" / "file1.txt"), "Text file should not be detected as binary"
+    assert not explorer._is_binary(
+        test_file_setup / "dir1" / "file1.txt"
+    ), "Text file should not be detected as binary"
 
     # Test 2: Binary file should be marked as binary
-    assert explorer._is_binary(test_file_setup / "binary_file"), "Binary file should be detected as binary"
+    assert explorer._is_binary(
+        test_file_setup / "binary_file"
+    ), "Binary file should be detected as binary"
 
 
 def test_file_explorer_normalize_path(test_file_setup):
     """
     Test that the file explorer normalizes paths correctly and securely.
-    
+
     This test verifies the behavior of path normalization:
     1. Relative paths are resolved correctly to absolute paths
     2. Paths with leading slashes are handled properly
     3. Nested paths are resolved correctly
     4. Directory traversal attempts are blocked for security
-    
+
     Args:
         test_file_setup: Fixture that provides a test directory with files
     """
@@ -531,7 +535,9 @@ def test_file_explorer_normalize_path(test_file_setup):
 
     # Test 1: Normalizing a relative path
     normalized = explorer._normalize_path("dir1")
-    assert normalized == test_file_setup / "dir1", "Relative path should be resolved to absolute path"
+    assert (
+        normalized == test_file_setup / "dir1"
+    ), "Relative path should be resolved to absolute path"
 
     # Test 2: Normalizing a path with leading slashes
     normalized = explorer._normalize_path("/dir1")
@@ -539,7 +545,9 @@ def test_file_explorer_normalize_path(test_file_setup):
 
     # Test 3: Normalizing a nested path
     normalized = explorer._normalize_path("dir2/subdir")
-    assert normalized == test_file_setup / "dir2" / "subdir", "Nested paths should be resolved correctly"
+    assert (
+        normalized == test_file_setup / "dir2" / "subdir"
+    ), "Nested paths should be resolved correctly"
 
     # Test 4: Security check - block directory traversal attempts
     with pytest.raises(InvalidPathError):

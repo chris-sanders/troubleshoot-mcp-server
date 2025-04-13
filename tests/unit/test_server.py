@@ -122,7 +122,7 @@ async def test_kubectl_tool():
         # Mock the bundle manager's check_api_server_available method
         mock_manager.check_api_server_available = AsyncMock(return_value=True)
         mock_get_manager.return_value = mock_manager
-        
+
         # And then mock the kubectl executor
         with patch("mcp_server_troubleshoot.server.get_kubectl_executor") as mock_get_executor:
             mock_executor = Mock()
