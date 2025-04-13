@@ -1,7 +1,7 @@
 # Component: Bundle Manager
 
 ## Purpose
-The Bundle Manager is responsible for handling the lifecycle of Kubernetes support bundles, including downloading, extraction, initialization, diagnostics, and cleanup.
+The Bundle Manager is responsible for handling the lifecycle of Kubernetes support bundles, including downloading, extraction, initialization, diagnostics, and cleanup. It implements comprehensive cleanup mechanisms for both when a different bundle is activated and when the server shuts down.
 
 ## Responsibilities
 - Download support bundles from remote sources when needed
@@ -10,7 +10,9 @@ The Bundle Manager is responsible for handling the lifecycle of Kubernetes suppo
 - Initialize sbctl to create a Kubernetes API server from the bundle
 - Maintain the state of the current active bundle
 - Provide API server availability checking with diagnostics
-- Clean up orphaned processes and resources
+- Clean up orphaned processes and extracted bundle directories during:
+  - Bundle switching (when a new bundle is activated)
+  - Server shutdown (via signal handlers and atexit hooks)
 - Provide bundle metadata to other components
 
 ## Interfaces
@@ -52,7 +54,11 @@ The Bundle Manager implements robust error handling for various failure scenario
 - **check_api_server_available()**: Verifies if the Kubernetes API server is responding
 - **get_diagnostic_info()**: Collects diagnostic information for troubleshooting
 - **_check_sbctl_available()**: Validates sbctl is installed and working
-- **cleanup()**: Cleans up resources when shutting down
+- **cleanup()**: Performs comprehensive cleanup of all resources during server shutdown
+- **_cleanup_active_bundle()**: Cleans up the currently active bundle, including:
+  - Terminating the sbctl process
+  - Removing extracted bundle directories
+  - Resetting the active bundle reference
 
 ### sbctl Process Management
 

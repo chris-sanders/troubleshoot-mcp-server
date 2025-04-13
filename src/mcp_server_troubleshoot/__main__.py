@@ -4,6 +4,7 @@ This comment was added to test Docker cache invalidation.
 """
 
 import argparse
+import atexit
 import json
 import logging
 import os
@@ -11,7 +12,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
-from .server import mcp, initialize_with_bundle_dir
+from .server import mcp, initialize_with_bundle_dir, shutdown
 from .config import get_recommended_client_config
 
 logger = logging.getLogger(__name__)
@@ -133,13 +134,21 @@ def main(args: Optional[List[str]] = None) -> None:
     # Initialize bundle manager with the bundle directory
     initialize_with_bundle_dir(bundle_dir)
 
+    # Register shutdown function with atexit to ensure cleanup on normal exit
+    logger.debug("Registering atexit shutdown handler")
+    atexit.register(shutdown)
+
     # Run the FastMCP server - this handles stdin/stdout automatically
     try:
         mcp.run()
     except KeyboardInterrupt:
         logger.info("Server stopped by user")
+        # Explicitly call shutdown here to handle Ctrl+C case
+        shutdown()
     except Exception as e:
         logger.exception(f"Error running server: {e}")
+        # Ensure cleanup on error exit
+        shutdown()
         sys.exit(1)
 
 
