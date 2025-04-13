@@ -3,9 +3,81 @@ Test configuration and fixtures for pytest.
 """
 
 import os
+import signal
 import subprocess
+import time
+import contextlib
 import pytest
 from pathlib import Path
+
+# Configure pytest_asyncio globally
+pytest_plugins = ["pytest_asyncio"]
+
+
+# Custom fixture for cleaning up resources
+@pytest.fixture
+def resource_cleaner():
+    """
+    Provides an exit stack that ensures resources are properly closed after tests.
+    
+    This helps prevent ResourceWarning by ensuring proper cleanup of file handles, 
+    sockets, and other resources created during tests.
+    
+    Example usage:
+        def test_file_operations(resource_cleaner):
+            # Files will be closed automatically at test exit
+            file = resource_cleaner.enter_context(open("some_file.txt", "r"))
+            # Test code that uses the file
+    """
+    with contextlib.ExitStack() as stack:
+        yield stack
+        # Resources will be automatically closed when the test exits
+
+
+# Custom fixture for cleaning up asyncio resources
+@pytest.fixture
+def clean_asyncio():
+    """
+    Ensures that asyncio resources are properly cleaned up after tests.
+    
+    This prevents ResourceWarning warnings from asyncio sub-processes and pipes.
+    """
+    import asyncio
+    import gc
+    
+    # Store the original event loop
+    old_loop = asyncio.get_event_loop()
+    
+    # Create a fresh event loop for the test
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    yield loop
+    
+    # Close the loop and all its resources
+    try:
+        # Cancel all pending tasks
+        pending = asyncio.all_tasks(loop)
+        if pending:
+            for task in pending:
+                task.cancel()
+            loop.run_until_complete(
+                asyncio.gather(*pending, return_exceptions=True)
+            )
+            
+        # Shut down async generators
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        
+        # Close the loop
+        loop.close()
+    except Exception:
+        pass
+    
+    # Restore the original loop
+    asyncio.set_event_loop(old_loop)
+    
+    # Force garbage collection to clean up any lingering objects
+    gc.collect()
 
 
 @pytest.fixture
@@ -33,12 +105,26 @@ def test_support_bundle(fixtures_dir) -> Path:
 def is_docker_available():
     """Check if Docker is available on the system."""
     try:
-        subprocess.run(
-            ["docker", "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        return True
+        with subprocess.Popen(
+            ["docker", "--version"], 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE,
+            text=True
+        ) as process:
+            process.communicate(timeout=5)
+            return process.returncode == 0
     except (subprocess.SubprocessError, FileNotFoundError):
         return False
+
+
+@contextlib.contextmanager
+def safe_open(file_path, mode):
+    """Safely open a file and ensure it's closed."""
+    file = open(file_path, mode)
+    try:
+        yield file
+    finally:
+        file.close()
 
 
 def build_docker_image(project_root, use_mock_sbctl=False):
@@ -61,11 +147,12 @@ def build_docker_image(project_root, use_mock_sbctl=False):
 
     try:
         # Remove any existing image first to ensure a clean build
-        subprocess.run(
+        with subprocess.Popen(
             ["docker", "rmi", "-f", "mcp-server-troubleshoot:latest"],
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+            stderr=subprocess.DEVNULL
+        ) as process:
+            process.communicate(timeout=30)
         
         # For test mode with mock sbctl, we need to modify the Dockerfile
         if use_mock_sbctl:
@@ -75,7 +162,8 @@ def build_docker_image(project_root, use_mock_sbctl=False):
                 return False, "Dockerfile not found"
                 
             # Read the original Dockerfile
-            with open(dockerfile, "r") as f:
+            dockerfile_content = ""
+            with safe_open(dockerfile, "r") as f:
                 dockerfile_content = f.read()
             
             # Create a modified version that uses mock_sbctl.py
@@ -102,34 +190,45 @@ RUN chmod +x /usr/local/bin/sbctl
                 )
                 
             # Write the modified Dockerfile
-            with open(dockerfile_test, "w") as f:
+            with safe_open(dockerfile_test, "w") as f:
                 f.write(dockerfile_content)
                 
             # Build using the temporary Dockerfile
-            result = subprocess.run(
+            result = None
+            with subprocess.Popen(
                 ["docker", "build", "-f", "Dockerfile.test", "-t", "mcp-server-troubleshoot:latest", "."],
-                check=True,
                 cwd=str(project_root),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True,
-            )
+                text=True
+            ) as process:
+                stdout, stderr = process.communicate(timeout=300)
+                if process.returncode != 0:
+                    raise subprocess.CalledProcessError(process.returncode, process.args, stdout, stderr)
+                result = type('CompletedProcess', (), {'returncode': 0, 'stdout': stdout, 'stderr': stderr})
             
             # Clean up the temporary Dockerfile
-            dockerfile_test.unlink()
+            if dockerfile_test.exists():
+                dockerfile_test.unlink()
         else:
             # Use the standard build script
-            result = subprocess.run(
+            result = None
+            with subprocess.Popen(
                 [str(build_script)],
-                check=True,
                 cwd=str(project_root),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True,
-            )
+                text=True
+            ) as process:
+                stdout, stderr = process.communicate(timeout=300)
+                if process.returncode != 0:
+                    raise subprocess.CalledProcessError(process.returncode, process.args, stdout, stderr)
+                result = type('CompletedProcess', (), {'returncode': 0, 'stdout': stdout, 'stderr': stderr})
             
         return True, result
     except subprocess.CalledProcessError as e:
+        return False, e
+    except Exception as e:
         return False, e
 
 
@@ -181,9 +280,25 @@ def docker_image(request):
     # Yield to allow tests to run
     yield "mcp-server-troubleshoot:latest"
     
-    # Cleanup is not included here as this fixture has session scope
-    # The image will be cleaned up when pytest exits
-    # If specific test cases need cleanup, they should handle it themselves
+    # Explicitly clean up any running containers
+    with subprocess.Popen(
+        ["docker", "ps", "-q", "--filter", "ancestor=mcp-server-troubleshoot:latest"],
+        stdout=subprocess.PIPE,
+        text=True
+    ) as process:
+        containers = process.communicate(timeout=10)[0].strip().split('\n')
+        
+    for container_id in containers:
+        if container_id:
+            try:
+                with subprocess.Popen(
+                    ["docker", "stop", container_id], 
+                    stdout=subprocess.DEVNULL, 
+                    stderr=subprocess.DEVNULL
+                ) as process:
+                    process.communicate(timeout=10)
+            except Exception:
+                pass
 
 
 @pytest.fixture(scope="session")

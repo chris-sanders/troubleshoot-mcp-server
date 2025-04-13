@@ -168,14 +168,19 @@ def test_sbctl_direct(test_support_bundle):
 
 
 @pytest.mark.asyncio
-async def test_bundle_manager_simple(test_support_bundle):
+async def test_bundle_manager_simple(test_support_bundle, clean_asyncio):
     """
     Simple test of the bundle manager with a real support bundle.
     This test just prints results to stdout.
 
     Args:
         test_support_bundle: Path to the test support bundle (pytest fixture)
+        clean_asyncio: Fixture that ensures proper asyncio cleanup
     """
+    # Use a high-level context manager to handle resources
+    import contextlib
+    import gc
+    
     real_bundle_path = test_support_bundle
 
     print(f"\nTesting BundleManager with real bundle: {real_bundle_path}\n")
@@ -194,15 +199,16 @@ async def test_bundle_manager_simple(test_support_bundle):
 
         # Use a shorter timeout to avoid long hangs
         try:
-            result = await asyncio.wait_for(
-                manager.initialize_bundle(str(real_bundle_path)), timeout=15.0
-            )
-            print("Bundle initialized successfully!")
-            print(f"Bundle ID: {result.id}")
-            print(f"Bundle path: {result.path}")
-            print(f"Kubeconfig path: {result.kubeconfig_path}")
-            print(f"Kubeconfig exists: {result.kubeconfig_path.exists()}")
-            print(f"Initialized: {result.initialized}")
+            with contextlib.closing(asyncio.get_event_loop()) as loop:
+                result = await asyncio.wait_for(
+                    manager.initialize_bundle(str(real_bundle_path)), timeout=15.0
+                )
+                print("Bundle initialized successfully!")
+                print(f"Bundle ID: {result.id}")
+                print(f"Bundle path: {result.path}")
+                print(f"Kubeconfig path: {result.kubeconfig_path}")
+                print(f"Kubeconfig exists: {result.kubeconfig_path.exists()}")
+                print(f"Initialized: {result.initialized}")
 
         except asyncio.TimeoutError:
             print("Bundle initialization timed out after 15 seconds")
@@ -227,6 +233,14 @@ async def test_bundle_manager_simple(test_support_bundle):
             print("Cleanup completed successfully")
         except asyncio.TimeoutError:
             print("Cleanup timed out")
+            
+            # Try to force cleanup of any remaining processes
+            try:
+                subprocess.run(["pkill", "-f", "sbctl"], capture_output=True)
+                print("Sent kill signal to any sbctl processes")
+            except:
+                pass
+                
         except Exception as e:
             print(f"Error during cleanup: {str(e)}")
 
@@ -237,19 +251,24 @@ async def test_bundle_manager_simple(test_support_bundle):
                 print(f"Removed bundle directory: {bundle_dir}")
         except Exception as e:
             print(f"Error removing bundle directory: {str(e)}")
+        
+        # Force garbage collection to clean up any resources
+        gc.collect()
 
     # Simple pass assertion
     assert True, "Test completed"
 
 @pytest.mark.asyncio
-async def test_list_files_from_extracted_bundle(test_support_bundle):
+async def test_list_files_from_extracted_bundle(test_support_bundle, clean_asyncio):
     """
     Test listing files from an extracted support bundle.
     This test verifies that files can be listed from the extracted bundle directory.
     
     Args:
         test_support_bundle: Path to the test support bundle (pytest fixture)
+        clean_asyncio: Fixture that ensures proper asyncio cleanup
     """
+    import gc
     from mcp_server_troubleshoot.bundle import BundleManager
     from mcp_server_troubleshoot.files import FileExplorer
     
@@ -335,21 +354,36 @@ async def test_list_files_from_extracted_bundle(test_support_bundle):
             
     finally:
         # Clean up
-        await manager.cleanup()
+        try:
+            await asyncio.wait_for(manager.cleanup(), timeout=5.0)
+            print("Cleanup completed successfully")
+        except (asyncio.TimeoutError, Exception) as e:
+            print(f"Cleanup issue: {e}")
+            # Try to force cleanup of any remaining processes
+            try:
+                subprocess.run(["pkill", "-f", "sbctl"], capture_output=True)
+            except:
+                pass
+        
         if bundle_dir.exists():
             import shutil
             shutil.rmtree(bundle_dir)
             print(f"Removed bundle directory: {bundle_dir}")
+            
+        # Force garbage collection to clean up any resources
+        gc.collect()
 
 @pytest.mark.asyncio
-async def test_initialize_with_real_sbctl(test_support_bundle):
+async def test_initialize_with_real_sbctl(test_support_bundle, clean_asyncio):
     """
     Test using the real sbctl executable (not mocked) to initialize a bundle.
     This test will use the actual sbctl in PATH.
     
     Args:
         test_support_bundle: Path to the test support bundle (pytest fixture)
+        clean_asyncio: Fixture that ensures proper asyncio cleanup
     """
+    import gc
     real_bundle_path = test_support_bundle
     print(f"\nTesting with real sbctl and bundle: {real_bundle_path}\n")
     
@@ -567,6 +601,15 @@ async def test_initialize_with_real_sbctl(test_support_bundle):
                 print(f"Removed bundle directory: {bundle_dir}")
         except Exception as e:
             print(f"Error removing bundle directory: {str(e)}")
+            
+        # Remove any logger handlers added in this test
+        logger = logging.getLogger("mcp_server_troubleshoot.bundle")
+        for handler in logger.handlers[:]:
+            logger.removeHandler(handler)
+            handler.close()
+            
+        # Force garbage collection
+        gc.collect()
     
     # Simple pass assertion
     assert True, "Test with real sbctl completed"

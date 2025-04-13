@@ -161,29 +161,39 @@ def test_mcp_protocol(docker_setup):
         container_id = f"mcp-test-{uuid.uuid4().hex[:8]}"
 
         # Start the container in MCP mode
-        process = subprocess.Popen(
-            [
-                "docker",
-                "run",
-                "--name",
-                container_id,
-                "-i",  # Interactive mode for stdin
-                "-v",
-                f"{temp_path}:/data/bundles",
-                "-e",
-                "SBCTL_TOKEN=test-token",
-                "-e",
-                "MCP_BUNDLE_STORAGE=/data/bundles",
-                "--entrypoint",
-                "python",
-                "mcp-server-troubleshoot:latest",
-                "-m",
-                "mcp_server_troubleshoot.cli",
-            ],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        process = None
+        try:
+            process = subprocess.Popen(
+                [
+                    "docker",
+                    "run",
+                    "--name",
+                    container_id,
+                    "-i",  # Interactive mode for stdin
+                    "-v",
+                    f"{temp_path}:/data/bundles",
+                    "-e",
+                    "SBCTL_TOKEN=test-token",
+                    "-e",
+                    "MCP_BUNDLE_STORAGE=/data/bundles",
+                    "--entrypoint",
+                    "python",
+                    "mcp-server-troubleshoot:latest",
+                    "-m",
+                    "mcp_server_troubleshoot.cli",
+                ],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except Exception as e:
+            # Clean up the container in case of launch error
+            subprocess.run(
+                ["docker", "rm", "-f", container_id],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            raise e
 
         try:
             # Wait a moment for the container to start
@@ -254,18 +264,53 @@ def test_mcp_protocol(docker_setup):
 
         finally:
             # Clean up
-            process.terminate()
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                process.kill()
+            if process:
+                # Make sure all resources are closed
+                if process.stdin:
+                    process.stdin.close()
+                if process.stdout:
+                    process.stdout.close()
+                if process.stderr:
+                    process.stderr.close()
+                
+                # Terminate the process
+                try:
+                    process.terminate()
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        pass
 
             # Clean up the container
-            subprocess.run(
-                ["docker", "rm", "-f", container_id],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+            try:
+                subprocess.run(
+                    ["docker", "rm", "-f", container_id],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=True,
+                    timeout=10
+                )
+            except (subprocess.SubprocessError, subprocess.TimeoutExpired):
+                # If container cleanup fails, try more forceful approach
+                try:
+                    subprocess.run(
+                        ["docker", "kill", container_id],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        timeout=5
+                    )
+                    subprocess.run(
+                        ["docker", "rm", "-f", container_id],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        timeout=5
+                    )
+                except Exception:
+                    # At this point, we've tried our best
+                    pass
 
 
 if __name__ == "__main__":
