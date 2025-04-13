@@ -167,7 +167,48 @@ While the warning still appears in the output, it does not affect test execution
 4. Add higher-level integration tests focused on user workflows
 5. Consolidate redundant test code
 
-## Implemented Improvements (Current PR)
+## Additional Implemented Improvements (Current PR)
+
+Further improvements have been made to the test suite:
+
+### 1. Parameterized Tests
+
+We've added parameterized tests for all key components, which provide several benefits:
+- More comprehensive coverage with less code duplication
+- Clear documentation of valid/invalid inputs
+- Easier to add new test cases
+- Improved test readability
+
+New files:
+- `tests/unit/test_kubectl_parametrized.py`
+- `tests/unit/test_files_parametrized.py`
+- `tests/unit/test_server_parametrized.py`
+
+### 2. Test Assertion Helpers
+
+A new `TestAssertions` class has been added to `tests/unit/conftest.py` to provide:
+- Consistent assertion patterns across tests
+- Improved failure messages
+- Reduced boilerplate in test methods
+- Specialized assertions for API responses and object structures
+
+### 3. Test Object Factories
+
+A `TestFactory` class has been added to generate test objects with sensible defaults:
+- Reduces boilerplate for creating common test objects
+- Ensures consistency in test objects across test files
+- Simplifies test setup by focusing only on relevant properties
+- Makes tests more maintainable when object structures change
+
+### 4. Improved Error Testing
+
+A dedicated `error_setup` fixture has been added to provide:
+- Consistent environment for testing error conditions
+- Standard error scenarios that can be reused across tests
+- Reduced setup code duplication for error testing
+- More comprehensive error case coverage
+
+## Implemented Improvements (Original PR)
 
 We've implemented many of the suggestions above:
 

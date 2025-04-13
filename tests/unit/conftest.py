@@ -8,8 +8,279 @@ import pytest
 import pytest_asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
+import inspect
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, Callable, TypeVar
+import asyncio
 
 # Helper functions for async tests are defined in the main conftest.py
+
+# Define test assertion helpers
+class TestAssertions:
+    """
+    Collection of reusable test assertion helpers for common patterns in tests.
+    
+    These utilities make assertions more consistent, reduce duplication, and
+    provide better error messages when tests fail.
+    """
+    
+    @staticmethod
+    def assert_attributes_exist(obj: Any, attributes: List[str]) -> None:
+        """
+        Assert that an object has all the specified attributes.
+        
+        Args:
+            obj: The object to check
+            attributes: List of attribute names to verify
+        
+        Raises:
+            AssertionError: If any attribute is missing
+        """
+        for attr in attributes:
+            assert hasattr(obj, attr), f"Object should have attribute '{attr}'"
+    
+    @staticmethod
+    def assert_api_response_valid(response: List[Any], expected_type: str = "text",
+                                contains: Optional[List[str]] = None) -> None:
+        """
+        Assert that an MCP API response is valid and contains expected content.
+        
+        Args:
+            response: The API response to check
+            expected_type: Expected response type (e.g., 'text')
+            contains: List of strings that should be in the response text
+            
+        Raises:
+            AssertionError: If response is invalid or missing expected content
+        """
+        assert isinstance(response, list), "Response should be a list"
+        assert len(response) > 0, "Response should not be empty"
+        assert hasattr(response[0], 'type'), "Response item should have 'type' attribute"
+        assert response[0].type == expected_type, f"Response type should be '{expected_type}'"
+        
+        if contains and hasattr(response[0], 'text'):
+            for text in contains:
+                assert text in response[0].text, f"Response should contain '{text}'"
+    
+    @staticmethod
+    def assert_object_matches_attrs(obj: Any, expected_attrs: Dict[str, Any]) -> None:
+        """
+        Assert that an object has attributes matching expected values.
+        
+        Args:
+            obj: The object to check
+            expected_attrs: Dictionary of attribute names and expected values
+            
+        Raises:
+            AssertionError: If any attribute doesn't match the expected value
+        """
+        for attr, expected in expected_attrs.items():
+            assert hasattr(obj, attr), f"Object should have attribute '{attr}'"
+            actual = getattr(obj, attr)
+            assert actual == expected, f"Attribute '{attr}' value mismatch. Expected: {expected}, Got: {actual}"
+
+    @staticmethod
+    async def assert_asyncio_timeout(coro, timeout: float = 0.1) -> None:
+        """
+        Assert that an async coroutine times out.
+        
+        Args:
+            coro: Coroutine to execute
+            timeout: Timeout in seconds
+            
+        Raises:
+            AssertionError: If the coroutine doesn't time out
+        """
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(coro, timeout=timeout)
+
+
+# Make assertions available as a fixture
+@pytest.fixture
+def test_assertions() -> TestAssertions:
+    """
+    Provides test assertion helpers for common test patterns.
+    
+    These helpers improve test readability and consistency.
+    """
+    return TestAssertions
+
+
+# Factory functions for creating test objects
+class TestFactory:
+    """
+    Factory functions for creating test objects with minimal boilerplate.
+    
+    These factories create common test objects with default values,
+    allowing tests to focus on the specific values that matter for that test.
+    """
+    
+    @staticmethod
+    def create_bundle_metadata(
+        id: str = "test_bundle",
+        source: str = "test_source",
+        path: Optional[Path] = None,
+        kubeconfig_path: Optional[Path] = None,
+        initialized: bool = True
+    ) -> "BundleMetadata":
+        """
+        Create a BundleMetadata instance with sensible defaults.
+        
+        Args:
+            id: Bundle ID
+            source: Bundle source
+            path: Bundle path
+            kubeconfig_path: Path to kubeconfig
+            initialized: Whether the bundle is initialized
+            
+        Returns:
+            BundleMetadata instance
+        """
+        from mcp_server_troubleshoot.bundle import BundleMetadata
+        
+        if path is None:
+            path = Path(tempfile.mkdtemp())
+            
+        if kubeconfig_path is None:
+            kubeconfig_path = path / "kubeconfig"
+            # Create the kubeconfig file if it doesn't exist
+            if not kubeconfig_path.exists():
+                kubeconfig_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(kubeconfig_path, "w") as f:
+                    f.write('{"apiVersion": "v1", "clusters": [{"cluster": {"server": "http://localhost:8001"}}]}')
+                    
+        return BundleMetadata(
+            id=id,
+            source=source,
+            path=path,
+            kubeconfig_path=kubeconfig_path,
+            initialized=initialized
+        )
+    
+    @staticmethod
+    def create_kubectl_result(
+        command: str = "get pods",
+        exit_code: int = 0,
+        stdout: str = '{"items": []}',
+        stderr: str = "",
+        is_json: bool = True,
+        duration_ms: int = 100
+    ) -> "KubectlResult":
+        """
+        Create a KubectlResult instance with sensible defaults.
+        
+        Args:
+            command: The kubectl command
+            exit_code: Command exit code
+            stdout: Command standard output
+            stderr: Command standard error
+            is_json: Whether the output is JSON
+            duration_ms: Command execution duration
+            
+        Returns:
+            KubectlResult instance
+        """
+        from mcp_server_troubleshoot.kubectl import KubectlResult
+        
+        # Process output based on is_json
+        output = stdout
+        if is_json and stdout:
+            import json
+            try:
+                output = json.loads(stdout)
+            except json.JSONDecodeError:
+                output = stdout
+                is_json = False
+                
+        return KubectlResult(
+            command=command,
+            exit_code=exit_code,
+            stdout=stdout,
+            stderr=stderr,
+            output=output,
+            is_json=is_json,
+            duration_ms=duration_ms
+        )
+
+
+@pytest.fixture
+def test_factory() -> TestFactory:
+    """
+    Provides factory functions for creating common test objects.
+    
+    These factories reduce boilerplate in tests and ensure consistency
+    in test object creation.
+    """
+    return TestFactory
+
+
+@pytest.fixture
+def error_setup():
+    """
+    Fixture for testing error scenarios with standard error conditions.
+    
+    This fixture provides a controlled environment for testing error
+    handling without requiring each test to set up common error conditions.
+    
+    Returns:
+        Dictionary with common error scenarios and mock objects
+    """
+    # Create test directory
+    temp_dir = Path(tempfile.mkdtemp())
+    
+    # Set up non-existent paths
+    nonexistent_path = temp_dir / "nonexistent"
+    
+    # Create a directory (not a file)
+    directory_path = temp_dir / "directory"
+    directory_path.mkdir()
+    
+    # Create an empty file
+    empty_file = temp_dir / "empty.txt"
+    empty_file.touch()
+    
+    # Create a text file
+    text_file = temp_dir / "text.txt"
+    text_file.write_text("This is a text file\nwith multiple lines\nfor testing errors")
+    
+    # Create a binary file
+    binary_file = temp_dir / "binary.dat"
+    with open(binary_file, "wb") as f:
+        f.write(b"\x00\x01\x02\x03")
+    
+    # Create a mock bundle manager that returns None for active bundle
+    from mcp_server_troubleshoot.bundle import BundleManager
+    no_bundle_manager = Mock(spec=BundleManager)
+    no_bundle_manager.get_active_bundle.return_value = None
+    
+    # Create a mock process that fails
+    error_process = AsyncMock()
+    error_process.returncode = 1
+    error_process.communicate = AsyncMock(return_value=(b"", b"Command failed with an error"))
+    
+    # Create a mock asyncio client session with errors
+    error_session = AsyncMock()
+    error_session.get = AsyncMock(side_effect=Exception("Connection error"))
+    
+    return {
+        "temp_dir": temp_dir,
+        "nonexistent_path": nonexistent_path,
+        "directory_path": directory_path,
+        "empty_file": empty_file,
+        "text_file": text_file,
+        "binary_file": binary_file,
+        "no_bundle_manager": no_bundle_manager,
+        "error_process": error_process,
+        "error_session": error_session,
+        # Error classes for common exceptions in the app
+        "error_classes": {
+            "BundleNotFoundError": "mcp_server_troubleshoot.bundle.BundleNotFoundError",
+            "BundleDownloadError": "mcp_server_troubleshoot.bundle.BundleDownloadError",
+            "KubectlError": "mcp_server_troubleshoot.kubectl.KubectlError",
+            "PathNotFoundError": "mcp_server_troubleshoot.files.PathNotFoundError",
+            "ReadFileError": "mcp_server_troubleshoot.files.ReadFileError",
+            "InvalidPathError": "mcp_server_troubleshoot.files.InvalidPathError",
+        }
+    }
 
 @pytest.fixture
 def fixtures_dir() -> Path:
