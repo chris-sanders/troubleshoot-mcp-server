@@ -3,6 +3,9 @@
 ## Status: Review
 ## Started: 2025-04-14
 ## Branch: docs
+## PR: #19
+## PR URL: https://github.com/chris-sanders/troubleshoot-mcp-server/pull/19
+## PR Status: Open
 
 ## Progress Updates
 - 2025-04-14: Started working on documentation improvements
