@@ -129,39 +129,29 @@ Replace `${HOME}/bundles` with the actual path to your bundles directory if need
 
 For interactive testing and exploration of the MCP server, we recommend using the [MCP Inspector](https://github.com/modelcontextprotocol/inspector), which provides a graphical interface for interacting with MCP servers.
 
-### Setting up the MCP Inspector
-
-1. Clone the Inspector repository:
+Run the MCP Inspector directly using npx:
 
 ```bash
-git clone https://github.com/modelcontextprotocol/inspector.git
-cd inspector
+npx @modelcontextprotocol/inspector
 ```
 
-2. Build and run the Inspector:
+In the Inspector UI:
+1. Click "Add Server"
+2. Enter a name for your server (e.g., "Troubleshoot Server")
+3. For the launch command, use:
+   ```
+   docker run -i --rm \
+     -v "$(pwd)/bundles:/data/bundles" \
+     -e SBCTL_TOKEN="$SBCTL_TOKEN" \
+     mcp-server-troubleshoot:latest
+   ```
+4. Click "Save"
 
-```bash
-npm install
-npm start
-```
-
-3. In the Inspector UI:
-   - Click "Add Server"
-   - Enter a name for your server (e.g., "Troubleshoot Server")
-   - For the launch command, use:
-     ```
-     docker run -i --rm \
-       -v "$(pwd)/bundles:/data/bundles" \
-       -e SBCTL_TOKEN="$SBCTL_TOKEN" \
-       mcp-server-troubleshoot:latest
-     ```
-   - Click "Save"
-
-4. Now you can interact with your MCP server through the Inspector:
-   - Initialize a bundle
-   - Execute kubectl commands
-   - Explore files
-   - View rich responses
+Now you can interact with your MCP server through the Inspector:
+- Initialize a bundle
+- Execute kubectl commands
+- Explore files
+- View rich responses
 
 The MCP Inspector provides a much better experience than using raw JSON-RPC calls and helps you explore the available tools and their parameters.
 
