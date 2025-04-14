@@ -1,8 +1,23 @@
 """
 Parametrized tests for the KubectlExecutor component.
 
-This file demonstrates better test structure using pytest parameterization
-to reduce duplication and improve coverage.
+This module tests the kubectl command execution functionality with parameterized tests
+that verify all key behaviors while focusing on functionality rather than implementation.
+
+Benefits of the parameterized approach:
+1. Comprehensive testing of multiple input combinations
+2. Clear documentation of valid/invalid inputs and their expected behavior
+3. Easier maintenance - adding new test cases is simple
+4. Better visualization of edge cases and error handling
+
+The tests cover these main user scenarios:
+1. Command argument validation (ensuring proper input validation)
+2. Command execution with various output formats (JSON vs. text)
+3. Error handling for different failure cases (timeouts, missing kubectl, etc.)
+4. Output parsing for different formats
+
+Each test verifies the behavior that users would observe, rather than implementation
+details, making the tests more resilient to refactoring.
 """
 
 import asyncio

@@ -162,59 +162,112 @@ async def test_bundle_validity_checker(
 
 
 @pytest.mark.asyncio
-async def test_integration_list_and_initialize(temp_bundle_dir, mock_valid_bundle, monkeypatch):
-    """Test the integration between list_available_bundles and initialize_bundle.
-
-    This test verifies that we can use the relative_path from list_available_bundles
-    to initialize a bundle with initialize_bundle.
+async def test_relative_path_initialization(temp_bundle_dir, mock_valid_bundle):
+    """Test that a bundle can be initialized using the relative path.
+    
+    This test verifies the user workflow of:
+    1. Listing available bundles
+    2. Using the relative_path from the bundle listing to initialize a bundle
+    3. Successfully initializing the bundle with the relative path
     """
-    print("\n--- Starting test_integration_list_and_initialize ---")
+    import logging
+    import os
+    from unittest.mock import patch
+    
+    logger = logging.getLogger(__name__)
+    
+    # Create a bundle manager with our test directory
+    bundle_manager = BundleManager(temp_bundle_dir)
+    
+    # List available bundles - this is the first step in the user workflow
+    bundles = await bundle_manager.list_available_bundles()
+    assert len(bundles) == 1
+    
+    # Get the relative path - this is what a user would use from the UI
+    relative_path = bundles[0].relative_path
+    assert relative_path == "valid_bundle.tar.gz"
+    
+    # Instead of monkeypatching internal methods, we'll mock at a higher level
+    # This focuses on the behavior (initializing a bundle) rather than implementation
+    with patch.object(bundle_manager, "_initialize_with_sbctl", autospec=False) as mock_init:
+        # Set up the mock to create the kubeconfig file and return its path
+        async def side_effect(bundle_path, output_dir):
+            logger.info(f"Creating mock kubeconfig in {output_dir}")
+            # Ensure the output directory exists
+            os.makedirs(output_dir, exist_ok=True)
+            # Create a minimal kubeconfig file
+            kubeconfig_path = output_dir / "kubeconfig"
+            with open(kubeconfig_path, "w") as f:
+                f.write("{}")
+            return kubeconfig_path
+            
+        mock_init.side_effect = side_effect
+        
+        # Test initializing with relative path (the actual user workflow)
+        metadata = await bundle_manager.initialize_bundle(relative_path)
+        
+        # Verify the behavior (not implementation details)
+        assert metadata is not None
+        assert metadata.initialized is True
+        assert metadata.source == relative_path
+        assert metadata.kubeconfig_path.exists()
+        
+        # Clean up for the next part of the test
+        await bundle_manager._cleanup_active_bundle()
+        
+        # Test also works with full path
+        metadata = await bundle_manager.initialize_bundle(str(mock_valid_bundle))
+        assert metadata is not None
+        assert metadata.initialized is True
+        assert metadata.source == str(mock_valid_bundle)
 
-    # Mock the sbctl process and initialize_with_sbctl to skip the potentially hanging part
-    async def mock_initialize_with_sbctl(self, bundle_path, output_dir):
-        print(
-            f"Mock initialize_with_sbctl called with bundle_path={bundle_path}, output_dir={output_dir}"
-        )
-        kubeconfig_path = output_dir / "kubeconfig"
-        # Create an empty kubeconfig file
-        with open(kubeconfig_path, "w") as f:
-            f.write("{}")
-        return kubeconfig_path
 
-    # Use monkeypatch to replace the actual initialize_with_sbctl method
-    monkeypatch.setattr(BundleManager, "_initialize_with_sbctl", mock_initialize_with_sbctl)
-
+@pytest.mark.asyncio
+async def test_bundle_path_resolution_behavior(temp_bundle_dir, mock_valid_bundle):
+    """Test that the bundle manager correctly resolves different path formats.
+    
+    This test verifies the behavior of the bundle path resolution logic:
+    1. Absolute paths are used directly
+    2. Relative paths are resolved within the bundle directory
+    3. Filenames are found within the bundle directory
+    """
+    import os
+    from unittest.mock import patch
+    
     # Create the bundle manager
     bundle_manager = BundleManager(temp_bundle_dir)
-    print(f"Bundle directory: {bundle_manager.bundle_dir}")
-
-    # List available bundles
-    print("Listing available bundles...")
-    bundles = await bundle_manager.list_available_bundles()
-    print(f"Found {len(bundles)} bundles")
-    assert len(bundles) == 1
-
-    # Get the relative path from the bundle info
-    relative_path = bundles[0].relative_path
-    print(f"Relative path: {relative_path}")
-    assert relative_path == "valid_bundle.tar.gz"
-
-    # Try to initialize with the relative path - this should now work
-    print(f"Initializing bundle with relative path: {relative_path}")
-    metadata = await bundle_manager.initialize_bundle(relative_path)
-    print("Bundle initialized with relative path")
-    assert metadata is not None
-    assert metadata.source == relative_path
-
-    # Reset the bundle manager to check we can initialize with the full path
-    print("Cleaning up active bundle")
-    await bundle_manager._cleanup_active_bundle()
-
-    # Verify we can initialize with the full path
-    print(f"Initializing bundle with full path: {mock_valid_bundle}")
-    metadata = await bundle_manager.initialize_bundle(str(mock_valid_bundle))
-    print("Bundle initialized with full path")
-    assert metadata is not None
-    assert metadata.source == str(mock_valid_bundle)
-
-    print("--- Test completed successfully ---")
+    
+    # Create patch for _initialize_with_sbctl to avoid actual initialization
+    with patch.object(bundle_manager, "_initialize_with_sbctl", autospec=False) as mock_init:
+        # Set up the mock to return a valid kubeconfig path
+        async def side_effect(bundle_path, output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+            kubeconfig_path = output_dir / "kubeconfig"
+            with open(kubeconfig_path, "w") as f:
+                f.write("{}")
+            return kubeconfig_path
+            
+        mock_init.side_effect = side_effect
+        
+        # Test 1: Absolute path - should be used directly
+        metadata = await bundle_manager.initialize_bundle(str(mock_valid_bundle))
+        assert metadata.source == str(mock_valid_bundle)
+        await bundle_manager._cleanup_active_bundle()
+        
+        # Test 2: Relative path - should be resolved within bundle directory
+        # Create a subdirectory and move the bundle there
+        subdir = temp_bundle_dir / "subdir"
+        os.makedirs(subdir, exist_ok=True)
+        rel_bundle = subdir / "subdir_bundle.tar.gz"
+        import shutil
+        shutil.copy(mock_valid_bundle, rel_bundle)
+        
+        # Now try to initialize with a relative path from the bundle_dir
+        rel_path = "subdir/subdir_bundle.tar.gz"
+        metadata = await bundle_manager.initialize_bundle(rel_path)
+        assert metadata.source == rel_path
+        await bundle_manager._cleanup_active_bundle()
+        
+        # Test 3: Just filename - should be found within bundle directory
+        metadata = await bundle_manager.initialize_bundle("valid_bundle.tar.gz")
+        assert metadata.source == "valid_bundle.tar.gz"
