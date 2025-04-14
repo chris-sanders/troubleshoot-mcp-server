@@ -191,40 +191,25 @@ def handle_signal(signum: int, frame: Any) -> None:
     app_context = get_app_context()
     if app_context and hasattr(app_context, "bundle_manager"):
         try:
-            # Create a file log for debug purposes that won't be affected by interpreter shutdown
-            debug_log_path = "/tmp/mcp_shutdown_debug.log"
-            with open(debug_log_path, "a") as debug_log:
-                debug_log.write(f"\n\n--- SHUTDOWN STARTED AT {time.ctime()} ---\n")
-                debug_log.write(f"Signal received: {sig_name} ({signum})\n")
+            # Directly access bundle manager and perform cleanup explicitly
+            # This avoids relying on atexit handlers or context manager cleanup
+            if app_context.bundle_manager.active_bundle:
+                bundle_id = app_context.bundle_manager.active_bundle.id
+                bundle_path = app_context.bundle_manager.active_bundle.path
+                logger.info(f"Performing direct cleanup of bundle: {bundle_id}")
 
-                # Directly access bundle manager and perform cleanup explicitly
-                # This avoids relying on atexit handlers or context manager cleanup
-                debug_log.write("Starting direct bundle cleanup\n")
+                # Explicitly clean up the active bundle's directory
+                if bundle_path and bundle_path.exists():
+                    logger.info(f"Removing bundle directory: {bundle_path}")
+                    try:
+                        import shutil
 
-                if app_context.bundle_manager.active_bundle:
-                    bundle_id = app_context.bundle_manager.active_bundle.id
-                    bundle_path = app_context.bundle_manager.active_bundle.path
-                    debug_log.write(f"Active bundle found: {bundle_id}, path: {bundle_path}\n")
-
-                    # Explicitly clean up the active bundle's directory
-                    if bundle_path and bundle_path.exists():
-                        debug_log.write(f"Removing bundle directory: {bundle_path}\n")
-                        try:
-                            import shutil
-
-                            shutil.rmtree(bundle_path)
-                            debug_log.write(
-                                f"Successfully removed bundle directory: {bundle_path}\n"
-                            )
-                        except Exception as e:
-                            debug_log.write(f"Error removing bundle directory: {e}\n")
-                else:
-                    debug_log.write("No active bundle found for cleanup\n")
-
-                debug_log.write("Direct cleanup completed\n")
-        except Exception as log_e:
-            # If debug log fails, try regular logging
-            logger.error(f"Error in direct cleanup: {log_e}")
+                        shutil.rmtree(bundle_path)
+                        logger.info(f"Successfully removed bundle directory")
+                    except Exception as e:
+                        logger.error(f"Error removing bundle directory: {e}")
+        except Exception as e:
+            logger.error(f"Error in direct cleanup: {e}")
 
     try:
         # Call the normal shutdown process
@@ -234,9 +219,8 @@ def handle_signal(signum: int, frame: Any) -> None:
     except Exception as e:
         logger.error(f"Error during explicit shutdown: {e}")
 
-    # Small delay to allow logs to flush
+    # Exit immediately - no delay needed
     logger.info("Cleanup completed, exiting process")
-    time.sleep(0.5)
 
     # Exit the process
     sys.exit(0)
