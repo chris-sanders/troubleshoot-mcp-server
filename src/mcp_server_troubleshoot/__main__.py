@@ -12,8 +12,9 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
-from .server import mcp, initialize_with_bundle_dir, shutdown
+from .server import mcp, shutdown
 from .config import get_recommended_client_config
+from .lifecycle import setup_signal_handlers
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +107,7 @@ def main(args: Optional[List[str]] = None) -> None:
     if not mcp_mode:
         logger.info("Starting MCP server for Kubernetes support bundles")
     else:
-        logger.debug("Starting MCP server for Kubernetes support bundles")
+        logger.debug("Starting MCP server for Kubernetes support bundles (stdio mode)")
 
     # Process bundle directory
     bundle_dir = None
@@ -131,8 +132,13 @@ def main(args: Optional[List[str]] = None) -> None:
         else:
             logger.debug(f"Using bundle directory: {bundle_dir}")
 
-    # Initialize bundle manager with the bundle directory
-    initialize_with_bundle_dir(bundle_dir)
+    # Configure the MCP server based on the mode
+    # In stdio mode, we enable use_stdio=True
+    if mcp_mode:
+        logger.debug("Configuring MCP server for stdio mode")
+        mcp.use_stdio = True
+        # Set up signal handlers specifically for stdio mode
+        setup_signal_handlers()
 
     # Register shutdown function with atexit to ensure cleanup on normal exit
     logger.debug("Registering atexit shutdown handler")
@@ -140,6 +146,7 @@ def main(args: Optional[List[str]] = None) -> None:
 
     # Run the FastMCP server - this handles stdin/stdout automatically
     try:
+        logger.debug("Starting FastMCP server")
         mcp.run()
     except KeyboardInterrupt:
         logger.info("Server stopped by user")

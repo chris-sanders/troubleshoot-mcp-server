@@ -919,7 +919,7 @@ class BundleManager:
     async def _cleanup_active_bundle(self) -> None:
         """
         Clean up the active bundle including processes and extracted directories.
-        
+
         This method:
         1. Terminates the sbctl process first (if running)
         2. Removes extracted bundle directories
@@ -938,11 +938,28 @@ class BundleManager:
                     bundle_path = self.active_bundle.path
                     logger.info(f"Removing extracted bundle directory: {bundle_path}")
 
+                    # Log directory details
+                    try:
+                        dir_stats = os.stat(bundle_path)
+                        logger.info(
+                            f"Bundle directory stats - permissions: {oct(dir_stats.st_mode)}, "
+                            f"owner: {dir_stats.st_uid}, group: {dir_stats.st_gid}"
+                        )
+
+                        # List directory contents
+                        import glob
+
+                        files = glob.glob(f"{bundle_path}/**", recursive=True)
+                        logger.info(f"Found {len(files)} items in bundle directory")
+                    except Exception as list_err:
+                        logger.warning(f"Error getting bundle directory details: {list_err}")
+
                     # Create a list of paths we should not delete (containing parent directories)
                     protected_paths = [
-                        self.bundle_dir,                  # Main bundle directory
-                        Path(self.bundle_dir).parent,     # Parent of bundle directory
+                        self.bundle_dir,  # Main bundle directory
+                        Path(self.bundle_dir).parent,  # Parent of bundle directory
                     ]
+                    logger.info(f"Protected paths: {protected_paths}")
 
                     # Only remove if it's not a protected path and exists
                     if bundle_path.exists() and bundle_path not in protected_paths:
@@ -950,16 +967,52 @@ class BundleManager:
                         if str(bundle_path).startswith(str(self.bundle_dir)):
                             try:
                                 import shutil
+
+                                logger.info(f"Starting shutil.rmtree on bundle path: {bundle_path}")
                                 shutil.rmtree(bundle_path)
-                                logger.info(f"Successfully removed bundle directory: {bundle_path}")
+                                logger.info(
+                                    f"shutil.rmtree completed, checking if path still exists"
+                                )
+
+                                if os.path.exists(bundle_path):
+                                    logger.error(
+                                        f"Bundle directory still exists after rmtree: {bundle_path}"
+                                    )
+                                else:
+                                    logger.info(
+                                        f"Successfully removed bundle directory: {bundle_path}"
+                                    )
                             except PermissionError as e:
-                                logger.warning(f"Permission error removing bundle directory: {e}")
+                                logger.error(f"Permission error removing bundle directory: {e}")
+                                logger.error(
+                                    f"Error details: {str(e)}, file: {getattr(e, 'filename', 'unknown')}"
+                                )
                             except OSError as e:
-                                logger.warning(f"OS error removing bundle directory: {e}")
+                                logger.error(f"OS error removing bundle directory: {e}")
+                                logger.error(
+                                    f"Error type: {type(e).__name__}, errno: {getattr(e, 'errno', 'N/A')}"
+                                )
                         else:
-                            logger.warning(f"Not removing bundle directory outside bundle_dir: {bundle_path}")
+                            logger.warning(
+                                f"Not removing bundle directory outside bundle_dir: {bundle_path}"
+                            )
+                    else:
+                        if bundle_path in protected_paths:
+                            logger.warning(
+                                f"Bundle path {bundle_path} is a protected path, not removing"
+                            )
+                        if not bundle_path.exists():
+                            logger.warning(f"Bundle path {bundle_path} no longer exists")
+                else:
+                    if not self.active_bundle.path:
+                        logger.warning("Active bundle path is None")
+                    elif not self.active_bundle.path.exists():
+                        logger.warning(
+                            f"Active bundle path does not exist: {self.active_bundle.path}"
+                        )
             except Exception as e:
                 logger.error(f"Error cleaning up bundle directory: {e}")
+                logger.error(f"Exception type: {type(e).__name__}, details: {str(e)}")
                 # Continue with cleanup even if directory removal fails
 
             # 3. Reset the active bundle
@@ -1568,12 +1621,12 @@ class BundleManager:
     async def cleanup(self) -> None:
         """
         Clean up all resources when shutting down the server.
-        
+
         This method performs a complete cleanup sequence:
         1. Terminates the active bundle and its processes
         2. Removes extracted bundle directories
         3. Removes the temporary bundle directory if created by this instance
-        
+
         This should be called when shutting down the server to ensure proper resource
         management and prevent orphaned files/processes.
         """
@@ -1587,24 +1640,33 @@ class BundleManager:
             try:
                 # Use pkill as a final safety measure to ensure no sbctl processes remain
                 import subprocess
+
                 try:
                     logger.info("Checking for any remaining sbctl processes")
                     ps_cmd = ["ps", "-ef"]
                     ps_result = subprocess.run(ps_cmd, capture_output=True, text=True)
 
                     if ps_result.returncode == 0:
-                        sbctl_processes = [line for line in ps_result.stdout.splitlines() if "sbctl" in line]
+                        sbctl_processes = [
+                            line for line in ps_result.stdout.splitlines() if "sbctl" in line
+                        ]
                         if sbctl_processes:
-                            logger.warning(f"Found {len(sbctl_processes)} sbctl processes still running during shutdown")
+                            logger.warning(
+                                f"Found {len(sbctl_processes)} sbctl processes still running during shutdown"
+                            )
                             # Try to terminate them
                             kill_cmd = ["pkill", "-f", "sbctl"]
                             kill_result = subprocess.run(kill_cmd, capture_output=True, text=True)
                             if kill_result.returncode not in (0, 1):  # 1 means no processes found
-                                logger.warning(f"pkill returned non-zero exit code: {kill_result.returncode}")
+                                logger.warning(
+                                    f"pkill returned non-zero exit code: {kill_result.returncode}"
+                                )
                         else:
                             logger.info("No sbctl processes found during shutdown")
                 except Exception as process_err:
-                    logger.warning(f"Error checking for orphaned processes during shutdown: {process_err}")
+                    logger.warning(
+                        f"Error checking for orphaned processes during shutdown: {process_err}"
+                    )
             except Exception as e:
                 logger.warning(f"Error during extended process cleanup: {e}")
 

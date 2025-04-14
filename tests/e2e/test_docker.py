@@ -60,7 +60,7 @@ def test_dockerignore_exists():
 def test_build_script_exists_and_executable():
     """Test that the build script exists and is executable."""
     project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
-    
+
     # Check in scripts directory first (new structure)
     build_script = project_dir / "scripts" / "build.sh"
     if not build_script.exists():
@@ -68,14 +68,14 @@ def test_build_script_exists_and_executable():
         build_script = project_dir / "build.sh"
         if not build_script.exists():
             pytest.skip("Build script not found in scripts/ or root directory")
-    
+
     assert os.access(build_script, os.X_OK), f"{build_script} is not executable"
 
 
 def test_run_script_exists_and_executable():
     """Test that the run script exists and is executable."""
     project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
-    
+
     # Check in scripts directory first (new structure)
     run_script = project_dir / "scripts" / "run.sh"
     if not run_script.exists():
@@ -83,7 +83,7 @@ def test_run_script_exists_and_executable():
         run_script = project_dir / "run.sh"
         if not run_script.exists():
             pytest.skip("Run script not found in scripts/ or root directory")
-    
+
     assert os.access(run_script, os.X_OK), f"{run_script} is not executable"
 
 

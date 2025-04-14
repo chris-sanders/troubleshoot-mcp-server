@@ -352,11 +352,11 @@ async def test_bundle_manager_cleanup_active_bundle():
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
         manager = BundleManager(bundle_dir)
-        
+
         # Create a bundle directory with some content
         bundle_path = bundle_dir / "test_bundle_dir"
         bundle_path.mkdir(parents=True)
-        
+
         # Add some files to the bundle directory to verify cleanup
         test_file = bundle_path / "test_file.txt"
         with open(test_file, "w") as f:
@@ -390,14 +390,14 @@ async def test_bundle_manager_cleanup_active_bundle():
         # Verify the active bundle was reset
         assert manager.active_bundle is None
         assert manager.sbctl_process is None
-        
+
         # Verify the directory was removed
         assert not bundle_path.exists()
         assert not test_file.exists()
-        
+
         # Verify the parent directory was not removed
         assert bundle_dir.exists()
-        
+
 
 @pytest.mark.asyncio
 async def test_bundle_manager_cleanup_active_bundle_protected_paths():
@@ -405,7 +405,7 @@ async def test_bundle_manager_cleanup_active_bundle_protected_paths():
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
         manager = BundleManager(bundle_dir)
-        
+
         # Set the active bundle to point to the main bundle directory (should be protected)
         manager.active_bundle = BundleMetadata(
             id="test",
@@ -439,11 +439,11 @@ async def test_bundle_manager_cleanup_active_bundle_protected_paths():
         # Verify the active bundle reference was reset
         assert manager.active_bundle is None
         assert manager.sbctl_process is None
-        
+
         # Verify the protected directory was not removed
         assert bundle_dir.exists()
         assert test_file.exists()
-        
+
 
 @pytest.mark.asyncio
 async def test_bundle_manager_server_shutdown_cleanup():
@@ -451,11 +451,11 @@ async def test_bundle_manager_server_shutdown_cleanup():
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
         manager = BundleManager(bundle_dir)
-        
+
         # Create a bundle directory with some content
         bundle_path = bundle_dir / "test_bundle_dir"
         bundle_path.mkdir(parents=True)
-        
+
         # Add some files to the bundle directory to verify cleanup
         test_file = bundle_path / "test_file.txt"
         with open(test_file, "w") as f:
@@ -475,30 +475,32 @@ async def test_bundle_manager_server_shutdown_cleanup():
         mock_process.terminate = MagicMock()
         mock_process.wait = AsyncMock()
         manager.sbctl_process = mock_process
-        
+
         # Mock _cleanup_active_bundle to verify it's called
         manager._cleanup_active_bundle = AsyncMock()
-        
+
         # Mock subprocess.run to avoid actual process operations
         with patch("subprocess.run", return_value=MagicMock(returncode=0, stdout="", stderr="")):
             # Call cleanup
             await manager.cleanup()
-            
+
             # Verify _cleanup_active_bundle was called
             manager._cleanup_active_bundle.assert_awaited_once()
-            
+
             # Create a mock that returns process data
             mock_ps_result = MagicMock()
             mock_ps_result.returncode = 0
-            mock_ps_result.stdout = "user  12345  12340  0 12:00 pts/0 00:00:00 sbctl serve bundle.tar.gz"
-            
+            mock_ps_result.stdout = (
+                "user  12345  12340  0 12:00 pts/0 00:00:00 sbctl serve bundle.tar.gz"
+            )
+
             # Create a mock for pkill result
             mock_pkill_result = MagicMock()
             mock_pkill_result.returncode = 0
-            
+
             # Mock subprocess to return our mock objects
             with patch("subprocess.run", side_effect=[mock_ps_result, mock_pkill_result]):
                 # Test with orphaned processes
                 await manager.cleanup()
-                
+
                 # The mock subprocess.run will be called twice - once for ps and once for pkill

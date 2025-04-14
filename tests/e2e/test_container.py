@@ -147,7 +147,6 @@ def test_mcp_protocol(docker_setup):
     This test sends a JSON-RPC request to the container running in MCP mode
     and verifies that it responds correctly.
     """
-    import json
     import uuid
     import tempfile
     import time
@@ -210,42 +209,49 @@ def test_mcp_protocol(docker_setup):
 
             # Instead of using a full client, we'll use a simpler approach
             # to verify basic MCP functionality
-            
+
             # Simple version check - we expect to get a response, even if it's an error
             from threading import Timer
-            
+
             def timeout_handler():
                 print("Test timed out, terminating container...")
                 process.terminate()
                 pytest.fail("Test timed out waiting for response")
-            
+
             # Set a timer for timeout
             timer = Timer(10.0, timeout_handler)
             timer.start()
-            
+
             try:
                 # Wait a bit longer for container to produce logs
                 time.sleep(3)
-                
+
                 # Instead of checking logs, let's just check the container is running
                 ps_check_detailed = subprocess.run(
-                    ["docker", "ps", "--format", "{{.Command}},{{.Status}}", "-f", f"name={container_id}"],
+                    [
+                        "docker",
+                        "ps",
+                        "--format",
+                        "{{.Command}},{{.Status}}",
+                        "-f",
+                        f"name={container_id}",
+                    ],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
-                    check=False
+                    check=False,
                 )
-                
+
                 # Print detailed info for debugging
                 print(f"Container info: {ps_check_detailed.stdout}")
-                
+
                 # Just check that the container started and is running
                 assert ps_check_detailed.stdout.strip(), "Container is not running"
                 assert "python" in ps_check_detailed.stdout, "Container is not running Python"
-                
+
                 # Consider the test passed if container is running
                 print("Container is running properly")
-                
+
                 # Skip the MCP protocol communication to avoid hanging
                 # The actual protocol testing is done in test_mcp_protocol.py
                 # which is better suited for protocol-level testing
@@ -256,9 +262,9 @@ def test_mcp_protocol(docker_setup):
             # The simplified approach above replaces the full client test
             # We just verify that we can get a response from the server,
             # which is enough to confirm the container runs correctly
-            
+
             print("Basic MCP protocol test passed")
-            
+
             # Note: The full suite of MCP tests can be found in tests/integration/test_mcp_direct.py
             # These test actual protocol functionality in more detail
 
@@ -272,7 +278,7 @@ def test_mcp_protocol(docker_setup):
                     process.stdout.close()
                 if process.stderr:
                     process.stderr.close()
-                
+
                 # Terminate the process
                 try:
                     process.terminate()
@@ -291,7 +297,7 @@ def test_mcp_protocol(docker_setup):
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     check=True,
-                    timeout=10
+                    timeout=10,
                 )
             except (subprocess.SubprocessError, subprocess.TimeoutExpired):
                 # If container cleanup fails, try more forceful approach
@@ -300,13 +306,13 @@ def test_mcp_protocol(docker_setup):
                         ["docker", "kill", container_id],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
-                        timeout=5
+                        timeout=5,
                     )
                     subprocess.run(
                         ["docker", "rm", "-f", container_id],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
-                        timeout=5
+                        timeout=5,
                     )
                 except Exception:
                     # At this point, we've tried our best
