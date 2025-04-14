@@ -54,19 +54,25 @@ Based on documentation review, specific issues to address include:
    - README.md (lines 22-28) recommends scripts instead of direct Docker commands
    - DOCKER.md presents script usage first, direct commands as alternative
    - user_guide.md (lines 36-40) references `run.sh` with incorrect parameters
-   - Inconsistent environment variable usage across examples
+   - Inconsistent environment variable usage across examples 
+   
+   This was addressed by removing the unnecessary environment variable (MCP_BUNDLE_STORAGE) from all examples and keeping only the essential SBCTL_TOKEN environment variable consistently across all documentation.
 
 2. Documentation Duplication Issues:
    - MCP configuration instructions appear in README.md, DOCKER.md, and user_guide.md
    - Tool documentation duplicated across files with slight differences
    - No clear indication which document is authoritative for specific topics
    - Repetitive installation instructions across multiple files
+   
+   This was addressed by establishing clear ownership for specific topics across the documentation files, removing duplicate instructions, and adding proper cross-references between documents.
 
 3. Path and Reference Issues:
    - user_guide.md contains incorrect paths like `../mcp-server-troubleshoot/DOCKER.md`
    - README.md project structure doesn't match actual repository layout
    - Python version references vary (3.10+, 3.11+, 3.13 recommended)
    - Internal document links sometimes use incorrect relative paths
+   
+   This was addressed by fixing all incorrect path references, updating the Python version to consistently use 3.13, correcting the project structure in README.md to match the actual repository layout, and ensuring all internal links use correct relative paths.
 
 **IMPORTANT**: Do NOT modify files in the examples/ directory. Add a note explaining these are developer reference examples.
 
@@ -83,7 +89,6 @@ The following Docker command examples were updated and verified for consistency:
    docker run -i --rm \
      -v "/path/to/bundles:/data/bundles" \
      -e SBCTL_TOKEN="your-token" \
-     -e MCP_BUNDLE_STORAGE="/data/bundles" \
      mcp-server-troubleshoot:latest
    ```
 
@@ -96,7 +101,6 @@ The following Docker command examples were updated and verified for consistency:
    docker run -i --rm \
      -v "$(pwd)/bundles:/data/bundles" \
      -e SBCTL_TOKEN="$SBCTL_TOKEN" \
-     -e MCP_BUNDLE_STORAGE="/data/bundles" \
      mcp-server-troubleshoot:latest
    ```
 
@@ -107,11 +111,10 @@ The following Docker command examples were updated and verified for consistency:
    docker run -i --rm \
      -v "/path/to/bundles:/data/bundles" \
      -e SBCTL_TOKEN="your-token" \
-     -e MCP_BUNDLE_STORAGE="/data/bundles" \
      mcp-server-troubleshoot:latest
    ```
 
-4. **All examples** now include explanations of key parameters.
+4. **All examples** now include explanations of key parameters, and unnecessary environment variables have been removed.
 
 ### Files Updated and Changes Made
 
@@ -122,12 +125,15 @@ The following Docker command examples were updated and verified for consistency:
    - Updated project structure to match actual directory layout
    - Added note about examples directory for reference only
    - Updated Requirements section
+   - Removed unnecessary environment variable from Docker command example
 
 2. **DOCKER.md**:
    - Reorganized to prioritize direct Docker commands over scripts
    - Added detailed parameter explanations for Docker commands
-   - Updated usage examples with direct commands
+   - Removed references to convenience scripts
+   - Replaced raw JSON-RPC usage examples with MCP Inspector instructions
    - Improved organization with clear sections
+   - Removed unnecessary environment variables from Docker command examples
 
 3. **docs/user_guide.md**:
    - Fixed incorrect path references to DOCKER.md
@@ -135,6 +141,7 @@ The following Docker command examples were updated and verified for consistency:
    - Updated tool references to match actual implementation
    - Fixed Python version references to consistently use 3.13
    - Improved cross-document linking
+   - Removed unnecessary environment variable from Docker command example
 
 ### Documentation Link Verification
 

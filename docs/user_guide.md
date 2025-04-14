@@ -33,7 +33,6 @@ docker build -t mcp-server-troubleshoot:latest .
 docker run -i --rm \
   -v "/path/to/bundles:/data/bundles" \
   -e SBCTL_TOKEN="your-token" \
-  -e MCP_BUNDLE_STORAGE="/data/bundles" \
   mcp-server-troubleshoot:latest
 ```
 
