@@ -4,55 +4,48 @@ This document provides instructions for building and running the MCP server for 
 
 ## Building the Container
 
-You can build the Docker container using the provided build script:
+Build the Docker container with the standard Docker build command:
 
 ```bash
 # Navigate to the project directory
 cd troubleshoot-mcp-server
 
-# Run the build script
-./scripts/build.sh
+# Build the image
+docker build -t mcp-server-troubleshoot:latest .
 ```
 
 This will create a Docker image named `mcp-server-troubleshoot:latest`.
 
-Alternatively, you can build the container manually:
-
-```bash
-docker build -t mcp-server-troubleshoot:latest .
-```
-
 ## Running the Container
 
-You can run the container using the provided run script, which automatically sets up volume mounts and environment variables:
+Run the container directly with Docker, mounting your bundle storage directory and setting required environment variables:
 
 ```bash
+# Create a directory for bundles (if it doesn't exist)
+mkdir -p ./bundles
+
 # Set the SBCTL_TOKEN environment variable for bundle operations
 export SBCTL_TOKEN="your_token_here"
-
-# Run the container in interactive mode
-./scripts/run.sh
-
-# You can also pass command-line options
-./scripts/run.sh --verbose
-
-# Specify a custom bundle directory
-./scripts/run.sh --bundle-dir=/path/to/bundles
-```
-
-Alternatively, you can run the container manually:
-
-```bash
-# Create a directory for bundles
-mkdir -p ./bundles
 
 # Run the container
 docker run -i --rm \
   -v "$(pwd)/bundles:/data/bundles" \
-  -e SBCTL_TOKEN="your_token_here" \
-  -e MCP_BUNDLE_STORAGE="/data/bundles" \
+  -e SBCTL_TOKEN="$SBCTL_TOKEN" \
   mcp-server-troubleshoot:latest
 ```
+
+### Command Parameters Explained
+
+- `-i`: Run in interactive mode (required for MCP protocol communication)
+- `--rm`: Automatically remove the container when it exits
+- `-v "$(pwd)/bundles:/data/bundles"`: Mount local bundle directory to container path
+- `-e SBCTL_TOKEN="$SBCTL_TOKEN"`: Pass authentication token from environment
+
+### Optional Parameters
+
+- `--verbose`: Enable verbose logging: `-e MCP_LOG_LEVEL=DEBUG`
+- `--port 8080`: Map container port: `-p 8080:8080`
+
 
 ## Configuration
 
@@ -132,28 +125,35 @@ This configuration assumes:
 
 Replace `${HOME}/bundles` with the actual path to your bundles directory if needed.
 
-## Usage Examples
+## Using the MCP Inspector
 
-### Initialize a Bundle
+For interactive testing and exploration of the MCP server, we recommend using the [MCP Inspector](https://github.com/modelcontextprotocol/inspector), which provides a graphical interface for interacting with MCP servers.
 
-```bash
-# Using echo to send a request to initialize a bundle
-echo '{"jsonrpc":"2.0","id":"1","method":"call_tool","params":{"name":"initialize_bundle","arguments":{"source":"/data/bundles/bundle.tar.gz"}}}' | ./scripts/run.sh
-```
-
-### Execute kubectl Commands
+Run the MCP Inspector directly using npx:
 
 ```bash
-# Using echo to send a request to execute a kubectl command
-echo '{"jsonrpc":"2.0","id":"1","method":"call_tool","params":{"name":"kubectl","arguments":{"command":"get pods"}}}' | ./scripts/run.sh
+npx @modelcontextprotocol/inspector
 ```
 
-### Explore Files
+In the Inspector UI:
+1. Click "Add Server"
+2. Enter a name for your server (e.g., "Troubleshoot Server")
+3. For the launch command, use:
+   ```
+   docker run -i --rm \
+     -v "$(pwd)/bundles:/data/bundles" \
+     -e SBCTL_TOKEN="$SBCTL_TOKEN" \
+     mcp-server-troubleshoot:latest
+   ```
+4. Click "Save"
 
-```bash
-# Using echo to send a request to list files
-echo '{"jsonrpc":"2.0","id":"1","method":"call_tool","params":{"name":"list_files","arguments":{"path":"/"}}}' | ./scripts/run.sh
-```
+Now you can interact with your MCP server through the Inspector:
+- Initialize a bundle
+- Execute kubectl commands
+- Explore files
+- View rich responses
+
+The MCP Inspector provides a much better experience than using raw JSON-RPC calls and helps you explore the available tools and their parameters.
 
 ### Using with an MCP Client
 
