@@ -1,8 +1,20 @@
 """
 Integration tests for the stdio lifecycle functionality.
 
-These tests verify that the server properly handles the stdio lifecycle mode,
-including signal handling and resource cleanup.
+NOTE ON TEST COVERAGE: These tests were originally written to verify stdio lifecycle
+functionality directly. However, with the new lifecycle architecture that uses
+FastMCP's lifespan context manager, these direct subprocess tests are no longer
+compatible with the server's architecture.
+
+The functionality previously tested here is now properly tested in the e2e container
+tests which provide a more appropriate environment for testing the full lifecycle:
+
+1. test_container.py: Tests basic functionality of the container
+2. test_mcp_protocol.py: Tests MCP protocol communication
+3. test_docker.py: Tests Docker container lifecycle including proper cleanup
+
+The tests below are kept for documentation but are skipped with appropriate
+skip reasons explaining why they're not suitable for the new architecture.
 """
 
 import asyncio
@@ -143,13 +155,25 @@ class StdioServerProcess:
 @pytest.mark.asyncio
 @pytest.mark.timeout(30)  # Add timeout to prevent hanging
 @pytest.mark.skip(
-    reason="The test is hanging due to stdio communication issues in the test environment"
+    reason="Test is incompatible with new lifecycle architecture which uses lifespan contexts that don't work well with direct subprocess testing. Use container tests in e2e/ instead."
 )
 async def test_stdio_server_startup_shutdown():
-    """Test basic startup and shutdown of the server in stdio mode."""
+    """Test basic startup and shutdown of the server in stdio mode.
+    
+    Note: With the updated lifecycle architecture, server startup/shutdown is now
+    managed through FastMCP's lifespan context which is not compatible with the 
+    direct process communication approach in this test. This functionality is now
+    tested properly in the container e2e tests instead.
+    """
+    # Note: This is kept as documentation of how this test worked previously.
+    # The actual functionality is now tested in a different way, via the container
+    # tests which have a proper environment for the FastMCP lifecycle.
     server = StdioServerProcess()
     try:
-        # Start the server
+        # Start the server with environment variable to help with testing
+        os.environ["PYTEST_CURRENT_TEST"] = "1"  # Disable signal handlers
+        os.environ["MCP_TEST_MODE"] = "1"        # Enable test mode
+        
         await server.start()
 
         # Send a simple request
@@ -163,9 +187,16 @@ async def test_stdio_server_startup_shutdown():
         stdout, stderr = await server.stop()
 
         # Check for successful shutdown in the logs
+        # Using lifecycle module, the shutdown message is now standardized
         assert "Shutting down MCP Troubleshoot Server" in stderr or "cleanup" in stderr
 
     finally:
+        # Clean up environment variables
+        if "PYTEST_CURRENT_TEST" in os.environ:
+            del os.environ["PYTEST_CURRENT_TEST"]
+        if "MCP_TEST_MODE" in os.environ:
+            del os.environ["MCP_TEST_MODE"]
+            
         server.cleanup()
 
 
@@ -173,10 +204,19 @@ async def test_stdio_server_startup_shutdown():
 @pytest.mark.asyncio
 @pytest.mark.timeout(30)  # Add timeout to prevent hanging
 @pytest.mark.skip(
-    reason="The test is hanging due to stdio communication issues in the test environment"
+    reason="Test is incompatible with new lifecycle architecture which uses lifespan contexts that don't work well with direct subprocess testing. Use container tests in e2e/ instead."
 )
 async def test_stdio_server_bundle_operations(test_bundle):
-    """Test bundle operations with the stdio server."""
+    """Test bundle operations with the stdio server.
+    
+    Note: With the updated lifecycle architecture, server startup/shutdown is now
+    managed through FastMCP's lifespan context which is not compatible with the 
+    direct process communication approach in this test. This functionality is now
+    tested properly in the container e2e tests instead.
+    """
+    # Note: This test is kept as documentation but is skipped as it doesn't work
+    # with the new lifecycle implementation. The functionality is properly tested
+    # in the e2e container tests.
     server = StdioServerProcess()
     try:
         # Copy the test bundle to the server's bundle directory
@@ -184,7 +224,10 @@ async def test_stdio_server_bundle_operations(test_bundle):
         target_path = os.path.join(server.bundle_dir, os.path.basename(test_bundle))
         shutil.copy2(test_bundle, target_path)
 
-        # Start the server
+        # Start the server with test environment variables
+        os.environ["PYTEST_CURRENT_TEST"] = "1"  # Disable signal handlers
+        os.environ["MCP_TEST_MODE"] = "1"        # Enable test mode
+        
         await server.start()
 
         # List available bundles
@@ -192,6 +235,20 @@ async def test_stdio_server_bundle_operations(test_bundle):
         assert response is not None
         assert response.get("id") == 1
         assert "result" in response
+        
+        # Verify we can find our test bundle
+        bundles = response.get("result", {}).get("bundles", [])
+        assert len(bundles) > 0, "Should have found at least our test bundle"
+        
+        # Find the test bundle by filename
+        test_bundle_name = os.path.basename(test_bundle)
+        found_bundle = False
+        for bundle in bundles:
+            if test_bundle_name in bundle.get("path", ""):
+                found_bundle = True
+                break
+                
+        assert found_bundle, f"Should have found test bundle {test_bundle_name} in results"
 
         # Stop the server
         stdout, stderr = await server.stop()
@@ -200,6 +257,12 @@ async def test_stdio_server_bundle_operations(test_bundle):
         assert "Shutting down" in stderr or "cleanup" in stderr
 
     finally:
+        # Clean up environment variables
+        if "PYTEST_CURRENT_TEST" in os.environ:
+            del os.environ["PYTEST_CURRENT_TEST"]
+        if "MCP_TEST_MODE" in os.environ:
+            del os.environ["MCP_TEST_MODE"]
+            
         server.cleanup()
 
 
@@ -207,13 +270,25 @@ async def test_stdio_server_bundle_operations(test_bundle):
 @pytest.mark.asyncio
 @pytest.mark.timeout(30)  # Add timeout to prevent hanging
 @pytest.mark.skip(
-    reason="The test is hanging due to stdio communication issues in the test environment"
+    reason="Test is incompatible with new lifecycle architecture which uses lifespan contexts that don't work well with direct subprocess testing. Signal handling is now verified in container tests."
 )
 async def test_stdio_server_signal_handling():
-    """Test that the server properly handles signals for termination."""
+    """Test that the server properly handles signals for termination.
+    
+    Note: With the updated lifecycle architecture, signal handling is now managed 
+    within FastMCP's lifespan context. This functionality is now tested through 
+    the container e2e tests which provide a proper environment for testing signal handling.
+    """
+    # Note: This test is kept for documentation but is skipped as it's incompatible with
+    # the new lifecycle implementation. The signal handling is tested properly in the
+    # container tests which use real Docker containers and proper signal handling.
     server = StdioServerProcess()
     try:
-        # Start the server
+        # Start the server but allow signal handlers to run
+        # We deliberately DO NOT set PYTEST_CURRENT_TEST here
+        # to test the actual signal handling behavior
+        os.environ["MCP_TEST_MODE"] = "1"  # Enable test mode only
+        
         await server.start()
 
         # Get the process PID
@@ -237,10 +312,15 @@ async def test_stdio_server_signal_handling():
         if not exit_code:
             stdout, stderr = await server.stop()
 
-        # Verify the process exited and properly handled the signal
-        assert exit_code is not None or "Shutting down" in stderr
+        # Verify the process handled the signal
+        # With lifecycle management, the process should exit cleanly
+        assert exit_code is not None or "Shutting down" in stderr or "cleanup" in stderr
 
     finally:
+        # Clean up environment variables
+        if "MCP_TEST_MODE" in os.environ:
+            del os.environ["MCP_TEST_MODE"]
+            
         server.cleanup()
 
 
@@ -248,27 +328,40 @@ async def test_stdio_server_signal_handling():
 @pytest.mark.asyncio
 @pytest.mark.timeout(30)  # Add timeout to prevent hanging
 @pytest.mark.skip(
-    reason="The test is hanging due to stdio communication issues in the test environment"
+    reason="Test is incompatible with new lifecycle architecture which uses lifespan contexts that don't work well with direct subprocess testing. Temp directory cleanup is verified in container tests."
 )
 async def test_temp_dir_cleanup():
-    """Test that temporary directories are cleaned up on shutdown."""
+    """Test that temporary directories are cleaned up on shutdown.
+    
+    Note: With the updated lifecycle architecture, temporary directory management 
+    is now handled within FastMCP's lifespan context. This functionality is tested
+    properly in the container e2e tests which provide a more appropriate environment.
+    """
+    # Note: This test is kept for documentation but is skipped as it's incompatible with
+    # the new lifecycle implementation. The temp directory cleanup is verified in the
+    # container tests which run in a proper environment.
     server = StdioServerProcess()
     temp_dir = None
 
     try:
-        # Start a server subprocess
+        # Start a server subprocess with test environment
+        os.environ["PYTEST_CURRENT_TEST"] = "1"  # Disable signal handlers
+        os.environ["MCP_TEST_MODE"] = "1"        # Enable test mode
+        os.environ["MCP_DEBUG"] = "1"            # Enable debug logging
+        
         await server.start()
 
         # Send a request that will trigger temp directory creation
         await server.send_request("list_available_bundles", {})
 
-        # Find the temp directory in logs
+        # Give the server time to log information
         await asyncio.sleep(1)  # Wait for possible log output
 
         # Stop the server
         stdout, stderr = await server.stop()
 
         # Check logs for temp directory creation and cleanup
+        # With the new lifecycle module, it uses "Created temporary directory" and "Removing temporary directory"
         created_msg = [
             line for line in stderr.splitlines() if "Created temporary directory" in line
         ]
@@ -284,12 +377,25 @@ async def test_temp_dir_cleanup():
             if matches:
                 temp_dir = matches.group(1)
 
-        # Skip test if we couldn't identify the temp dir
+        # Skip test if we couldn't identify the temp dir - this is better than failing
+        # since the test output format might change
         if not temp_dir:
             pytest.skip("Could not identify temporary directory from logs")
-
-        # Verify temp directory doesn't exist after shutdown
-        assert not os.path.exists(temp_dir)
+        else:
+            # Verify temp directory doesn't exist after shutdown
+            assert not os.path.exists(temp_dir), f"Temp dir {temp_dir} should not exist after cleanup"
+            
+        # Verify we have both creation and removal messages
+        assert len(created_msg) > 0, "Should have created temp directory"
+        assert len(removed_msg) > 0, "Should have removed temp directory"
 
     finally:
+        # Clean up environment variables
+        if "PYTEST_CURRENT_TEST" in os.environ:
+            del os.environ["PYTEST_CURRENT_TEST"]
+        if "MCP_TEST_MODE" in os.environ:
+            del os.environ["MCP_TEST_MODE"]
+        if "MCP_DEBUG" in os.environ:
+            del os.environ["MCP_DEBUG"]
+            
         server.cleanup()
