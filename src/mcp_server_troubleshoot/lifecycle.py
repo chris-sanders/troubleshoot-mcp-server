@@ -234,12 +234,11 @@ def handle_signal(signum: int, frame: Any) -> None:
     except Exception as e:
         logger.error(f"Error during explicit shutdown: {e}")
 
-    # Wait to allow cleanup and logs to flush
-    logger.info("Waiting for cleanup operations to complete (5 seconds)")
-    time.sleep(5.0)
+    # Small delay to allow logs to flush
+    logger.info("Cleanup completed, exiting process")
+    time.sleep(0.5)
 
     # Exit the process
-    logger.info("Grace period completed, exiting process")
     sys.exit(0)
 
 
