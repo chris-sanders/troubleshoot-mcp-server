@@ -1,8 +1,25 @@
 """
 Parametrized tests for the MCP server.
 
-This module demonstrates improved test structure using pytest parameterization
-and the TestAssertions helper class to reduce duplication and improve coverage.
+This module tests the MCP server tools and handlers using parameterized tests that
+verify different input combinations and edge cases in a systematic way.
+
+Benefits of this testing approach:
+1. Comprehensive coverage of multiple scenarios with concise code
+2. Clear documentation of expected outputs for each input combination
+3. Consistent testing patterns using the TestAssertions helper class
+4. Better visualization of error cases and edge conditions
+
+The tests focus on these key user workflows:
+1. Bundle initialization with different sources and conditions
+2. Kubectl command execution with various formats and error cases
+3. File operations (listing, reading, searching) with different inputs
+4. Resource cleanup and shutdown behavior
+5. Signal handling and graceful termination
+
+Each test verifies the behavior from the user's perspective, focusing on the
+actual outputs users would see rather than implementation details, which
+makes the tests more resilient to internal refactoring.
 """
 
 import tempfile

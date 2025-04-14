@@ -1,8 +1,21 @@
 """
 Parametrized tests for the File Explorer component.
 
-This module demonstrates improved test structure using pytest parameterization
-to reduce duplication and improve coverage.
+This module uses pytest parameterization to test the FileExplorer component with
+multiple input combinations, focusing on validating behavior rather than implementation.
+
+Benefits of the parameterized approach:
+1. Comprehensive coverage with fewer test functions
+2. Clear documentation of valid/invalid inputs and expected outcomes
+3. Easier maintenance - adding new test cases doesn't require new test functions
+4. Better visualization of test boundaries and edge cases
+
+The tests focus on three main user workflows:
+1. Listing files and directories within a bundle
+2. Reading file contents with different options (line ranges, binary detection)
+3. Searching for patterns in files (grep functionality)
+
+Each test verifies both normal operation and proper error handling.
 """
 
 from pathlib import Path
