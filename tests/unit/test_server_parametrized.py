@@ -563,32 +563,72 @@ async def test_cleanup_resources(test_assertions):
     Args:
         test_assertions: Assertions helper fixture
     """
-    # Mock the bundle manager
-    with patch("mcp_server_troubleshoot.server._bundle_manager") as mock_bundle_manager:
+    # Mock both app_context and legacy bundle manager
+    with patch("mcp_server_troubleshoot.server.get_app_context") as mock_get_context, \
+         patch("mcp_server_troubleshoot.server.globals") as mock_globals:
+        
         # Reset shutdown flag
         import mcp_server_troubleshoot.server
         mcp_server_troubleshoot.server._is_shutting_down = False
         
-        # Setup cleanup mock
-        mock_bundle_manager.cleanup = AsyncMock()
+        # Setup app context mode
+        mock_app_context = AsyncMock()
+        mock_app_context.bundle_manager = AsyncMock()
+        mock_app_context.bundle_manager.cleanup = AsyncMock()
+        
+        # Set return value for get_app_context
+        mock_get_context.return_value = mock_app_context
+        
+        # Mock globals for legacy mode
+        mock_globals.return_value = {
+            "_bundle_manager": None  # Not used in this test since we test app_context mode
+        }
         
         # Call cleanup_resources
         await cleanup_resources()
         
-        # Verify cleanup was called
-        mock_bundle_manager.cleanup.assert_awaited_once()
+        # Verify cleanup was called on app context bundle manager
+        mock_app_context.bundle_manager.cleanup.assert_awaited_once()
         
         # Verify shutdown flag was set
         assert mcp_server_troubleshoot.server._is_shutting_down is True
         
         # Reset mock
-        mock_bundle_manager.cleanup.reset_mock()
+        mock_app_context.bundle_manager.cleanup.reset_mock()
         
         # Call cleanup_resources again (should not call cleanup again)
         await cleanup_resources()
         
         # Verify cleanup was not called again
-        mock_bundle_manager.cleanup.assert_not_awaited()
+        mock_app_context.bundle_manager.cleanup.assert_not_awaited()
+        
+    # Now test legacy mode
+    with patch("mcp_server_troubleshoot.server.get_app_context") as mock_get_context, \
+         patch("mcp_server_troubleshoot.server.globals") as mock_globals:
+        
+        # Reset shutdown flag
+        mcp_server_troubleshoot.server._is_shutting_down = False
+        
+        # Setup legacy mode (no app context)
+        mock_get_context.return_value = None
+        
+        # Setup legacy bundle manager
+        mock_bundle_manager = AsyncMock()
+        mock_bundle_manager.cleanup = AsyncMock()
+        
+        # Mock globals for legacy mode
+        mock_globals.return_value = {
+            "_bundle_manager": mock_bundle_manager
+        }
+        
+        # Call cleanup_resources
+        await cleanup_resources()
+        
+        # Verify cleanup was called on legacy bundle manager
+        mock_bundle_manager.cleanup.assert_awaited_once()
+        
+        # Verify shutdown flag was set
+        assert mcp_server_troubleshoot.server._is_shutting_down is True
 
 
 @pytest.mark.asyncio

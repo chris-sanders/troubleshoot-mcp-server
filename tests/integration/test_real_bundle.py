@@ -131,7 +131,7 @@ def test_sbctl_help_behavior(test_support_bundle):
 
 
 @pytest.mark.asyncio
-async def test_bundle_lifecycle(bundle_manager):
+async def test_bundle_lifecycle(bundle_manager_fixture):
     """
     Test the complete lifecycle of a bundle with proper resource management.
     This test verifies the functional behavior:
@@ -140,10 +140,10 @@ async def test_bundle_lifecycle(bundle_manager):
     3. Re-initialization with and without force behaves correctly
 
     Args:
-        bundle_manager: Fixture that provides a BundleManager and bundle path
+        bundle_manager_fixture: Fixture that provides a BundleManager and bundle path
     """
     # Unpack the fixture
-    manager, real_bundle_path = bundle_manager
+    manager, real_bundle_path = bundle_manager_fixture
 
     # Act: Initialize the bundle
     result = await asyncio.wait_for(manager.initialize_bundle(str(real_bundle_path)), timeout=30.0)
@@ -185,12 +185,12 @@ async def test_bundle_initialization_workflow(bundle_manager_fixture, test_asser
     3. It properly reports directory structure
 
     Args:
-        bundle_manager: Fixture that provides a BundleManager and bundle path
+        bundle_manager_fixture: Fixture that provides a BundleManager and bundle path
     """
     from mcp_server_troubleshoot.files import FileExplorer
 
     # Unpack the fixture
-    manager, bundle_path = bundle_manager
+    manager, bundle_path = bundle_manager_fixture
 
     # First initialize the bundle
     result = await manager.initialize_bundle(str(bundle_path))
@@ -245,7 +245,7 @@ async def test_bundle_initialization_workflow(bundle_manager_fixture, test_asser
 
 
 @pytest.mark.asyncio
-async def test_bundle_manager_performance(bundle_manager):
+async def test_bundle_manager_performance(bundle_manager_fixture):
     """
     Test the performance and reliability of the BundleManager with real bundles.
 
@@ -255,10 +255,10 @@ async def test_bundle_manager_performance(bundle_manager):
     3. Diagnostic information is available
 
     Args:
-        bundle_manager: Fixture that provides a BundleManager and bundle path
+        bundle_manager_fixture: Fixture that provides a BundleManager and bundle path
     """
     # Unpack the fixture
-    manager, bundle_path = bundle_manager
+    manager, bundle_path = bundle_manager_fixture
 
     # BEHAVIOR TEST 1: Bundle initialization completes within expected time
     start_time = time.time()
