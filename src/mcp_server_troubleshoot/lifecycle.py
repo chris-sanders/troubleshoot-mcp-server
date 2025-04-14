@@ -195,10 +195,12 @@ def handle_signal(signum: int, frame: Any) -> None:
     except Exception as e:
         logger.error(f"Error during explicit shutdown: {e}")
 
-    # Wait a moment to allow logs to flush
-    time.sleep(0.5)
+    # Wait longer to allow cleanup to complete
+    logger.info("Waiting for cleanup operations to complete (5 seconds)")
+    time.sleep(5.0)
 
     # Exit the process, which will trigger context manager cleanup as backup
+    logger.info("Grace period completed, exiting process")
     sys.exit(0)
 
 

@@ -84,6 +84,7 @@ if [ "$DEBUG_MODE" = true ]; then
     -e SBCTL_TOKEN="${SBCTL_TOKEN:-}" \
     -e MCP_BUNDLE_STORAGE="/data/bundles" \
     -e MCP_LOG_LEVEL="${LOG_LEVEL}" \
+    --stop-timeout 10 \
     --name "$CONTAINER_NAME" \
     "${IMAGE_NAME}:${IMAGE_TAG}" ${VERBOSE} ${ARGS}
 else
@@ -93,6 +94,7 @@ else
     -v "${BUNDLE_DIR}:/data/bundles" \
     -e SBCTL_TOKEN="${SBCTL_TOKEN:-}" \
     --rm \
+    --stop-timeout 10 \
     --name "$CONTAINER_NAME" \
     "${IMAGE_NAME}:${IMAGE_TAG}" ${VERBOSE} ${ARGS}
 fi

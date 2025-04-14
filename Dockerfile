@@ -96,6 +96,9 @@ RUN useradd -m mcp-user && \
 
 USER mcp-user
 
+# Set stop signal and grace period 
+STOPSIGNAL SIGTERM
+
 # Command to run - use ENTRYPOINT + CMD pattern for flexibility
 # This allows overriding the command while keeping the entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
