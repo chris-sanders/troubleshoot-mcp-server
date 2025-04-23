@@ -512,7 +512,7 @@ async def test_bundle_manager_download_bundle_error():
                 # Call _download_bundle directly to test its error handling
                 await manager._download_bundle(url)
 
-        # Use [:80] to match the truncation in the error message
+        # Assert the expected HTTP error message, not the TypeError
         assert f"Failed to download bundle from {url[:80]}..." in str(excinfo.value)
         assert "HTTP 404 Not Found" in str(excinfo.value)
 
