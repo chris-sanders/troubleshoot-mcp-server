@@ -186,14 +186,17 @@ def mock_aiohttp_download():
     mock_aio_response.content_length = 100
 
     # === START MODIFICATION ===
-    # Configure iter_chunked to return a real async iterator mock
-    async def async_iterator_func():
+    # Mock the content object
+    mock_content = AsyncMock()
+
+    # Define the async iterator directly for iter_chunked
+    async def async_iterator():
         yield b"chunk1"
         yield b"chunk2"
-        # The return value of the async generator function IS the async iterator
-    mock_aio_response.content = AsyncMock()
-    # Assign the result of calling the async generator function
-    mock_aio_response.content.iter_chunked.return_value = async_iterator_func()
+
+    # Make the iter_chunked mock return our async iterator when called
+    mock_content.iter_chunked = MagicMock(return_value=async_iterator())
+    mock_aio_response.content = mock_content
     # === END MODIFICATION ===
 
     # Mock the __aenter__ and __aexit__ for the response context manager
@@ -347,8 +350,11 @@ async def test_bundle_manager_download_replicated_url_api_401(mock_httpx_client)
 
         with patch.dict(os.environ, {"SBCTL_TOKEN": "bad_token"}, clear=True):
             with pytest.raises(BundleDownloadError) as excinfo:
-                # Call _get_replicated_signed_url directly to isolate the logic
-                await manager._get_replicated_signed_url(REPLICATED_URL)
+                # === START MODIFICATION ===
+                # Call _download_bundle instead of _get_replicated_signed_url
+                await manager._download_bundle(REPLICATED_URL)
+                # === END MODIFICATION ===
+            # The error should propagate from _get_replicated_signed_url
             assert "Failed to authenticate with Replicated API (status 401)" in str(excinfo.value)
 
 
@@ -368,8 +374,10 @@ async def test_bundle_manager_download_replicated_url_api_404(mock_httpx_client)
 
         with patch.dict(os.environ, {"SBCTL_TOKEN": "good_token"}, clear=True):
             with pytest.raises(BundleDownloadError) as excinfo:
-                # Call _get_replicated_signed_url directly
-                await manager._get_replicated_signed_url(REPLICATED_URL)
+                # === START MODIFICATION ===
+                # Call _download_bundle instead of _get_replicated_signed_url
+                await manager._download_bundle(REPLICATED_URL)
+                # === END MODIFICATION ===
             assert "Support bundle not found on Replicated Vendor Portal" in str(excinfo.value)
             assert f"slug: {REPLICATED_SLUG}" in str(excinfo.value)
 
@@ -390,8 +398,10 @@ async def test_bundle_manager_download_replicated_url_api_other_error(mock_httpx
 
         with patch.dict(os.environ, {"SBCTL_TOKEN": "good_token"}, clear=True):
             with pytest.raises(BundleDownloadError) as excinfo:
-                # Call _get_replicated_signed_url directly
-                await manager._get_replicated_signed_url(REPLICATED_URL)
+                # === START MODIFICATION ===
+                # Call _download_bundle instead of _get_replicated_signed_url
+                await manager._download_bundle(REPLICATED_URL)
+                # === END MODIFICATION ===
             assert "Failed to get signed URL from Replicated API (status 500)" in str(
                 excinfo.value
             )
@@ -416,8 +426,10 @@ async def test_bundle_manager_download_replicated_url_missing_signed_uri(mock_ht
 
         with patch.dict(os.environ, {"SBCTL_TOKEN": "good_token"}, clear=True):
             with pytest.raises(BundleDownloadError) as excinfo:
-                # Call _get_replicated_signed_url directly
-                await manager._get_replicated_signed_url(REPLICATED_URL)
+                # === START MODIFICATION ===
+                # Call _download_bundle instead of _get_replicated_signed_url
+                await manager._download_bundle(REPLICATED_URL)
+                # === END MODIFICATION ===
             assert "Could not find 'signedUri' in Replicated API response" in str(excinfo.value)
 
 
@@ -439,8 +451,8 @@ async def test_bundle_manager_download_replicated_url_network_error():
             with patch.dict(os.environ, {"SBCTL_TOKEN": "good_token"}, clear=True):
                 with pytest.raises(BundleDownloadError) as excinfo:
                     # === START MODIFICATION ===
-                    # Call _get_replicated_signed_url directly
-                    await manager._get_replicated_signed_url(REPLICATED_URL)
+                    # Call _download_bundle instead of _get_replicated_signed_url
+                    await manager._download_bundle(REPLICATED_URL)
                     # === END MODIFICATION ===
                 assert "Network error requesting signed URL" in str(excinfo.value)
 
@@ -524,14 +536,13 @@ async def test_bundle_manager_download_bundle_error():
     mock_aio_response.reason = "Not Found"
 
     # === START MODIFICATION ===
-    # Configure iter_chunked correctly for the error response as well
-    # (though it won't be reached if status is not 200)
-    async def async_iterator_func():
-         # Empty iterator for error case
-         if False: yield # pragma: no cover
-    mock_aio_response.content = AsyncMock()
-    mock_aio_response.content.iter_chunked.return_value = async_iterator_func()
-    # === END MODIFICATION ===
+    # Mock the content object and iter_chunked for the error response
+    mock_content = AsyncMock()
+    async def async_iterator_error():
+         if False: yield # pragma: no cover # Empty iterator
+    mock_content.iter_chunked = MagicMock(return_value=async_iterator_error())
+    mock_aio_response.content = mock_content
+     # === END MODIFICATION ===
 
     # Mock the context manager methods for the response
     mock_aio_response.__aenter__.return_value = mock_aio_response
