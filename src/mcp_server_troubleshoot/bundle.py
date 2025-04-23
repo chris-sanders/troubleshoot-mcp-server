@@ -390,6 +390,7 @@ class BundleManager:
                 logger.debug(f"Requesting signed URL from Replicated API: {api_url}")
                 response = await client.get(api_url, headers=headers)
 
+                # Check for errors before trying to parse JSON
                 if response.status_code == 401:
                     raise BundleDownloadError(
                         f"Failed to authenticate with Replicated API (status {response.status_code}). "
@@ -405,6 +406,7 @@ class BundleManager:
                         f"Failed to get signed URL from Replicated API (status {response.status_code}): {response_text}"
                     )
 
+                # Now parse JSON only if status is 200
                 response_data = response.json()
                 signed_url = response_data.get("signedUri")
 
@@ -416,17 +418,19 @@ class BundleManager:
                 logger.info("Successfully retrieved signed URL from Replicated API.")
                 return signed_url
 
+        except httpx.Timeout as e:
+             logger.exception(f"Timeout requesting signed URL from Replicated API: {e}")
+             raise BundleDownloadError(f"Timeout requesting signed URL: {e}")
         except httpx.RequestError as e:
             logger.exception(f"Network error requesting signed URL from Replicated API: {e}")
             raise BundleDownloadError(f"Network error requesting signed URL: {e}")
         except json.JSONDecodeError as e:
             logger.exception(f"Error decoding JSON response from Replicated API: {e}")
             raise BundleDownloadError(f"Invalid JSON response from Replicated API: {e}")
+        except BundleDownloadError: # Re-raise specific errors
+             raise
         except Exception as e:
             logger.exception(f"Unexpected error getting signed URL from Replicated API: {e}")
-            # Re-raise BundleDownloadError if it's already that type
-            if isinstance(e, BundleDownloadError):
-                raise
             raise BundleDownloadError(f"Unexpected error getting signed URL: {str(e)}")
 
     async def _download_bundle(self, url: str) -> Path:
@@ -466,13 +470,26 @@ class BundleManager:
             os.path.basename(parsed_original_url.path)
             or f"bundle_{self._generate_bundle_id(original_url)}.tar.gz"
         )
+        # Ensure filename is safe
+        filename = re.sub(r'[^\w\-.]', '_', filename)
+        if not filename: # Handle cases where sanitization results in empty string
+            filename = f"bundle_{self._generate_bundle_id(original_url)}.tar.gz"
+
         download_path = self.bundle_dir / filename
 
         try:
-            # Headers for the actual download (signed URLs usually don't need auth)
+            # Headers for the actual download
             download_headers = {}
-            # Note: We don't add SBCTL_TOKEN here as signed URLs typically include auth parameters.
-            # If specific headers are needed for signed URLs, they should be added here.
+            # Add auth token ONLY for non-Replicated URLs (signed URLs have auth embedded)
+            if actual_download_url == original_url: # Check if we are using the original URL
+                token = os.environ.get("SBCTL_TOKEN")
+                if token:
+                    download_headers["Authorization"] = f"Bearer {token}"
+                    logger.debug("Added Authorization header for direct download.")
+                else:
+                     logger.debug("No SBCTL_TOKEN found for direct download.")
+            else:
+                logger.debug("Skipping Authorization header for signed Replicated URL.")
 
             # Set a timeout for the download to prevent hanging
             timeout = aiohttp.ClientTimeout(total=MAX_DOWNLOAD_TIMEOUT)
@@ -481,8 +498,10 @@ class BundleManager:
                 # Use the actual_download_url for the GET request
                 async with session.get(actual_download_url, headers=download_headers) as response:
                     if response.status != 200:
+                        # Include response reason for better error messages
+                        reason = response.reason or "Unknown Error"
                         raise BundleDownloadError(
-                            f"Failed to download bundle from {actual_download_url[:80]}...: HTTP {response.status}"
+                            f"Failed to download bundle from {actual_download_url[:80]}...: HTTP {response.status} {reason}"
                         )
 
                     # Check content length if available

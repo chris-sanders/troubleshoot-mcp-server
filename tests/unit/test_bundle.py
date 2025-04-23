@@ -173,17 +173,35 @@ def mock_httpx_client():
 @pytest.fixture
 def mock_aiohttp_download():
     """Fixture to mock the actual download part using aiohttp."""
-    mock_aio_response = AsyncMock()
+    # Mock the response object
+    mock_aio_response = AsyncMock(spec=aiohttp.ClientResponse)
     mock_aio_response.status = 200
+    mock_aio_response.reason = "OK"
     mock_aio_response.content_length = 100
-    mock_aio_response.content.iter_chunked = AsyncMock(return_value=[b"chunk1", b"chunk2"])
+    # Configure iter_chunked to be an async iterator
+    async def async_iterator():
+        yield b"chunk1"
+        yield b"chunk2"
+    mock_aio_response.content.iter_chunked = AsyncMock(return_value=async_iterator())
+    # Mock the __aenter__ and __aexit__ for the response context manager
+    mock_aio_response.__aenter__.return_value = mock_aio_response
+    mock_aio_response.__aexit__ = AsyncMock(return_value=None)
 
-    mock_aio_session = AsyncMock()
-    mock_aio_session.__aenter__.return_value.get = AsyncMock(return_value=mock_aio_response)
-    mock_aio_session.__aexit__ = AsyncMock()
+    # Mock the session's get method to return the mock response
+    mock_get = AsyncMock(return_value=mock_aio_response)
 
+    # Mock the session object
+    mock_aio_session = AsyncMock(spec=aiohttp.ClientSession)
+    mock_aio_session.get = mock_get
+    # Mock the __aenter__ and __aexit__ for the session context manager
+    mock_aio_session.__aenter__.return_value = mock_aio_session
+    mock_aio_session.__aexit__ = AsyncMock(return_value=None)
+
+    # Patch aiohttp.ClientSession to return our mock session
     with patch("aiohttp.ClientSession", return_value=mock_aio_session) as mock_constructor:
-        yield mock_constructor, mock_aio_response
+        # Yield the constructor, the session instance, and the response instance
+        # This gives tests more flexibility for assertions
+        yield mock_constructor, mock_aio_session, mock_aio_response
 
 
 @pytest.mark.asyncio
@@ -191,8 +209,8 @@ async def test_bundle_manager_download_replicated_url_success_sbctl_token(
     mock_httpx_client, mock_aiohttp_download
 ):
     """Test downloading from Replicated URL with SBCTL_TOKEN successfully."""
-    mock_httpx_constructor, _ = mock_httpx_client
-    mock_aiohttp_constructor, _ = mock_aiohttp_download
+    mock_httpx_constructor, mock_httpx_response = mock_httpx_client
+    mock_aiohttp_constructor, mock_aio_session, mock_aio_response = mock_aiohttp_download
 
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
@@ -215,8 +233,8 @@ async def test_bundle_manager_download_replicated_url_success_sbctl_token(
 
             # Verify aiohttp call for actual download
             mock_aiohttp_constructor.assert_called_once()
-            mock_aio_get_call = mock_aiohttp_constructor.return_value.__aenter__.return_value.get
-            mock_aio_get_call.assert_awaited_once_with(SIGNED_URL, headers={})
+            # Assert on the session's get method
+            mock_aio_session.get.assert_awaited_once_with(SIGNED_URL, headers={})
 
             # Verify file was created
             assert download_path.exists()
@@ -229,8 +247,8 @@ async def test_bundle_manager_download_replicated_url_success_replicated_token(
     mock_httpx_client, mock_aiohttp_download
 ):
     """Test downloading from Replicated URL with REPLICATED_TOKEN successfully."""
-    mock_httpx_constructor, _ = mock_httpx_client
-    mock_aiohttp_constructor, _ = mock_aiohttp_download
+    mock_httpx_constructor, mock_httpx_response = mock_httpx_client
+    mock_aiohttp_constructor, mock_aio_session, mock_aio_response = mock_aiohttp_download
 
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
@@ -250,8 +268,7 @@ async def test_bundle_manager_download_replicated_url_success_replicated_token(
                 },
             )
             # Verify aiohttp call used the signed URL
-            mock_aio_get_call = mock_aiohttp_constructor.return_value.__aenter__.return_value.get
-            mock_aio_get_call.assert_awaited_once_with(SIGNED_URL, headers={})
+            mock_aio_session.get.assert_awaited_once_with(SIGNED_URL, headers={})
 
 
 @pytest.mark.asyncio
@@ -392,7 +409,7 @@ async def test_bundle_manager_download_replicated_url_network_error():
 @pytest.mark.asyncio
 async def test_bundle_manager_download_non_replicated_url(mock_aiohttp_download):
     """Test that non-Replicated URLs are downloaded directly without API calls."""
-    mock_aiohttp_constructor, _ = mock_aiohttp_download
+    mock_aiohttp_constructor, mock_aio_session, mock_aio_response = mock_aiohttp_download
     non_replicated_url = "https://normal.example.com/bundle.tar.gz"
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -407,12 +424,8 @@ async def test_bundle_manager_download_non_replicated_url(mock_aiohttp_download)
                 # Verify httpx was NOT called
                 mock_httpx_constructor.assert_not_called()
 
-                # Verify aiohttp was called with the original URL
-                mock_aio_get_call = (
-                    mock_aiohttp_constructor.return_value.__aenter__.return_value.get
-                )
-                # Check headers includes the SBCTL_TOKEN for non-replicated URLs
-                mock_aio_get_call.assert_awaited_once_with(
+                # Verify aiohttp was called with the original URL and token
+                mock_aio_session.get.assert_awaited_once_with(
                     non_replicated_url, headers={"Authorization": "Bearer token_val"}
                 )
 
@@ -426,12 +439,10 @@ async def test_bundle_manager_download_non_replicated_url(mock_aiohttp_download)
 
 
 @pytest.mark.asyncio
-async def test_bundle_manager_download_bundle():
+async def test_bundle_manager_download_bundle(mock_aiohttp_download): # Use fixture as argument
     """Test that the bundle manager can download a non-Replicated bundle."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        bundle_dir = Path(temp_dir)
-    # This test now focuses on the non-Replicated case, using the fixture
-    mock_aiohttp_constructor, _ = mock_aiohttp_download
+    # Unpack the fixture results
+    mock_aiohttp_constructor, mock_aio_session, mock_aio_response = mock_aiohttp_download
     non_replicated_url = "https://example.com/bundle.tar.gz"
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -448,8 +459,7 @@ async def test_bundle_manager_download_bundle():
             result = await manager.initialize_bundle(non_replicated_url)
 
             # Verify aiohttp was called correctly by _download_bundle
-            mock_aio_get_call = mock_aiohttp_constructor.return_value.__aenter__.return_value.get
-            mock_aio_get_call.assert_awaited_once_with(
+            mock_aio_session.get.assert_awaited_once_with(
                 non_replicated_url, headers={"Authorization": "Bearer token_val"}
             )
 
@@ -460,50 +470,46 @@ async def test_bundle_manager_download_bundle():
             # Check that the bundle path inside the metadata points to the downloaded file's dir
             expected_bundle_dir_name_part = "bundle_" # From filename generation
             assert expected_bundle_dir_name_part in result.path.name
-
-
-@pytest.mark.asyncio
-async def test_bundle_manager_download_bundle_auth():
-    """Test that the bundle manager uses auth token for download."""
-    # This test verifies that the auth token from env vars is included in requests
-
-    # Test the code directly by making a headers dict and applying the same logic
-    headers = {}
-    with patch.dict(os.environ, {"SBCTL_TOKEN": "test_token"}):
-        # This is the same logic used in _download_bundle
-        token = os.environ.get("SBCTL_TOKEN")
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-
-    # Verify the headers were set correctly for non-Replicated download
-    assert "Authorization" in headers
-    assert headers["Authorization"] == "Bearer test_token"
+            # Check the generated filename used for download path
+            expected_filename = "bundle.tar.gz" # Based on URL parsing
+            assert (manager.bundle_dir / expected_filename).exists()
 
 
 @pytest.mark.asyncio
 async def test_bundle_manager_download_bundle_error():
     """Test that the bundle manager handles download errors for non-Replicated URLs."""
+    # === START MODIFICATION ===
+    # Define the mock session and response for this specific test
+    mock_aio_response = AsyncMock(spec=aiohttp.ClientResponse)
+    mock_aio_response.status = 404
+    mock_aio_response.reason = "Not Found"
+    # Mock the context manager methods for the response
+    mock_aio_response.__aenter__.return_value = mock_aio_response
+    mock_aio_response.__aexit__ = AsyncMock(return_value=None)
+
+    mock_get = AsyncMock(return_value=mock_aio_response)
+
+    mock_aio_session = AsyncMock(spec=aiohttp.ClientSession)
+    mock_aio_session.get = mock_get
+    # Mock the context manager methods for the session
+    mock_aio_session.__aenter__.return_value = mock_aio_session
+    mock_aio_session.__aexit__ = AsyncMock(return_value=None)
+    # === END MODIFICATION ===
+
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
         manager = BundleManager(bundle_dir)
+        url = "https://example.com/missing_bundle.tar.gz"
 
-        # Create an alternative implementation with proper async context handling
-        async def mock_download_with_error(*args, **kwargs):
-            # Simulate a 404 error using aiohttp mock
-            mock_aio_response.status = 404
-            mock_aio_response.reason = "Not Found"
+        # Patch ClientSession to return our defined mock session
+        with patch("aiohttp.ClientSession", return_value=mock_aio_session):
+             with pytest.raises(BundleDownloadError) as excinfo:
+                # Call _download_bundle directly to test its error handling
+                await manager._download_bundle(url)
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            bundle_dir = Path(temp_dir)
-            manager = BundleManager(bundle_dir)
-            url = "https://example.com/missing_bundle.tar.gz"
-
-            with patch("aiohttp.ClientSession", return_value=mock_aio_session):
-                 with pytest.raises(BundleDownloadError) as excinfo:
-                    await manager._download_bundle(url)
-
-            assert f"Failed to download bundle from {url}" in str(excinfo.value)
-            assert "HTTP 404" in str(excinfo.value)
+        # Use [:80] to match the truncation in the error message
+        assert f"Failed to download bundle from {url[:80]}..." in str(excinfo.value)
+        assert "HTTP 404 Not Found" in str(excinfo.value)
 
 
 @pytest.mark.asyncio
