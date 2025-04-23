@@ -372,12 +372,12 @@ class BundleManager:
         slug = match.group(1)
         logger.info(f"Detected Replicated Vendor Portal URL with slug: {slug}")
 
-        # Get token - SBCTL_TOKEN takes precedence over REPLICATED_TOKEN
-        token = os.environ.get("SBCTL_TOKEN") or os.environ.get("REPLICATED_TOKEN")
+        # Get token - SBCTL_TOKEN takes precedence over REPLICATED
+        token = os.environ.get("SBCTL_TOKEN") or os.environ.get("REPLICATED")
         if not token:
             raise BundleDownloadError(
                 "Cannot download from Replicated Vendor Portal: "
-                "SBCTL_TOKEN or REPLICATED_TOKEN environment variable not set."
+                "SBCTL_TOKEN or REPLICATED environment variable not set."
             )
 
         api_url = REPLICATED_API_ENDPOINT.format(slug=slug)

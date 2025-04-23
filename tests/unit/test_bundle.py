@@ -274,11 +274,11 @@ async def test_bundle_manager_download_replicated_url_success_replicated_token(
         bundle_dir = Path(temp_dir)
         manager = BundleManager(bundle_dir)
 
-        # Only REPLICATED_TOKEN is set
-        with patch.dict(os.environ, {"REPLICATED_TOKEN": "replicated_token_value"}, clear=True):
+        # Only REPLICATED is set
+        with patch.dict(os.environ, {"REPLICATED": "replicated_token_value"}, clear=True):
             await manager._download_bundle(REPLICATED_URL)
 
-            # Verify httpx call used REPLICATED_TOKEN
+            # Verify httpx call used REPLICATED token
             mock_get_call = mock_httpx_constructor.return_value.__aenter__.return_value.get
             mock_get_call.assert_awaited_once_with(
                 REPLICATED_API_URL,
@@ -307,7 +307,9 @@ async def test_bundle_manager_download_replicated_url_token_precedence(
         # Both tokens are set
         with patch.dict(
             os.environ,
-            {"SBCTL_TOKEN": "sbctl_token_value", "REPLICATED_TOKEN": "replicated_token_value"},
+            # === START MODIFICATION ===
+            {"SBCTL_TOKEN": "sbctl_token_value", "REPLICATED": "replicated_token_value"},
+            # === END MODIFICATION ===
             clear=True,
         ):
             await manager._download_bundle(REPLICATED_URL)

@@ -21,7 +21,7 @@ curl -L -s "$SIGNED_URL" -o support-bundle-2025-04-22-16-51.tgz
 ```
 
 ## Success Criteria
-- [x] Add support for providing the SBCTL_TOKEN as the environment REPLICATED, SBCTL_TOKEN if present will take precedence
+- [x] Add support for providing the SBCTL_TOKEN as the environment variable, **REPLICATED** as an alternative. SBCTL_TOKEN if present will take precedence
 - [x] Detect Replicated vendor portal URLs and process separately
 - [x] Create a python way to process Replicated vendor portal URLs based on the base example above and properly download the signed bundle
 
@@ -48,7 +48,7 @@ N/A
 ## Progress Updates
 * **YYYY-MM-DD**: Started task. Created branch `task/replicated-vp`.
 * **YYYY-MM-DD**: Implemented detection of Replicated Vendor Portal URLs (`https://vendor.replicated.com/troubleshoot/analyze/...`) in `_download_bundle` using regex.
-* **YYYY-MM-DD**: Added `_get_replicated_signed_url` method to fetch the signed download URL from the Replicated API (`https://api.replicated.com/vendor/v3/supportbundle/{slug}`). Handles token precedence (`SBCTL_TOKEN` > `REPLICATED_TOKEN`) and API errors (401, 404, other). Uses `httpx` for the API call with timeout.
+* **YYYY-MM-DD**: Added `_get_replicated_signed_url` method to fetch the signed download URL from the Replicated API (`https://api.replicated.com/vendor/v3/supportbundle/{slug}`). Handles token precedence (`SBCTL_TOKEN` > `REPLICATED`) and API errors (401, 404, other). Uses `httpx` for the API call with timeout.
 * **YYYY-MM-DD**: Modified `_download_bundle` to call `_get_replicated_signed_url` for Replicated URLs and use the resulting signed URL for the actual download via `aiohttp`. Non-Replicated URLs are downloaded directly as before. Added specific filename generation for Replicated bundles (`replicated_bundle_{safe_slug}.tar.gz`).
 * **YYYY-MM-DD**: Added unit tests (`tests/unit/test_bundle.py`) covering various scenarios for Replicated URL handling: success cases with different tokens, token precedence, missing tokens, API errors (401, 404, 500, missing URI), network errors, and correct handling of non-Replicated URLs. Mocks `httpx.AsyncClient` and `aiohttp.ClientSession`.
 * **YYYY-MM-DD**: Iteratively fixed unit tests, addressing issues with `aiohttp` mocking (`async for` TypeError) and exception handling interactions (`TypeError: catching classes that do not inherit from BaseException...`). Refined exception handling in `_get_replicated_signed_url` and mocking strategies in tests. Fixed filename assertion. All unit tests related to this feature are now passing.
