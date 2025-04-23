@@ -882,65 +882,7 @@ class BundleManager:
             
     # Removed all alternative download approaches in favor of a single httpx-based one
             
-    async def _diagnostic_request(self, url: str) -> dict:
-        """
-        Make a diagnostic request to gather information about the URL using httpx.
-        
-        Args:
-            url: The URL to diagnose
-            
-        Returns:
-            Dictionary with diagnostic information
-        """
-        diagnostics = {"url": url}
-        
-        try:
-            # Parse the URL to check query parameters
-            from urllib.parse import urlparse, parse_qs
-            parsed_url = urlparse(url)
-            
-            # Extract query parameters
-            query_params = parse_qs(parsed_url.query)
-            diagnostics["url_scheme"] = parsed_url.scheme
-            diagnostics["url_hostname"] = parsed_url.hostname
-            diagnostics["url_path"] = parsed_url.path
-            
-            # Check for AWS specific query parameters
-            aws_params = [param for param in query_params if param.startswith('X-Amz-')]
-            diagnostics["has_aws_params"] = len(aws_params) > 0
-            diagnostics["aws_param_count"] = len(aws_params)
-            diagnostics["aws_param_names"] = aws_params
-            
-            # Create a client with short timeout
-            timeout = httpx.Timeout(10.0)
-            
-            async with httpx.AsyncClient(timeout=timeout, verify=False) as client:
-                # Try a HEAD request first (less data, just headers)
-                try:
-                    headers = {"User-Agent": "diagnostics/1.0"}
-                    response = await client.head(url, headers=headers)
-                    diagnostics["head_status"] = response.status_code
-                    diagnostics["head_headers"] = dict(response.headers)
-                except Exception as e:
-                    diagnostics["head_error"] = str(e)
-                
-                # Try a request with AWS-specific headers
-                try:
-                    aws_headers = {
-                        "User-Agent": "aws-cli/2.0",
-                        "Accept": "*/*",
-                        "Accept-Encoding": "identity",
-                    }
-                    
-                    response = await client.head(url, headers=aws_headers)
-                    diagnostics["aws_head_status"] = response.status_code
-                    diagnostics["aws_head_headers"] = dict(response.headers)
-                except Exception as e:
-                    diagnostics["aws_head_error"] = str(e)
-            
-            return diagnostics
-        except Exception as e:
-            return {"diagnostic_error": str(e)}
+    # The _diagnostic_request method is already defined earlier in the file
 
     async def _initialize_with_sbctl(self, bundle_path: Path, output_dir: Path) -> Path:
         """
