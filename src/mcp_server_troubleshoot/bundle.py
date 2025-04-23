@@ -383,15 +383,34 @@ class BundleManager:
         api_url = REPLICATED_API_ENDPOINT.format(slug=slug)
         headers = {"Authorization": token, "Content-Type": "application/json"}
 
+        response: Optional[httpx.Response] = None # Initialize response variable
         # === START RESTRUCTURE ===
         try:
-            # Use the globally defined download timeout
+            # Block 1: Handle network/request errors
             timeout = httpx.Timeout(MAX_DOWNLOAD_TIMEOUT)
             async with httpx.AsyncClient(timeout=timeout) as client:
                 logger.debug(f"Requesting signed URL from Replicated API: {api_url}")
                 response = await client.get(api_url, headers=headers)
 
-            # Check status code *after* the async with block closes the client
+        except httpx.Timeout as e:
+             logger.exception(f"Timeout requesting signed URL from Replicated API: {e}")
+             raise BundleDownloadError(f"Timeout requesting signed URL: {e}")
+        except httpx.RequestError as e:
+            logger.exception(f"Network error requesting signed URL from Replicated API: {e}")
+            raise BundleDownloadError(f"Network error requesting signed URL: {e}")
+        except Exception as e:
+             # Catch unexpected errors during the request itself
+             distinct_error_msg = f"UNEXPECTED EXCEPTION during Replicated API request: {type(e).__name__}: {str(e)}"
+             logger.exception(distinct_error_msg)
+             raise BundleDownloadError(distinct_error_msg)
+
+        # Block 2: Process the response if the request succeeded
+        try:
+            if response is None:
+                 # Should not happen if request succeeded, but handle defensively
+                 raise BundleDownloadError("Failed to get response from Replicated API.")
+
+            # Check status code
             if response.status_code == 401:
                 logger.error(f"Replicated API returned 401 Unauthorized for slug {slug}")
                 raise BundleDownloadError(
@@ -404,13 +423,13 @@ class BundleManager:
                     f"Support bundle not found on Replicated Vendor Portal (slug: {slug}, status {response.status_code})."
                 )
             elif response.status_code != 200:
-                response_text = response.text[:500]  # Limit response text length
+                response_text = response.text[:500]
                 logger.error(f"Replicated API returned error {response.status_code} for slug {slug}: {response_text}")
                 raise BundleDownloadError(
                     f"Failed to get signed URL from Replicated API (status {response.status_code}): {response_text}"
                 )
 
-            # If status is 200, proceed to parse JSON
+            # If status is 200, parse JSON
             try:
                 response_data = response.json()
             except json.JSONDecodeError as e:
@@ -418,7 +437,6 @@ class BundleManager:
                  raise BundleDownloadError(f"Invalid JSON response from Replicated API: {e}")
 
             signed_url = response_data.get("signedUri")
-
             if not signed_url:
                 logger.error(f"Missing 'signedUri' in Replicated API response for slug {slug}")
                 raise BundleDownloadError(
@@ -428,18 +446,12 @@ class BundleManager:
             logger.info("Successfully retrieved signed URL from Replicated API.")
             return signed_url
 
-        except httpx.Timeout as e:
-             logger.exception(f"Timeout requesting signed URL from Replicated API: {e}")
-             raise BundleDownloadError(f"Timeout requesting signed URL: {e}")
-        except httpx.RequestError as e:
-            logger.exception(f"Network error requesting signed URL from Replicated API: {e}")
-            raise BundleDownloadError(f"Network error requesting signed URL: {e}")
         except BundleDownloadError:
-            # Re-raise specific BundleDownloadErrors we've already identified
+            # Re-raise specific BundleDownloadErrors from response processing
             raise
         except Exception as e:
-            # Catch any other unexpected errors during the process and wrap them
-            distinct_error_msg = f"UNEXPECTED EXCEPTION in _get_replicated_signed_url: {type(e).__name__}: {str(e)}"
+            # Catch any other unexpected errors during response processing
+            distinct_error_msg = f"UNEXPECTED EXCEPTION processing Replicated API response: {type(e).__name__}: {str(e)}"
             logger.exception(distinct_error_msg)
             raise BundleDownloadError(distinct_error_msg)
         # === END RESTRUCTURE ===
