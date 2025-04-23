@@ -59,6 +59,7 @@ logger.debug(f"Feature flags - Allow alternative kubeconfig: {ALLOW_ALTERNATIVE_
 REPLICATED_VENDOR_URL_PATTERN = re.compile(
     r"https://vendor\.replicated\.com/troubleshoot/analyze/([^/]+)"
 )
+# Ensure there is NO space between 'v' and '3'
 REPLICATED_API_ENDPOINT = "https://api.replicated.com/vendor/v3/supportbundle/{slug}"
 
 
@@ -410,15 +411,21 @@ class BundleManager:
                 )
 
             # If status is 200, parse JSON
+            response_data = None # Initialize
             try:
                 response_data = response.json()
-            except json.JSONDecodeError as e:
-                 logger.exception(f"Error decoding JSON response from Replicated API (status 200): {e}")
-                 raise BundleDownloadError(f"Invalid JSON response from Replicated API: {e}")
+            except json.JSONDecodeError as json_e:
+                 logger.exception(f"Error decoding JSON response from Replicated API (status 200): {json_e}")
+                 raise BundleDownloadError(f"Invalid JSON response from Replicated API: {json_e}")
+
+            # Add validation: Ensure response_data is a dictionary
+            if not isinstance(response_data, dict):
+                logger.error(f"Replicated API response was not a JSON dictionary: {type(response_data)}")
+                raise BundleDownloadError("Invalid response format from Replicated API (expected JSON dictionary).")
 
             signed_url = response_data.get("signedUri")
             if not signed_url:
-                logger.error(f"Missing 'signedUri' in Replicated API response for slug {slug}")
+                logger.error(f"Missing 'signedUri' in Replicated API response for slug {slug}. Response data: {response_data}") # Log response data
                 raise BundleDownloadError(
                     "Could not find 'signedUri' in Replicated API response."
                 )
