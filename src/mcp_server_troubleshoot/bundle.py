@@ -423,9 +423,20 @@ class BundleManager:
                 logger.error(f"Replicated API response was not a JSON dictionary: {type(response_data)}")
                 raise BundleDownloadError("Invalid response format from Replicated API (expected JSON dictionary).")
 
-            signed_url = response_data.get("signedUri")
+            # === START MODIFICATION ===
+            # Access the nested 'bundle' dictionary first
+            bundle_data = response_data.get("bundle")
+            if not isinstance(bundle_data, dict):
+                logger.error(f"Missing 'bundle' dictionary in Replicated API response. Response data: {response_data}")
+                raise BundleDownloadError("Invalid response format from Replicated API (missing 'bundle' object).")
+
+            # Now get 'signedUri' from the nested dictionary
+            signed_url = bundle_data.get("signedUri")
+            # === END MODIFICATION ===
+
             if not signed_url:
-                logger.error(f"Missing 'signedUri' in Replicated API response for slug {slug}. Response data: {response_data}") # Log response data
+                # Log the bundle_data specifically if signedUri is missing from it
+                logger.error(f"Missing 'signedUri' in Replicated API response bundle object for slug {slug}. Bundle data: {bundle_data}")
                 raise BundleDownloadError(
                     "Could not find 'signedUri' in Replicated API response."
                 )
