@@ -434,7 +434,7 @@ class BundleManager:
         Download a support bundle from a URL, handling Replicated Vendor Portal URLs.
 
         Args:
-            url: The URL to download the bundle from
+            url: The URL to download the bundle from (can be original or signed)
 
         Returns:
             The path to the downloaded bundle
