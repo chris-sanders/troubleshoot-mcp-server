@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiohttp  # Added import
 import httpx
 import pytest
 from pydantic import ValidationError
