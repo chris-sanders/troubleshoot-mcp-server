@@ -163,8 +163,12 @@ def mock_httpx_client():
     # mock_response.status_code = 200 # Removed duplicate/incorrectly indented line
     # Default to success state, tests will override for error cases
     mock_response.status_code = 200
-    mock_response.json = MagicMock(return_value={"signedUri": SIGNED_URL})
-    mock_response.text = json.dumps({"signedUri": SIGNED_URL})
+    # === START MODIFICATION ===
+    # Mock the CORRECT nested structure
+    correct_response_data = {"bundle": {"signedUri": SIGNED_URL}}
+    mock_response.json = MagicMock(return_value=correct_response_data)
+    mock_response.text = json.dumps(correct_response_data)
+    # === END MODIFICATION ===
 
     mock_client = MagicMock(spec=httpx.AsyncClient)
     # Make the mock client's get method return the mock_response
@@ -421,12 +425,13 @@ async def test_bundle_manager_download_replicated_url_api_other_error(mock_httpx
 async def test_bundle_manager_download_replicated_url_missing_signed_uri(mock_httpx_client):
     """Test error handling when 'signedUri' is missing from API response."""
     mock_httpx_constructor, mock_response = mock_httpx_client
-    # === START MODIFICATION ===
-    # Configure for success status but missing key in JSON
+    # Configure for success status but missing key in the nested JSON
     mock_response.status_code = 200
-    mock_response.json.return_value = {"message": "Success but no URI"} # Override json return
+    # === START MODIFICATION ===
+    # Mock the nested structure but without 'signedUri' inside 'bundle'
+    mock_response.json.return_value = {"bundle": {"message": "Success but no URI"}}
     mock_response.json.side_effect = None # Allow json() call
-    mock_response.text = json.dumps({"message": "Success but no URI"})
+    mock_response.text = json.dumps({"bundle": {"message": "Success but no URI"}})
     # === END MODIFICATION ===
 
     with tempfile.TemporaryDirectory() as temp_dir:
