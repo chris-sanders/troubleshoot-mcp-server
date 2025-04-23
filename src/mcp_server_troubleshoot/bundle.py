@@ -427,21 +427,24 @@ class BundleManager:
             return signed_url
             # === END RESTRUCTURE ===
 
-        except httpx.Timeout as e:
-             logger.exception(f"Timeout requesting signed URL from Replicated API: {e}")
-             raise BundleDownloadError(f"Timeout requesting signed URL: {e}")
-        except httpx.RequestError as e:
-            # This should now correctly catch the RequestError raised by the mock
-            logger.exception(f"Network error requesting signed URL from Replicated API: {e}")
-            raise BundleDownloadError(f"Network error requesting signed URL: {e}")
-        except BundleDownloadError:
-            # Re-raise specific BundleDownloadErrors we've already identified
-            raise
         except Exception as e:
-            # Catch any other unexpected errors during the entire process and wrap them
-            distinct_error_msg = f"UNEXPECTED EXCEPTION in _get_replicated_signed_url: {type(e).__name__}: {str(e)}"
-            logger.exception(distinct_error_msg)
-            raise BundleDownloadError(distinct_error_msg)
+            # === START CONSOLIDATED EXCEPTION HANDLING ===
+            if isinstance(e, BundleDownloadError):
+                # Re-raise specific BundleDownloadErrors we've already identified
+                raise e
+            elif isinstance(e, httpx.Timeout):
+                 logger.exception(f"Timeout requesting signed URL from Replicated API: {e}")
+                 raise BundleDownloadError(f"Timeout requesting signed URL: {e}") from e
+            elif isinstance(e, httpx.RequestError):
+                # This should now correctly catch the RequestError raised by the mock
+                logger.exception(f"Network error requesting signed URL from Replicated API: {e}")
+                raise BundleDownloadError(f"Network error requesting signed URL: {e}") from e
+            else:
+                # Catch any other unexpected errors during the entire process and wrap them
+                distinct_error_msg = f"UNEXPECTED EXCEPTION in _get_replicated_signed_url: {type(e).__name__}: {str(e)}"
+                logger.exception(distinct_error_msg)
+                raise BundleDownloadError(distinct_error_msg) from e
+            # === END CONSOLIDATED EXCEPTION HANDLING ===
 
     async def _download_bundle(self, url: str) -> Path:
         """
