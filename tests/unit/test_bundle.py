@@ -333,9 +333,12 @@ async def test_bundle_manager_download_replicated_url_missing_token():
         with patch.dict(os.environ, {}, clear=True):
             with pytest.raises(BundleDownloadError) as excinfo:
                 await manager._download_bundle(REPLICATED_URL)
-            assert "SBCTL_TOKEN or REPLICATED_TOKEN environment variable not set" in str(
-                excinfo.value
-            )
+            # === START MODIFICATION ===
+            # Update assertion to match the exact error message and correct ENV name
+            expected_error_part = "SBCTL_TOKEN or REPLICATED environment variable not set"
+            assert expected_error_part in str(excinfo.value)
+            assert "Cannot download from Replicated Vendor Portal" in str(excinfo.value)
+            # === END MODIFICATION ===
 
 
 @pytest.mark.asyncio
