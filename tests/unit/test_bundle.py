@@ -438,7 +438,10 @@ async def test_bundle_manager_download_replicated_url_network_error():
 
             with patch.dict(os.environ, {"SBCTL_TOKEN": "good_token"}, clear=True):
                 with pytest.raises(BundleDownloadError) as excinfo:
-                    await manager._download_bundle(REPLICATED_URL)
+                    # === START MODIFICATION ===
+                    # Call _get_replicated_signed_url directly
+                    await manager._get_replicated_signed_url(REPLICATED_URL)
+                    # === END MODIFICATION ===
                 assert "Network error requesting signed URL" in str(excinfo.value)
 
 
