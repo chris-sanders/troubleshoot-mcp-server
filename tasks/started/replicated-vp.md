@@ -47,5 +47,7 @@ N/A
 
 
 ## Progress Updates
-(To be filled by AI during implementation)
-* ...
+* **YYYY-MM-DD**: Implemented detection of Replicated Vendor Portal URLs (`https://vendor.replicated.com/troubleshoot/analyze/...`).
+* **YYYY-MM-DD**: Added `_get_replicated_signed_url` method to fetch the signed download URL from the Replicated API (`https://api.replicated.com/vendor/v3/supportbundle/{slug}`). Handles token precedence (`SBCTL_TOKEN` > `REPLICATED_TOKEN`) and API errors (401, 404, other). Uses `httpx` for the API call with timeout.
+* **YYYY-MM-DD**: Modified `_download_bundle` to call `_get_replicated_signed_url` for Replicated URLs and use the resulting signed URL for the actual download via `aiohttp`. Non-Replicated URLs are downloaded directly as before.
+* **YYYY-MM-DD**: Added unit tests (`tests/unit/test_bundle.py`) covering various scenarios for Replicated URL handling: success cases with different tokens, token precedence, missing tokens, API errors (401, 404, missing URI), network errors, and correct handling of non-Replicated URLs. Mocks `httpx.AsyncClient` and `aiohttp.ClientSession`.

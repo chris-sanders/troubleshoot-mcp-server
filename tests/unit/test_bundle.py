@@ -2,11 +2,13 @@
 Tests for the Bundle Manager.
 """
 
+import json
 import os
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from pydantic import ValidationError
 
@@ -143,46 +145,321 @@ async def test_bundle_manager_initialize_bundle_nonexistent():
         assert str(nonexistent_path) in str(excinfo.value)
 
 
+# --- Replicated Vendor Portal Tests ---
+
+REPLICATED_URL = "https://vendor.replicated.com/troubleshoot/analyze/2025-04-22@16:51"
+REPLICATED_SLUG = "2025-04-22@16:51"
+REPLICATED_API_URL = f"https://api.replicated.com/vendor/v3/supportbundle/{REPLICATED_SLUG}"
+SIGNED_URL = "https://signed.example.com/download?token=abc"
+
+
+@pytest.fixture
+def mock_httpx_client():
+    """Fixture to mock httpx.AsyncClient."""
+    mock_response = MagicMock(spec=httpx.Response)
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"signedUri": SIGNED_URL}
+    # Ensure text attribute is present for error cases
+    mock_response.text = json.dumps({"signedUri": SIGNED_URL})
+
+    mock_client = MagicMock(spec=httpx.AsyncClient)
+    mock_client.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+    mock_client.__aexit__ = AsyncMock()
+
+    with patch("httpx.AsyncClient", return_value=mock_client) as mock_constructor:
+        yield mock_constructor, mock_response
+
+
+@pytest.fixture
+def mock_aiohttp_download():
+    """Fixture to mock the actual download part using aiohttp."""
+    mock_aio_response = AsyncMock()
+    mock_aio_response.status = 200
+    mock_aio_response.content_length = 100
+    mock_aio_response.content.iter_chunked = AsyncMock(return_value=[b"chunk1", b"chunk2"])
+
+    mock_aio_session = AsyncMock()
+    mock_aio_session.__aenter__.return_value.get = AsyncMock(return_value=mock_aio_response)
+    mock_aio_session.__aexit__ = AsyncMock()
+
+    with patch("aiohttp.ClientSession", return_value=mock_aio_session) as mock_constructor:
+        yield mock_constructor, mock_aio_response
+
+
 @pytest.mark.asyncio
-async def test_bundle_manager_download_bundle():
-    """Test that the bundle manager can download a bundle."""
+async def test_bundle_manager_download_replicated_url_success_sbctl_token(
+    mock_httpx_client, mock_aiohttp_download
+):
+    """Test downloading from Replicated URL with SBCTL_TOKEN successfully."""
+    mock_httpx_constructor, _ = mock_httpx_client
+    mock_aiohttp_constructor, _ = mock_aiohttp_download
+
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
         manager = BundleManager(bundle_dir)
 
-        # Create a mock download path
-        download_path = bundle_dir / "test_bundle.tar.gz"
-        with open(download_path, "w") as f:
-            f.write("mock bundle content")
+        with patch.dict(os.environ, {"SBCTL_TOKEN": "sbctl_token_value"}, clear=True):
+            download_path = await manager._download_bundle(REPLICATED_URL)
 
-        # Create a mock kubeconfig path
+            # Verify httpx call for signed URL
+            mock_httpx_constructor.assert_called_once()
+            # Check timeout was passed to httpx.AsyncClient
+            _, kwargs = mock_httpx_constructor.call_args
+            assert isinstance(kwargs.get("timeout"), httpx.Timeout)
+
+            mock_get_call = mock_httpx_constructor.return_value.__aenter__.return_value.get
+            mock_get_call.assert_awaited_once_with(
+                REPLICATED_API_URL,
+                headers={"Authorization": "sbctl_token_value", "Content-Type": "application/json"},
+            )
+
+            # Verify aiohttp call for actual download
+            mock_aiohttp_constructor.assert_called_once()
+            mock_aio_get_call = mock_aiohttp_constructor.return_value.__aenter__.return_value.get
+            mock_aio_get_call.assert_awaited_once_with(SIGNED_URL, headers={})
+
+            # Verify file was created
+            assert download_path.exists()
+            assert download_path.name.startswith("analyze_") # Based on slug
+            assert download_path.read_bytes() == b"chunk1chunk2"
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_download_replicated_url_success_replicated_token(
+    mock_httpx_client, mock_aiohttp_download
+):
+    """Test downloading from Replicated URL with REPLICATED_TOKEN successfully."""
+    mock_httpx_constructor, _ = mock_httpx_client
+    mock_aiohttp_constructor, _ = mock_aiohttp_download
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+
+        # Only REPLICATED_TOKEN is set
+        with patch.dict(os.environ, {"REPLICATED_TOKEN": "replicated_token_value"}, clear=True):
+            await manager._download_bundle(REPLICATED_URL)
+
+            # Verify httpx call used REPLICATED_TOKEN
+            mock_get_call = mock_httpx_constructor.return_value.__aenter__.return_value.get
+            mock_get_call.assert_awaited_once_with(
+                REPLICATED_API_URL,
+                headers={
+                    "Authorization": "replicated_token_value",
+                    "Content-Type": "application/json",
+                },
+            )
+            # Verify aiohttp call used the signed URL
+            mock_aio_get_call = mock_aiohttp_constructor.return_value.__aenter__.return_value.get
+            mock_aio_get_call.assert_awaited_once_with(SIGNED_URL, headers={})
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_download_replicated_url_token_precedence(
+    mock_httpx_client, mock_aiohttp_download
+):
+    """Test SBCTL_TOKEN takes precedence over REPLICATED_TOKEN."""
+    mock_httpx_constructor, _ = mock_httpx_client
+    mock_aiohttp_constructor, _ = mock_aiohttp_download
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+
+        # Both tokens are set
+        with patch.dict(
+            os.environ,
+            {"SBCTL_TOKEN": "sbctl_token_value", "REPLICATED_TOKEN": "replicated_token_value"},
+            clear=True,
+        ):
+            await manager._download_bundle(REPLICATED_URL)
+
+            # Verify httpx call used SBCTL_TOKEN
+            mock_get_call = mock_httpx_constructor.return_value.__aenter__.return_value.get
+            mock_get_call.assert_awaited_once_with(
+                REPLICATED_API_URL,
+                headers={"Authorization": "sbctl_token_value", "Content-Type": "application/json"},
+            )
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_download_replicated_url_missing_token():
+    """Test error handling when no token is provided for Replicated URL."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+
+        # No tokens set
+        with patch.dict(os.environ, {}, clear=True):
+            with pytest.raises(BundleDownloadError) as excinfo:
+                await manager._download_bundle(REPLICATED_URL)
+            assert "SBCTL_TOKEN or REPLICATED_TOKEN environment variable not set" in str(
+                excinfo.value
+            )
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_download_replicated_url_api_401(mock_httpx_client):
+    """Test error handling for Replicated API 401 Unauthorized."""
+    mock_httpx_constructor, mock_response = mock_httpx_client
+    mock_response.status_code = 401
+    mock_response.text = "Unauthorized"
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+
+        with patch.dict(os.environ, {"SBCTL_TOKEN": "bad_token"}, clear=True):
+            with pytest.raises(BundleDownloadError) as excinfo:
+                await manager._download_bundle(REPLICATED_URL)
+            assert "Failed to authenticate with Replicated API (status 401)" in str(excinfo.value)
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_download_replicated_url_api_404(mock_httpx_client):
+    """Test error handling for Replicated API 404 Not Found."""
+    mock_httpx_constructor, mock_response = mock_httpx_client
+    mock_response.status_code = 404
+    mock_response.text = "Not Found"
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+
+        with patch.dict(os.environ, {"SBCTL_TOKEN": "good_token"}, clear=True):
+            with pytest.raises(BundleDownloadError) as excinfo:
+                await manager._download_bundle(REPLICATED_URL)
+            assert "Support bundle not found on Replicated Vendor Portal" in str(excinfo.value)
+            assert f"slug: {REPLICATED_SLUG}" in str(excinfo.value)
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_download_replicated_url_api_other_error(mock_httpx_client):
+    """Test error handling for other Replicated API errors."""
+    mock_httpx_constructor, mock_response = mock_httpx_client
+    mock_response.status_code = 500
+    mock_response.text = "Internal Server Error"
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+
+        with patch.dict(os.environ, {"SBCTL_TOKEN": "good_token"}, clear=True):
+            with pytest.raises(BundleDownloadError) as excinfo:
+                await manager._download_bundle(REPLICATED_URL)
+            assert "Failed to get signed URL from Replicated API (status 500)" in str(
+                excinfo.value
+            )
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_download_replicated_url_missing_signed_uri(mock_httpx_client):
+    """Test error handling when 'signedUri' is missing from API response."""
+    mock_httpx_constructor, mock_response = mock_httpx_client
+    mock_response.json.return_value = {"message": "Success but no URI"} # Missing signedUri
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+
+        with patch.dict(os.environ, {"SBCTL_TOKEN": "good_token"}, clear=True):
+            with pytest.raises(BundleDownloadError) as excinfo:
+                await manager._download_bundle(REPLICATED_URL)
+            assert "Could not find 'signedUri' in Replicated API response" in str(excinfo.value)
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_download_replicated_url_network_error():
+    """Test error handling for network errors during Replicated API call."""
+    # Mock httpx.AsyncClient to raise a network error
+    mock_client = MagicMock(spec=httpx.AsyncClient)
+    mock_client.__aenter__.return_value.get = AsyncMock(
+        side_effect=httpx.RequestError("Network timeout")
+    )
+    mock_client.__aexit__ = AsyncMock()
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir)
+            manager = BundleManager(bundle_dir)
+
+            with patch.dict(os.environ, {"SBCTL_TOKEN": "good_token"}, clear=True):
+                with pytest.raises(BundleDownloadError) as excinfo:
+                    await manager._download_bundle(REPLICATED_URL)
+                assert "Network error requesting signed URL" in str(excinfo.value)
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_download_non_replicated_url(mock_aiohttp_download):
+    """Test that non-Replicated URLs are downloaded directly without API calls."""
+    mock_aiohttp_constructor, _ = mock_aiohttp_download
+    non_replicated_url = "https://normal.example.com/bundle.tar.gz"
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+
+        # Mock httpx to ensure it's NOT called
+        with patch("httpx.AsyncClient") as mock_httpx_constructor:
+            with patch.dict(os.environ, {"SBCTL_TOKEN": "token_val"}, clear=True):
+                download_path = await manager._download_bundle(non_replicated_url)
+
+                # Verify httpx was NOT called
+                mock_httpx_constructor.assert_not_called()
+
+                # Verify aiohttp was called with the original URL
+                mock_aio_get_call = (
+                    mock_aiohttp_constructor.return_value.__aenter__.return_value.get
+                )
+                # Check headers includes the SBCTL_TOKEN for non-replicated URLs
+                mock_aio_get_call.assert_awaited_once_with(
+                    non_replicated_url, headers={"Authorization": "Bearer token_val"}
+                )
+
+                # Verify file was created
+                assert download_path.exists()
+                assert download_path.name == "bundle.tar.gz"
+                assert download_path.read_bytes() == b"chunk1chunk2"
+
+
+# --- End Replicated Vendor Portal Tests ---
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_download_bundle():
+    """Test that the bundle manager can download a non-Replicated bundle."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+    # This test now focuses on the non-Replicated case, using the fixture
+    mock_aiohttp_constructor, _ = mock_aiohttp_download
+    non_replicated_url = "https://example.com/bundle.tar.gz"
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+
+        # Mock _initialize_with_sbctl as it's not the focus here
         kubeconfig_path = bundle_dir / "test_kubeconfig"
-        with open(kubeconfig_path, "w") as f:
-            f.write("mock kubeconfig content")
+        manager._initialize_with_sbctl = AsyncMock(return_value=kubeconfig_path)
+        manager._wait_for_initialization = AsyncMock() # Also mock wait
 
-        # Mock the _download_bundle method
-        async def mock_download(url):
-            assert url == "https://example.com/bundle.tar.gz"  # Verify the URL is correct
-            return download_path
+        # Call initialize_bundle which internally calls _download_bundle
+        with patch.dict(os.environ, {"SBCTL_TOKEN": "token_val"}, clear=True):
+            result = await manager.initialize_bundle(non_replicated_url)
 
-        # Mock the _initialize_with_sbctl method
-        async def mock_initialize(bundle_path, output_dir):
-            # Verify the parameters
-            assert bundle_path == download_path
-            # Return the kubeconfig path
-            return kubeconfig_path
+            # Verify aiohttp was called correctly by _download_bundle
+            mock_aio_get_call = mock_aiohttp_constructor.return_value.__aenter__.return_value.get
+            mock_aio_get_call.assert_awaited_once_with(
+                non_replicated_url, headers={"Authorization": "Bearer token_val"}
+            )
 
-        # Patch both methods needed for initialize_bundle to work
-        with patch.object(manager, "_download_bundle", side_effect=mock_download):
-            with patch.object(manager, "_initialize_with_sbctl", side_effect=mock_initialize):
-                with patch.object(manager, "_wait_for_initialization", AsyncMock()):
-                    # Call the initialize_bundle method with a URL
-                    result = await manager.initialize_bundle("https://example.com/bundle.tar.gz")
-
-                    # Verify the result
-                    assert isinstance(result, BundleMetadata)
-                    assert result.source == "https://example.com/bundle.tar.gz"
-                    assert result.kubeconfig_path == kubeconfig_path
+            # Verify the result of initialize_bundle
+            assert isinstance(result, BundleMetadata)
+            assert result.source == non_replicated_url
+            assert result.kubeconfig_path == kubeconfig_path
+            # Check that the bundle path inside the metadata points to the downloaded file's dir
+            expected_bundle_dir_name_part = "bundle_" # From filename generation
+            assert expected_bundle_dir_name_part in result.path.name
 
 
 @pytest.mark.asyncio
@@ -198,30 +475,35 @@ async def test_bundle_manager_download_bundle_auth():
         if token:
             headers["Authorization"] = f"Bearer {token}"
 
-    # Verify the headers were set correctly
+    # Verify the headers were set correctly for non-Replicated download
     assert "Authorization" in headers
     assert headers["Authorization"] == "Bearer test_token"
 
 
 @pytest.mark.asyncio
 async def test_bundle_manager_download_bundle_error():
-    """Test that the bundle manager handles download errors."""
+    """Test that the bundle manager handles download errors for non-Replicated URLs."""
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
         manager = BundleManager(bundle_dir)
 
         # Create an alternative implementation with proper async context handling
         async def mock_download_with_error(*args, **kwargs):
-            # Simulate a 404 error directly
-            raise BundleDownloadError(
-                "Failed to download bundle from https://example.com/bundle.tar.gz: HTTP 404"
-            )
+            # Simulate a 404 error using aiohttp mock
+            mock_aio_response.status = 404
+            mock_aio_response.reason = "Not Found"
 
-        # Instead of mocking aiohttp, which is complex for async testing,
-        # directly mock the manager's download method
-        with patch.object(manager, "_download_bundle", side_effect=mock_download_with_error):
-            with pytest.raises(BundleDownloadError):
-                await manager.initialize_bundle("https://example.com/bundle.tar.gz")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir)
+            manager = BundleManager(bundle_dir)
+            url = "https://example.com/missing_bundle.tar.gz"
+
+            with patch("aiohttp.ClientSession", return_value=mock_aio_session):
+                 with pytest.raises(BundleDownloadError) as excinfo:
+                    await manager._download_bundle(url)
+
+            assert f"Failed to download bundle from {url}" in str(excinfo.value)
+            assert "HTTP 404" in str(excinfo.value)
 
 
 @pytest.mark.asyncio
