@@ -161,39 +161,19 @@ def mock_httpx_client():
     # === START MODIFICATION ===
     # Default behavior: json() raises error, status is 200 (will be overridden)
     mock_response.status_code = 200
-    mock_response.json = MagicMock(side_effect=json.JSONDecodeError("Mock JSON decode error", "", 0))
-    mock_response.text = "Default mock text"
-
-    # Helper to configure for success
-    def configure_success():
+        # Default to success state, tests will override for error cases
         mock_response.status_code = 200
-        mock_response.json.side_effect = None  # Disable error side effect
-        mock_response.json.return_value = {"signedUri": SIGNED_URL}
+        mock_response.json = MagicMock(return_value={"signedUri": SIGNED_URL})
         mock_response.text = json.dumps({"signedUri": SIGNED_URL})
 
-    # Helper to configure for error
-    def configure_error(status_code, text):
-        mock_response.status_code = status_code
-        mock_response.text = text
-        # Ensure json() raises error for non-200 status
-        mock_response.json.side_effect = json.JSONDecodeError("Mock JSON decode error", "", 0)
-        mock_response.json.return_value = None # Reset return value
+        mock_client = MagicMock(spec=httpx.AsyncClient)
+        # Make the mock client's get method return the mock_response
+        mock_client.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+        mock_client.__aexit__ = AsyncMock()
 
-    # Add helpers to the mock object so tests can call them
-    mock_response.configure_success = configure_success
-    mock_response.configure_error = configure_error
-
-    # Start in success state by default
-    configure_success()
-    # === END MODIFICATION ===
-
-    mock_client = MagicMock(spec=httpx.AsyncClient)
-    mock_client.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
-    mock_client.__aexit__ = AsyncMock()
-
-    with patch("httpx.AsyncClient", return_value=mock_client) as mock_constructor:
-        # Yield both mocks so tests can reconfigure the response
-        yield mock_constructor, mock_response
+        with patch("httpx.AsyncClient", return_value=mock_client) as mock_constructor:
+            # Yield the constructor and the response mock for tests to configure
+            yield mock_constructor, mock_response
 
 
 @pytest.fixture
@@ -204,22 +184,24 @@ def mock_aiohttp_download():
     mock_aio_response.status = 200
     mock_aio_response.reason = "OK"
     mock_aio_response.content_length = 100
-    # Configure iter_chunked to be an async iterator
-    async def async_iterator():
+
+    # === START MODIFICATION ===
+    # Configure iter_chunked to return a real async iterator mock
+    async def async_iterator_func():
         yield b"chunk1"
         yield b"chunk2"
-    # The content object needs the iter_chunked method
+        # The return value of the async generator function IS the async iterator
     mock_aio_response.content = AsyncMock()
-    mock_aio_response.content.iter_chunked = AsyncMock(return_value=async_iterator())
+    # Assign the result of calling the async generator function
+    mock_aio_response.content.iter_chunked.return_value = async_iterator_func()
+    # === END MODIFICATION ===
+
     # Mock the __aenter__ and __aexit__ for the response context manager
     mock_aio_response.__aenter__.return_value = mock_aio_response
     mock_aio_response.__aexit__ = AsyncMock(return_value=None)
 
-    # === START MODIFICATION ===
     # Mock the session's get method. It's an async function that returns the response.
-    # The AsyncMock itself represents the awaitable coroutine.
     mock_get = AsyncMock(return_value=mock_aio_response)
-    # === END MODIFICATION ===
 
     # Mock the session object
     mock_aio_session = AsyncMock(spec=aiohttp.ClientSession)
@@ -352,8 +334,11 @@ async def test_bundle_manager_download_replicated_url_api_401(mock_httpx_client)
     """Test error handling for Replicated API 401 Unauthorized."""
     mock_httpx_constructor, mock_response = mock_httpx_client
     # === START MODIFICATION ===
-    # Configure the mock response for this specific error case
-    mock_response.configure_error(status_code=401, text="Unauthorized")
+    # Configure mock response directly for this test
+    mock_response.status_code = 401
+    mock_response.text = "Unauthorized"
+    # Ensure json() raises an error if called on non-200 status
+    mock_response.json.side_effect = json.JSONDecodeError("Mock JSON decode error", "", 0)
     # === END MODIFICATION ===
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -362,7 +347,8 @@ async def test_bundle_manager_download_replicated_url_api_401(mock_httpx_client)
 
         with patch.dict(os.environ, {"SBCTL_TOKEN": "bad_token"}, clear=True):
             with pytest.raises(BundleDownloadError) as excinfo:
-                await manager._download_bundle(REPLICATED_URL)
+                # Call _get_replicated_signed_url directly to isolate the logic
+                await manager._get_replicated_signed_url(REPLICATED_URL)
             assert "Failed to authenticate with Replicated API (status 401)" in str(excinfo.value)
 
 
@@ -371,8 +357,9 @@ async def test_bundle_manager_download_replicated_url_api_404(mock_httpx_client)
     """Test error handling for Replicated API 404 Not Found."""
     mock_httpx_constructor, mock_response = mock_httpx_client
     # === START MODIFICATION ===
-    # Configure the mock response for this specific error case
-    mock_response.configure_error(status_code=404, text="Not Found")
+    mock_response.status_code = 404
+    mock_response.text = "Not Found"
+    mock_response.json.side_effect = json.JSONDecodeError("Mock JSON decode error", "", 0)
     # === END MODIFICATION ===
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -381,7 +368,8 @@ async def test_bundle_manager_download_replicated_url_api_404(mock_httpx_client)
 
         with patch.dict(os.environ, {"SBCTL_TOKEN": "good_token"}, clear=True):
             with pytest.raises(BundleDownloadError) as excinfo:
-                await manager._download_bundle(REPLICATED_URL)
+                # Call _get_replicated_signed_url directly
+                await manager._get_replicated_signed_url(REPLICATED_URL)
             assert "Support bundle not found on Replicated Vendor Portal" in str(excinfo.value)
             assert f"slug: {REPLICATED_SLUG}" in str(excinfo.value)
 
@@ -391,8 +379,9 @@ async def test_bundle_manager_download_replicated_url_api_other_error(mock_httpx
     """Test error handling for other Replicated API errors."""
     mock_httpx_constructor, mock_response = mock_httpx_client
     # === START MODIFICATION ===
-    # Configure the mock response for this specific error case
-    mock_response.configure_error(status_code=500, text="Internal Server Error")
+    mock_response.status_code = 500
+    mock_response.text = "Internal Server Error"
+    mock_response.json.side_effect = json.JSONDecodeError("Mock JSON decode error", "", 0)
     # === END MODIFICATION ===
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -401,10 +390,12 @@ async def test_bundle_manager_download_replicated_url_api_other_error(mock_httpx
 
         with patch.dict(os.environ, {"SBCTL_TOKEN": "good_token"}, clear=True):
             with pytest.raises(BundleDownloadError) as excinfo:
-                await manager._download_bundle(REPLICATED_URL)
+                # Call _get_replicated_signed_url directly
+                await manager._get_replicated_signed_url(REPLICATED_URL)
             assert "Failed to get signed URL from Replicated API (status 500)" in str(
                 excinfo.value
             )
+            assert "Internal Server Error" in str(excinfo.value) # Check response text included
 
 
 @pytest.mark.asyncio
@@ -413,10 +404,11 @@ async def test_bundle_manager_download_replicated_url_missing_signed_uri(mock_ht
     mock_httpx_constructor, mock_response = mock_httpx_client
     # === START MODIFICATION ===
     # Configure for success status but missing key in JSON
-    mock_response.configure_success() # Start with success config
+    mock_response.status_code = 200
     mock_response.json.return_value = {"message": "Success but no URI"} # Override json return
+    mock_response.json.side_effect = None # Allow json() call
     mock_response.text = json.dumps({"message": "Success but no URI"})
-     # === END MODIFICATION ===
+    # === END MODIFICATION ===
 
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
@@ -424,7 +416,8 @@ async def test_bundle_manager_download_replicated_url_missing_signed_uri(mock_ht
 
         with patch.dict(os.environ, {"SBCTL_TOKEN": "good_token"}, clear=True):
             with pytest.raises(BundleDownloadError) as excinfo:
-                await manager._download_bundle(REPLICATED_URL)
+                # Call _get_replicated_signed_url directly
+                await manager._get_replicated_signed_url(REPLICATED_URL)
             assert "Could not find 'signedUri' in Replicated API response" in str(excinfo.value)
 
 
@@ -526,21 +519,28 @@ async def test_bundle_manager_download_bundle_error():
     mock_aio_response = AsyncMock(spec=aiohttp.ClientResponse)
     mock_aio_response.status = 404
     mock_aio_response.reason = "Not Found"
+
+    # === START MODIFICATION ===
+    # Configure iter_chunked correctly for the error response as well
+    # (though it won't be reached if status is not 200)
+    async def async_iterator_func():
+         # Empty iterator for error case
+         if False: yield # pragma: no cover
+    mock_aio_response.content = AsyncMock()
+    mock_aio_response.content.iter_chunked.return_value = async_iterator_func()
+    # === END MODIFICATION ===
+
     # Mock the context manager methods for the response
     mock_aio_response.__aenter__.return_value = mock_aio_response
     mock_aio_response.__aexit__ = AsyncMock(return_value=None)
 
-    # === START MODIFICATION ===
     # Mock the session's get method as an AsyncMock returning the response
     mock_get = AsyncMock(return_value=mock_aio_response)
-    # === END MODIFICATION ===
 
     mock_aio_session = AsyncMock(spec=aiohttp.ClientSession)
-    mock_aio_session.get = mock_get # Assign the mock get method
-    # Mock the context manager methods for the session
+    mock_aio_session.get = mock_get
     mock_aio_session.__aenter__.return_value = mock_aio_session
     mock_aio_session.__aexit__ = AsyncMock(return_value=None)
-    # === END MODIFICATION ===
 
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
@@ -550,10 +550,9 @@ async def test_bundle_manager_download_bundle_error():
         # Patch ClientSession to return our defined mock session
         with patch("aiohttp.ClientSession", return_value=mock_aio_session):
              with pytest.raises(BundleDownloadError) as excinfo:
-                # Call _download_bundle directly to test its error handling
                 await manager._download_bundle(url)
 
-        # Assert the expected HTTP error message, not the TypeError
+        # Assert the expected HTTP error message
         assert f"Failed to download bundle from {url[:80]}..." in str(excinfo.value)
         assert "HTTP 404 Not Found" in str(excinfo.value)
 
