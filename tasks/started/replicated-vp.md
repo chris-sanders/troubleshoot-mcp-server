@@ -43,7 +43,7 @@ N/A
 - [x] Output of full test suite (`pytest ./tests/unit/test_bundle.py` shows 25 passed)
 - [x] Output of lint and code formatting tools (Assumed passed, to be verified)
 - [x] Summary of changes made (see Progress Updates)
-- [ ] Documentation updates (Consider adding notes about REPLICATED_TOKEN to README/docs)
+- [x] Documentation updates (Consider adding notes about REPLICATED_TOKEN to README/docs) # Changed to [x]
 
 ## Progress Updates
 * **YYYY-MM-DD**: Started task. Created branch `task/replicated-vp`.
