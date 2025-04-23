@@ -42,6 +42,32 @@ N/A
 - [x] Output of lint and code formatting tools
 - [x] Summary of changes made, including documentation updates
 
+## Implementation Summary
+### Key Changes
+1. **URL Detection and Processing**
+   - Implemented URL pattern detection for Replicated vendor portal URLs
+   - Added slug extraction from portal URLs to use in API requests
+   - Created a dedicated download flow specific to Replicated URLs
+
+2. **Authentication Handling**
+   - Added support for `REPLICATED` environment variable for authentication tokens
+   - Maintained compatibility with existing `SBCTL_TOKEN` variable
+   - Implemented token precedence logic where `SBCTL_TOKEN` takes priority if both are present
+
+3. **API Integration**
+   - Implemented API calls to Replicated's vendor API to retrieve signed download URLs
+   - Added proper error handling for API responses
+   - Integrated the API flow with the existing download functionality
+
+4. **Testing**
+   - Created comprehensive test suite following Test-Driven Development principles
+   - Implemented tests for URL detection, authentication, API response parsing, error handling, and end-to-end download flow
+
+5. **Files Changed**
+   - `bundle.py`: Added Replicated URL detection and handling methods
+   - `config.py`: Updated recommended client configuration
+   - `DOCKER.md`: Updated documentation for container usage
+   - Added new test file: `test_replicated_vendor_portal.py`
 
 ## Progress Updates
 * Created comprehensive test suite for all aspects of Replicated Vendor Portal support

@@ -24,13 +24,15 @@ Run the container directly with Docker, mounting your bundle storage directory a
 # Create a directory for bundles (if it doesn't exist)
 mkdir -p ./bundles
 
-# Set the SBCTL_TOKEN environment variable for bundle operations
+# Set the authentication token environment variables for bundle operations
 export SBCTL_TOKEN="your_token_here"
+export REPLICATED="your_replicated_token_here"  # Optional: for Replicated vendor portal access
 
 # Run the container
 docker run -i --rm \
   -v "$(pwd)/bundles:/data/bundles" \
   -e SBCTL_TOKEN="$SBCTL_TOKEN" \
+  -e REPLICATED="$REPLICATED" \
   mcp-server-troubleshoot:latest
 ```
 
@@ -39,7 +41,8 @@ docker run -i --rm \
 - `-i`: Run in interactive mode (required for MCP protocol communication)
 - `--rm`: Automatically remove the container when it exits
 - `-v "$(pwd)/bundles:/data/bundles"`: Mount local bundle directory to container path
-- `-e SBCTL_TOKEN="$SBCTL_TOKEN"`: Pass authentication token from environment
+- `-e SBCTL_TOKEN="$SBCTL_TOKEN"`: Pass SBCTL authentication token from environment
+- `-e REPLICATED="$REPLICATED"`: Pass Replicated vendor portal authentication token from environment
 
 ### Optional Parameters
 
@@ -58,6 +61,7 @@ The container can be configured using the following:
 ### Environment Variables
 
 - `SBCTL_TOKEN`: Authentication token for accessing protected bundles.
+- `REPLICATED`: Authentication token for accessing Replicated vendor portal (SBCTL_TOKEN takes precedence if both are present).
 - `MCP_BUNDLE_STORAGE`: Directory to store and manage bundles (defaults to `/data/bundles`).
 - `MCP_LOG_LEVEL`: Set the logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
 
@@ -110,6 +114,8 @@ The output will provide a ready-to-use configuration for MCP clients:
         "${HOME}/bundles:/data/bundles",
         "-e",
         "SBCTL_TOKEN=${SBCTL_TOKEN}",
+        "-e",
+        "REPLICATED=${REPLICATED}",
         "mcp-server-troubleshoot:latest"
       ]
     }
@@ -119,9 +125,10 @@ The output will provide a ready-to-use configuration for MCP clients:
 
 This configuration assumes:
 
-1. You have the `SBCTL_TOKEN` environment variable set in your environment
-2. You want to store bundles in `${HOME}/bundles` on your host machine
-3. You're using Docker as your container runtime
+1. You have the `SBCTL_TOKEN` environment variable set in your environment for protected bundles
+2. Optionally, you have the `REPLICATED` environment variable set for accessing Replicated vendor portal
+3. You want to store bundles in `${HOME}/bundles` on your host machine
+4. You're using Docker as your container runtime
 
 Replace `${HOME}/bundles` with the actual path to your bundles directory if needed.
 
@@ -143,6 +150,7 @@ In the Inspector UI:
    docker run -i --rm \
      -v "$(pwd)/bundles:/data/bundles" \
      -e SBCTL_TOKEN="$SBCTL_TOKEN" \
+     -e REPLICATED="$REPLICATED" \
      mcp-server-troubleshoot:latest
    ```
 4. Click "Save"
@@ -184,7 +192,8 @@ Check if:
 ### Authentication Errors
 
 Check if:
-- The `SBCTL_TOKEN` environment variable is correctly set
+- The `SBCTL_TOKEN` environment variable is correctly set for protected bundles
+- For Replicated vendor portal URLs, the `REPLICATED` environment variable is set (or `SBCTL_TOKEN` if that's your authentication token)
 - The token has the required permissions for the bundle source
 
 ### JSON-RPC Communication Errors
