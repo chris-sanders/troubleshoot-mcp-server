@@ -440,25 +440,24 @@ async def test_bundle_manager_download_replicated_url_missing_signed_uri(mock_ht
 @pytest.mark.asyncio
 async def test_bundle_manager_download_replicated_url_network_error():
     """Test error handling for network errors during Replicated API call."""
-    # Mock httpx.AsyncClient to raise a network error
-    mock_client = MagicMock(spec=httpx.AsyncClient)
-    mock_client.__aenter__.return_value.get = AsyncMock(
-        side_effect=httpx.RequestError("Network timeout")
-    )
-    mock_client.__aexit__ = AsyncMock()
+    # === START MODIFICATION ===
+    # Patch the 'get' method directly to raise the network error
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+        mock_get.side_effect = httpx.RequestError("Network timeout")
 
-    with patch("httpx.AsyncClient", return_value=mock_client):
         with tempfile.TemporaryDirectory() as temp_dir:
             bundle_dir = Path(temp_dir)
             manager = BundleManager(bundle_dir)
 
             with patch.dict(os.environ, {"SBCTL_TOKEN": "good_token"}, clear=True):
                 with pytest.raises(BundleDownloadError) as excinfo:
-                    # === START MODIFICATION ===
-                    # Call _download_bundle instead of _get_replicated_signed_url
+                    # Call _download_bundle which calls _get_replicated_signed_url
                     await manager._download_bundle(REPLICATED_URL)
-                    # === END MODIFICATION ===
+
+                # Assert that the correct error (raised by the except httpx.RequestError block) is caught
                 assert "Network error requesting signed URL" in str(excinfo.value)
+                assert "Network timeout" in str(excinfo.value) # Check original error is included
+    # === END MODIFICATION ===
 
 
 @pytest.mark.asyncio
