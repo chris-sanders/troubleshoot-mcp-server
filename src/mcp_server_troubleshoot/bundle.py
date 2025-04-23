@@ -358,6 +358,12 @@ class BundleManager:
         """
         logger.info(f"Downloading bundle from: {url}")
 
+        # Check if it's a Replicated vendor portal URL
+        if self._is_replicated_url(url):
+            logger.info(f"Detected Replicated vendor portal URL: {url}")
+            return await self._download_replicated_bundle(url)
+
+        # Standard download process for non-Replicated URLs
         parsed_url = urlparse(url)
         filename = (
             os.path.basename(parsed_url.path) or f"bundle_{self._generate_bundle_id(url)}.tar.gz"
@@ -416,6 +422,1209 @@ class BundleManager:
             if download_path.exists():
                 download_path.unlink()
             raise BundleDownloadError(f"Failed to download bundle from {url}: {str(e)}")
+            
+    def _is_replicated_url(self, url: str) -> bool:
+        """
+        Check if the URL is from the Replicated vendor portal.
+        
+        Args:
+            url: URL to check
+            
+        Returns:
+            True if the URL is a Replicated vendor portal URL, False otherwise
+        """
+        # Sanitize URL by removing spaces
+        sanitized_url = url.replace(" ", "")
+        
+        # Parse the URL
+        parsed_url = urlparse(sanitized_url)
+        
+        # Check if it's from vendor.replicated.com and has the right path pattern
+        if (parsed_url.netloc == "vendor.replicated.com" and 
+            "/troubleshoot/analyze/" in parsed_url.path):
+            return True
+            
+        return False
+        
+    def _extract_slug_from_url(self, url: str) -> str:
+        """
+        Extract the support bundle slug from a Replicated vendor portal URL.
+        
+        Args:
+            url: Replicated vendor portal URL
+            
+        Returns:
+            The support bundle slug
+            
+        Raises:
+            ValueError: If the URL is not a valid Replicated vendor portal URL
+        """
+        # Sanitize URL by removing spaces
+        sanitized_url = url.replace(" ", "")
+        
+        if not self._is_replicated_url(url):
+            raise ValueError(f"Not a valid Replicated vendor portal URL: {url}")
+            
+        # The slug is the last part of the URL path
+        path_parts = sanitized_url.rstrip('/').split('/')
+        return path_parts[-1]
+        
+    async def _get_replicated_signed_url(self, slug: str) -> str:
+        """
+        Get a signed URL for downloading a support bundle from Replicated.
+        
+        Args:
+            slug: Support bundle slug
+            
+        Returns:
+            Signed URL for downloading the bundle
+            
+        Raises:
+            BundleDownloadError: If the signed URL could not be retrieved
+        """
+        # Get authentication token from environment variables
+        # SBCTL_TOKEN takes precedence over REPLICATED
+        token = os.environ.get("SBCTL_TOKEN") or os.environ.get("REPLICATED")
+        if not token:
+            raise BundleDownloadError(
+                "No authentication token available for Replicated API. "
+                "Please set SBCTL_TOKEN or REPLICATED environment variable."
+            )
+        
+        # Debug which token is being used (without revealing the token itself)
+        token_source = "SBCTL_TOKEN" if os.environ.get("SBCTL_TOKEN") else "REPLICATED"
+        token_length = len(token)
+        logger.info(f"DEBUG - Using token from {token_source} environment variable (length: {token_length})")
+            
+        # Construct API URL
+        api_url = f"https://api.replicated.com/vendor/v3/supportbundle/{slug}"
+        logger.info(f"Requesting signed URL from Replicated API: {api_url}")
+        
+        # Try first with httpx (which seems to handle the response better)
+        try:
+            import httpx
+            logger.info(f"DEBUG - Using httpx for API request")
+            
+            # Set timeout
+            timeout = httpx.Timeout(60)
+            
+            # Headers for the request
+            headers = {"Authorization": token, "Content-Type": "application/json"}
+            
+            # Log request headers (without the actual token)
+            debug_headers = headers.copy()
+            if "Authorization" in debug_headers:
+                prefix = debug_headers["Authorization"][:10] if len(debug_headers["Authorization"]) > 10 else ""
+                debug_headers["Authorization"] = f"{prefix}... (redacted)"
+            logger.info(f"DEBUG - API request headers: {debug_headers}")
+            
+            # Make the request with httpx
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.get(api_url, headers=headers)
+                
+                # Log response details for debugging
+                logger.info(f"DEBUG - API response status: {response.status_code}")
+                
+                # Check for error status codes
+                if response.status_code == 401:
+                    logger.error(f"Replicated API returned 401 Unauthorized")
+                    raise BundleDownloadError(
+                        f"Failed to authenticate with Replicated API (status 401). "
+                        "Check SBCTL_TOKEN/REPLICATED environment variable."
+                    )
+                elif response.status_code == 404:
+                    logger.error(f"Replicated API returned 404 Not Found for slug {slug}")
+                    raise BundleDownloadError(
+                        f"Support bundle not found on Replicated Vendor Portal (slug: {slug})."
+                    )
+                elif response.status_code != 200:
+                    response_text = response.text
+                    logger.error(f"DEBUG - API error response: {response_text}")
+                    raise BundleDownloadError(
+                        f"Failed to get signed URL: HTTP {response.status_code} - {response_text}"
+                    )
+                
+                # Parse the response JSON
+                try:
+                    response_data = response.json()
+                    logger.info(f"DEBUG - API response type: {type(response_data)}")
+                    
+                    # Validate response format
+                    if not isinstance(response_data, dict):
+                        logger.error(f"Invalid response format from Replicated API (not a dictionary)")
+                        raise BundleDownloadError("Invalid response format from Replicated API.")
+                    
+                    # Check for bundle object in response
+                    bundle_data = response_data.get("bundle")
+                    
+                    # Add more logging for detailed response analysis
+                    logger.info(f"DEBUG - Response keys: {list(response_data.keys())}")
+                    if bundle_data:
+                        logger.info(f"DEBUG - Bundle keys: {list(bundle_data.keys())}")
+                    
+                    # Try different fields in the response where the signed URL might be
+                    # First priority: signedUri in the root of the response
+                    signed_url = response_data.get("signedUri")
+                    
+                    # Second priority: signedUri in the bundle object
+                    if not signed_url and isinstance(bundle_data, dict):
+                        signed_url = bundle_data.get("signedUri")
+                        if signed_url:
+                            logger.info(f"DEBUG - Found signed URL in bundle.signedUri")
+                    
+                    # Third priority: uri in the bundle object
+                    if not signed_url and isinstance(bundle_data, dict):
+                        signed_url = bundle_data.get("uri")
+                        if signed_url:
+                            logger.info(f"DEBUG - Found URL in bundle.uri")
+                    
+                    # If still not found, check for any field that might contain a URL
+                    if not signed_url:
+                        for key, value in response_data.items():
+                            if isinstance(value, str) and value.startswith("http"):
+                                signed_url = value
+                                logger.info(f"DEBUG - Found possible URL in field '{key}'")
+                                break
+                        
+                        if not signed_url and isinstance(bundle_data, dict):
+                            for key, value in bundle_data.items():
+                                if isinstance(value, str) and value.startswith("http"):
+                                    signed_url = value
+                                    logger.info(f"DEBUG - Found possible URL in bundle.{key}")
+                                    break
+                    
+                    # If still not found, look specifically for the 'signedUri' field anywhere in the response
+                    if not signed_url:
+                        response_text = response.text
+                        import re
+                        url_match = re.search(r'"signedUri":"([^"]+)"', response_text)
+                        if url_match:
+                            signed_url = url_match.group(1)
+                            logger.info(f"DEBUG - Found signed URL via regex search")
+                    
+                    if not signed_url:
+                        # If we still can't find it, log the full response
+                        if len(response.text) < 1000:
+                            logger.error(f"DEBUG - Full API response: {response.text}")
+                        else:
+                            logger.error(f"DEBUG - API response too large to log ({len(response.text)} chars)")
+                        raise BundleDownloadError("No download URL found in Replicated API response")
+                    
+                    # Remove any spaces from the URL
+                    signed_url = signed_url.replace(" ", "")
+                    
+                    # Log success
+                    logger.info(f"Got signed URL for bundle {slug}")
+                    return signed_url
+                    
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse Replicated API response: {e}")
+                    logger.error(f"DEBUG - Invalid JSON response: {response.text[:500]}")
+                    raise BundleDownloadError(f"Invalid JSON in Replicated API response: {e}")
+                
+        except ImportError:
+            # Fall back to aiohttp if httpx is not available
+            logger.info(f"DEBUG - httpx not available, falling back to aiohttp for API request")
+        
+        # If httpx is not available or if the httpx approach failed, try with aiohttp
+        try:
+            # Set a timeout to prevent hanging
+            timeout = aiohttp.ClientTimeout(total=60)
+            
+            # Make API request
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                headers = {"Authorization": token, "Content-Type": "application/json"}
+                
+                # Log request headers (without the actual token)
+                debug_headers = headers.copy()
+                if "Authorization" in debug_headers:
+                    prefix = debug_headers["Authorization"][:10] if len(debug_headers["Authorization"]) > 10 else ""
+                    debug_headers["Authorization"] = f"{prefix}... (redacted)"
+                logger.info(f"DEBUG - API request headers: {debug_headers}")
+                
+                async with session.get(api_url, headers=headers) as response:
+                    # Log response details for debugging
+                    logger.info(f"DEBUG - API response status: {response.status}")
+                    logger.info(f"DEBUG - API response headers: {response.headers}")
+                    
+                    if response.status != 200:
+                        response_text = await response.text()
+                        logger.error(f"DEBUG - API error response: {response_text}")
+                        logger.error(f"Replicated API error: {response.status} - {response_text}")
+                        raise BundleDownloadError(
+                            f"Failed to get signed URL: HTTP {response.status} - {response_text}"
+                        )
+                        
+                    # Parse response to get signed URL
+                    response_text = await response.text()
+                    logger.info(f"DEBUG - API response body: {response_text}")
+                    
+                    try:
+                        response_data = json.loads(response_text)
+                        
+                        # Check for signedUri in the response directly (original expected format)
+                        signed_url = response_data.get("signedUri")
+                        
+                        # If not found, check in the bundle object structure (actual API format)
+                        if not signed_url and "bundle" in response_data:
+                            bundle_data = response_data["bundle"]
+                            # First try signedUri in the bundle object
+                            signed_url = bundle_data.get("signedUri")
+                            if signed_url:
+                                logger.info(f"DEBUG - Found signed URL in bundle.signedUri")
+                            
+                            # Then try the uri field
+                            if not signed_url:
+                                signed_url = bundle_data.get("uri")
+                                if signed_url:
+                                    logger.info(f"DEBUG - Found URL in bundle.uri")
+                            
+                        # If still not found, look specifically for the 'signedUri' field anywhere in the response
+                        if not signed_url:
+                            import re
+                            url_match = re.search(r'"signedUri":"([^"]+)"', response_text)
+                            if url_match:
+                                signed_url = url_match.group(1)
+                                logger.info(f"DEBUG - Found signed URL via regex search")
+                            
+                        if not signed_url:
+                            # Log the full response structure to debug
+                            logger.error(f"DEBUG - No URL found in API response")
+                            if len(response_text) < 1000:
+                                logger.error(f"DEBUG - Full API response: {response_text}")
+                            else:
+                                logger.error(f"DEBUG - API response too large to log ({len(response_text)} chars)")
+                            raise BundleDownloadError("No download URL found in Replicated API response")
+                        
+                        # Remove any spaces from the URL
+                        signed_url = signed_url.replace(" ", "")
+                        
+                        # Log the sanitized URL
+                        sanitized_url_for_log = signed_url
+                        if len(sanitized_url_for_log) > 100:
+                            # Truncate for logging if too long
+                            sanitized_url_for_log = sanitized_url_for_log[:97] + "..."
+                            
+                        logger.info(f"Got signed URL for bundle {slug}")
+                        return signed_url
+                        
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse Replicated API response: {e}")
+                        logger.error(f"DEBUG - Invalid JSON response: {response_text}")
+                        raise BundleDownloadError(
+                            f"Invalid response from Replicated API: {response_text}"
+                        )
+        except Exception as e:
+            logger.exception(f"Error getting signed URL from Replicated API: {str(e)}")
+            raise BundleDownloadError(f"Failed to get signed URL: {str(e)}")
+            
+    async def _download_replicated_bundle(self, url: str) -> Path:
+        """
+        Download a support bundle from Replicated vendor portal using pure Python.
+        
+        Args:
+            url: Replicated vendor portal URL
+            
+        Returns:
+            Path to the downloaded bundle
+            
+        Raises:
+            BundleDownloadError: If the bundle could not be downloaded
+        """
+        # Sanitize URL by removing spaces
+        sanitized_url = url.replace(" ", "")
+        logger.info(f"Processing Replicated vendor portal URL: {sanitized_url}")
+        
+        try:
+            # Extract the slug from the URL
+            slug = self._extract_slug_from_url(url)
+            logger.info(f"Extracted slug from URL: {slug}")
+            
+            # Get signed URL for downloading the bundle
+            signed_url = await self._get_replicated_signed_url(slug)
+            original_signed_url = signed_url  # Keep original for debugging
+            
+            # Sanitize the signed URL to remove any spaces
+            signed_url = signed_url.replace(" ", "")
+            
+            # Log the full signed URL for debugging (in case we need to compare with curl)
+            logger.info(f"DEBUG - Full signed URL: {signed_url}")
+            
+            # Parse the URL to understand its components
+            from urllib.parse import urlparse, parse_qs
+            parsed_url = urlparse(signed_url)
+            
+            # Log the URL components for debugging
+            logger.info(f"DEBUG - URL scheme: {parsed_url.scheme}")
+            logger.info(f"DEBUG - URL hostname: {parsed_url.hostname}")
+            logger.info(f"DEBUG - URL path: {parsed_url.path}")
+            
+            # Log query parameters separately to analyze the signature
+            query_params = parse_qs(parsed_url.query)
+            for param_name, param_value in query_params.items():
+                # Don't log the full value for security-sensitive parameters
+                if any(secret_param in param_name.lower() for secret_param in ["secret", "signature", "credential"]):
+                    logger.info(f"DEBUG - URL param {param_name}: [REDACTED]")
+                else:
+                    logger.info(f"DEBUG - URL param {param_name}: {param_value[0]}")
+            
+            # Use a truncated URL for regular logging
+            log_url = signed_url
+            if len(log_url) > 100:
+                log_url = log_url[:97] + "..."
+            logger.info(f"Got signed URL for bundle: {log_url}")
+            
+            # Generate a unique filename for the download
+            filename = f"bundle_{slug.replace('@', '_')}_{self._generate_bundle_id(sanitized_url)}.tar.gz"
+            download_path = self.bundle_dir / filename
+            
+            # Log helpful information for manual debugging via curl
+            logger.info(f"DEBUG - For manual testing, try: curl -v '{signed_url}' -o /tmp/test.tar.gz")
+            
+            # Create a temp file path for atomic downloads
+            import tempfile
+            temp_file = download_path.with_suffix(".tmp")
+            
+            try:
+                # Try a few different client configurations to see which one works
+                await self._try_download_approaches(signed_url, temp_file, download_path)
+                
+                # If we get here, one of the approaches succeeded
+                return download_path
+                
+            except Exception as e:
+                logger.exception(f"Detailed download error: {e}")
+                if temp_file.exists():
+                    temp_file.unlink()
+                    
+                # Try to perform a diagnostic request to get more info
+                try:
+                    logger.info("DEBUG - Performing diagnostic request to analyze the issue...")
+                    diagnostic_info = await self._diagnostic_request(signed_url)
+                    logger.info(f"DEBUG - Diagnostic info: {diagnostic_info}")
+                except Exception as diag_err:
+                    logger.error(f"DEBUG - Diagnostic request failed: {diag_err}")
+                
+                raise BundleDownloadError(f"Failed to download bundle after trying multiple approaches: {e}")
+                
+        except Exception as e:
+            logger.exception(f"Error downloading bundle from Replicated vendor portal: {str(e)}")
+            raise BundleDownloadError(
+                f"Failed to download bundle from Replicated vendor portal: {str(e)}"
+            )
+            
+    async def _download_approach_curl_like(self, signed_url: str, temp_file: Path, download_path: Path) -> None:
+        """Download approach that mimics curl's behavior as closely as possible."""
+        # Ensure parent directory exists
+        download_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Extract query parameters from URL to analyze what's in it
+        from urllib.parse import urlparse, parse_qs
+        parsed_url = urlparse(signed_url)
+        query_params = parse_qs(parsed_url.query)
+        
+        # Log the parameters to understand the URL structure (without sensitive data)
+        logger.info(f"DEBUG - URL host: {parsed_url.netloc}")
+        logger.info(f"DEBUG - URL path: {parsed_url.path}")
+        for param in query_params:
+            # Don't log sensitive parameters fully
+            if any(x in param.lower() for x in ["signature", "credential", "token", "secret"]):
+                logger.info(f"DEBUG - URL has parameter: {param} (value omitted)")
+            else:
+                logger.info(f"DEBUG - URL parameter: {param}={query_params[param][0][:20]}...")
+        
+        try:
+            # Import httpx for this approach if available (it handles S3 URLs better)
+            import httpx
+            
+            # Use httpx instead of aiohttp which handles S3 URLs better
+            logger.info(f"DEBUG - Using httpx-based approach for S3 URL")
+            
+            # Create a timeout
+            timeout = httpx.Timeout(MAX_DOWNLOAD_TIMEOUT)
+            
+            # Use a very minimal client with no extra headers or settings
+            async with httpx.AsyncClient(
+                timeout=timeout,
+                follow_redirects=True,  # Equivalent to curl's -L flag
+                verify=False  # Skip SSL verification like curl does by default
+            ) as client:
+                # Make request with the URL exactly as-is
+                response = await client.get(signed_url)
+                
+                # Check response status
+                if response.status_code != 200:
+                    logger.error(f"DEBUG - Error response ({response.status_code}): {response.text}")
+                    raise BundleDownloadError(f"HTTP error {response.status_code}: {response.text}")
+                
+                # Stream response to file
+                with temp_file.open("wb") as f:
+                    for chunk in response.iter_bytes(chunk_size=8192):
+                        f.write(chunk)
+                
+                # Move temp file to final destination
+                temp_file.rename(download_path)
+                logger.info(f"DEBUG - Successfully downloaded using httpx")
+                
+        except ImportError:
+            # Fall back to aiohttp if httpx is not available
+            logger.info(f"DEBUG - httpx not available, falling back to aiohttp")
+            
+            # Setup with minimal configuration
+            timeout = aiohttp.ClientTimeout(total=MAX_DOWNLOAD_TIMEOUT)
+            connector = aiohttp.TCPConnector(ssl=False)  # Bypass SSL verification like curl's default
+            
+            # Use the signed URL exactly as provided, without any parsing or modification
+            async with aiohttp.ClientSession(
+                timeout=timeout, 
+                connector=connector,
+                auto_decompress=False,  # Don't process compression
+                trust_env=True  # Trust environment variables for proxy etc.
+            ) as session:
+                # Use minimal headers that won't interfere with signatures
+                logger.info(f"DEBUG - Using curl-like approach with minimal headers")
+                
+                headers = {
+                    "Host": parsed_url.netloc,
+                }
+                
+                async with session.get(
+                    signed_url,
+                    headers=headers,
+                    allow_redirects=True,  # This is equivalent to curl's -L flag
+                    skip_auto_headers=['Accept-Encoding', 'User-Agent', 'Accept']  # Skip common default headers
+                ) as response:
+                    if response.status != 200:
+                        error_text = await response.text()
+                        logger.error(f"DEBUG - Error response ({response.status}): {error_text}")
+                        raise BundleDownloadError(f"HTTP error {response.status}: {error_text}")
+                    
+                    # Download to file
+                    await self._stream_to_file(response, temp_file, download_path)
+
+    async def _download_approach_direct_curl(self, signed_url: str, temp_file: Path, download_path: Path) -> None:
+        """Download approach that uses the actual curl executable, as a last resort."""
+        # Ensure parent directory exists
+        download_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Make sure we don't have spaces in the URL
+        safe_url = signed_url.replace(" ", "")
+        
+        # Build the curl command
+        curl_cmd = f"curl -L -s '{safe_url}' -o {temp_file}"
+        logger.info(f"DEBUG - Running direct curl command: {curl_cmd}")
+        
+        # Execute curl command
+        process = await asyncio.create_subprocess_shell(
+            curl_cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        
+        stdout, stderr = await process.communicate()
+        
+        if process.returncode != 0:
+            stderr_text = stderr.decode() if stderr else "No error output"
+            logger.error(f"DEBUG - curl process failed with code {process.returncode}: {stderr_text}")
+            raise BundleDownloadError(f"curl command failed with code {process.returncode}: {stderr_text}")
+        
+        # Check if file was downloaded
+        if not temp_file.exists() or temp_file.stat().st_size == 0:
+            raise BundleDownloadError("curl command completed but file was not downloaded or is empty")
+        
+        # Move temp file to final destination
+        shutil.move(str(temp_file), str(download_path))
+        logger.info(f"DEBUG - Successfully downloaded using direct curl command")
+
+    async def _try_download_approaches(self, signed_url: str, temp_file: Path, download_path: Path) -> None:
+        """
+        Try different approaches to download from S3 signed URL.
+        
+        Args:
+            signed_url: The signed URL to download from
+            temp_file: Path to temporary file for download
+            download_path: Final path for successful download
+            
+        Raises:
+            BundleDownloadError: If all download approaches fail
+        """
+        approaches = [
+            self._download_approach_curl_like,  # New approach that mimics curl exactly
+            self._download_approach_basic,
+            self._download_approach_no_ssl,
+            self._download_approach_with_aws_headers,
+            self._download_approach_preserve_query_params,
+            self._download_approach_s3_specific,
+            self._download_approach_direct_curl,  # Fallback to actual curl command if available
+        ]
+        
+        # Try each approach in sequence
+        last_error = None
+        for i, approach in enumerate(approaches):
+            try:
+                logger.info(f"DEBUG - Trying download approach {i+1}/{len(approaches)}: {approach.__name__}")
+                await approach(signed_url, temp_file, download_path)
+                # If we get here, the approach succeeded
+                logger.info(f"DEBUG - Download approach {i+1} ({approach.__name__}) succeeded!")
+                return  # Success! 
+            except Exception as e:
+                logger.error(f"DEBUG - Approach {i+1} ({approach.__name__}) failed: {str(e)}")
+                last_error = e
+                # Continue to next approach
+        
+        # If we get here, all approaches failed
+        raise BundleDownloadError(f"All download approaches failed. Last error: {last_error}")
+    
+    async def _download_approach_basic(self, signed_url: str, temp_file: Path, download_path: Path) -> None:
+        """Basic download approach with minimal configuration."""
+        # Ensure parent directory exists
+        download_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Basic setup
+        timeout = aiohttp.ClientTimeout(total=MAX_DOWNLOAD_TIMEOUT)
+        
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            headers = {
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "*/*",
+            }
+            
+            # Log what we're doing
+            logger.info(f"DEBUG - Approach 1: Basic request with standard headers")
+            
+            async with session.get(signed_url, headers=headers, allow_redirects=True) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(f"DEBUG - Error response ({response.status}): {error_text}")
+                    raise BundleDownloadError(f"HTTP error {response.status}: {error_text}")
+                
+                # Download to file
+                await self._stream_to_file(response, temp_file, download_path)
+    
+    async def _download_approach_no_ssl(self, signed_url: str, temp_file: Path, download_path: Path) -> None:
+        """Download approach with SSL verification disabled."""
+        # Ensure parent directory exists
+        download_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Setup with SSL disabled
+        timeout = aiohttp.ClientTimeout(total=MAX_DOWNLOAD_TIMEOUT)
+        connector = aiohttp.TCPConnector(ssl=False)
+        
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+            headers = {
+                "User-Agent": "Mozilla/5.0", 
+                "Accept": "*/*",
+            }
+            
+            # Log what we're doing
+            logger.info(f"DEBUG - Approach 2: Request with SSL verification disabled")
+            
+            async with session.get(signed_url, headers=headers, allow_redirects=True) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(f"DEBUG - Error response ({response.status}): {error_text}")
+                    raise BundleDownloadError(f"HTTP error {response.status}: {error_text}")
+                
+                # Download to file
+                await self._stream_to_file(response, temp_file, download_path)
+    
+    async def _download_approach_with_aws_headers(self, signed_url: str, temp_file: Path, download_path: Path) -> None:
+        """Download approach with AWS specific headers."""
+        # Ensure parent directory exists
+        download_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # AWS-specific setup
+        timeout = aiohttp.ClientTimeout(total=MAX_DOWNLOAD_TIMEOUT)
+        connector = aiohttp.TCPConnector(ssl=False)
+        
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+            # Headers specifically for AWS S3
+            headers = {
+                "User-Agent": "aws-cli/2.0",
+                "Accept": "*/*",
+                "Accept-Encoding": "identity",
+                "Connection": "keep-alive"
+            }
+            
+            # Log what we're doing
+            logger.info(f"DEBUG - Approach 3: Request with AWS-specific headers")
+            
+            async with session.get(
+                signed_url, 
+                headers=headers, 
+                allow_redirects=True,
+                skip_auto_headers=['Accept-Encoding']
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(f"DEBUG - Error response ({response.status}): {error_text}")
+                    raise BundleDownloadError(f"HTTP error {response.status}: {error_text}")
+                
+                # Download to file
+                await self._stream_to_file(response, temp_file, download_path)
+                
+    async def _download_approach_preserve_query_params(self, signed_url: str, temp_file: Path, download_path: Path) -> None:
+        """Download approach that carefully preserves query parameters."""
+        # Ensure parent directory exists
+        download_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Parse URL to get base and params
+        from urllib.parse import urlparse, parse_qs
+        
+        parsed_url = urlparse(signed_url)
+        base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
+        query_params = parse_qs(parsed_url.query)
+        
+        # Use params dict instead of full URL to preserve exact param formatting
+        timeout = aiohttp.ClientTimeout(total=MAX_DOWNLOAD_TIMEOUT)
+        connector = aiohttp.TCPConnector(ssl=False)
+        
+        # Convert multi-value dict to single values
+        params = {k: v[0] for k, v in query_params.items()}
+        
+        # Log what we're doing
+        logger.info(f"DEBUG - Approach 4: Using separately passed query parameters")
+        logger.info(f"DEBUG - Base URL: {base_url}")
+        logger.info(f"DEBUG - Param count: {len(params)}")
+        
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+            headers = {
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "*/*",
+            }
+            
+            # Pass params separately to avoid URL encoding issues
+            async with session.get(
+                base_url, 
+                params=params,
+                headers=headers, 
+                allow_redirects=True,
+                skip_auto_headers=['Accept-Encoding']
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(f"DEBUG - Error response ({response.status}): {error_text}")
+                    raise BundleDownloadError(f"HTTP error {response.status}: {error_text}")
+                
+                # Download to file
+                await self._stream_to_file(response, temp_file, download_path)
+    
+    async def _download_approach_s3_specific(self, signed_url: str, temp_file: Path, download_path: Path) -> None:
+        """Download approach with S3-specific workarounds."""
+        # Ensure parent directory exists
+        download_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Setup optimized for S3
+        timeout = aiohttp.ClientTimeout(total=MAX_DOWNLOAD_TIMEOUT)
+        connector = aiohttp.TCPConnector(
+            ssl=False,
+            force_close=True,  # Don't reuse connections
+            enable_cleanup_closed=True,
+        )
+        
+        # Log what we're doing
+        logger.info(f"DEBUG - Approach 5: S3-specific configuration with curl-like headers")
+        
+        # Create a session that won't try to compress/decompress content
+        async with aiohttp.ClientSession(
+            timeout=timeout, 
+            connector=connector, 
+            auto_decompress=False  # Don't process compression
+        ) as session:
+            # Headers specifically for S3
+            # Very important: the exact format of the Host header
+            from urllib.parse import urlparse
+            parsed_url = urlparse(signed_url)
+            
+            headers = {
+                "User-Agent": "curl/7.68.0",  # Mimic curl since it works
+                "Accept": "*/*",
+                "Host": parsed_url.netloc,  # Explicit host header
+                "Connection": "close"  # Don't keep connection open
+            }
+            
+            async with session.get(
+                signed_url, 
+                headers=headers, 
+                allow_redirects=True,
+                skip_auto_headers=['Accept-Encoding']
+            ) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(f"DEBUG - Error response ({response.status}): {error_text}")
+                    raise BundleDownloadError(f"HTTP error {response.status}: {error_text}")
+                
+                # Download to file
+                await self._stream_to_file(response, temp_file, download_path)
+    
+    async def _stream_to_file(self, response, temp_file: Path, download_path: Path) -> None:
+        """Stream response content to file with progress tracking."""
+        # Check content length if available
+        content_length = response.content_length
+        if content_length and content_length > MAX_DOWNLOAD_SIZE:
+            raise BundleDownloadError(
+                f"Bundle size ({content_length / 1024 / 1024:.1f} MB) exceeds maximum allowed size "
+                f"({MAX_DOWNLOAD_SIZE / 1024 / 1024:.1f} MB)"
+            )
+        
+        # Download to temp file first for atomic operation
+        total_size = 0
+        chunk_size = 1024 * 1024  # 1MB chunks
+        
+        # Open temporary file for writing
+        with temp_file.open("wb") as f:
+            # Download in chunks
+            async for chunk in response.content.iter_chunked(chunk_size):
+                total_size += len(chunk)
+                
+                # Check size limit during download
+                if total_size > MAX_DOWNLOAD_SIZE:
+                    # Close and remove the partial file
+                    f.close()
+                    temp_file.unlink()
+                    raise BundleDownloadError(
+                        f"Bundle download exceeded maximum allowed size "
+                        f"({MAX_DOWNLOAD_SIZE / 1024 / 1024:.1f} MB)"
+                    )
+                
+                # Write chunk to file
+                f.write(chunk)
+                
+                # Log progress for large files
+                if total_size % (10 * chunk_size) == 0:
+                    logger.info(f"DEBUG - Downloaded {total_size / (1024 * 1024):.1f} MB so far")
+        
+        # Verify download succeeded and file is not empty
+        if total_size == 0:
+            if temp_file.exists():
+                temp_file.unlink()
+            raise BundleDownloadError("Downloaded file is empty")
+        
+        # Move the temporary file to the final location
+        if temp_file.exists():
+            temp_file.rename(download_path)
+            logger.info(f"Successfully downloaded {total_size / (1024 * 1024):.1f} MB to {download_path}")
+        else:
+            raise BundleDownloadError("Temporary download file was not created")
+    
+    async def _diagnostic_request(self, url: str) -> dict:
+        """Make a diagnostic HEAD request to get more info about URL issues."""
+        diagnostic_info = {
+            "url": url,
+            "attempts": []
+        }
+        
+        # Parse the URL
+        from urllib.parse import urlparse
+        parsed_url = urlparse(url)
+        
+        # Settings for diagnostic requests
+        timeout = aiohttp.ClientTimeout(total=30)  # Shorter timeout for diagnostics
+        
+        # Try different combinations of settings for diagnosis
+        diagnostic_configs = [
+            {"name": "standard", "ssl": None, "headers": {"User-Agent": "Mozilla/5.0"}},
+            {"name": "no-ssl", "ssl": False, "headers": {"User-Agent": "Mozilla/5.0"}},
+            {"name": "curl-like", "ssl": False, "headers": {
+                "User-Agent": "curl/7.68.0", 
+                "Host": parsed_url.netloc
+            }},
+            {"name": "aws-cli-like", "ssl": False, "headers": {
+                "User-Agent": "aws-cli/2.0", 
+                "Accept": "*/*"
+            }},
+        ]
+        
+        for config in diagnostic_configs:
+            attempt_info = {
+                "name": config["name"],
+                "result": "not_attempted"
+            }
+            
+            try:
+                connector = aiohttp.TCPConnector(ssl=config["ssl"])
+                
+                async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+                    # First try a HEAD request (faster for diagnostics)
+                    try:
+                        async with session.head(url, headers=config["headers"]) as response:
+                            attempt_info.update({
+                                "method": "HEAD",
+                                "status": response.status,
+                                "headers": dict(response.headers),
+                                "result": "success" if response.status == 200 else "error"
+                            })
+                    except Exception as head_err:
+                        # If HEAD fails, try GET but only read headers
+                        attempt_info.update({
+                            "method": "HEAD",
+                            "error": str(head_err),
+                            "result": "error"
+                        })
+                        
+                        try:
+                            async with session.get(url, headers=config["headers"]) as response:
+                                # Don't read the body, just get status and headers
+                                attempt_info.update({
+                                    "method": "GET",
+                                    "status": response.status,
+                                    "headers": dict(response.headers),
+                                    "result": "success" if response.status == 200 else "error"
+                                })
+                                
+                                # If we get an error, try to read a small part of the body for error info
+                                if response.status != 200:
+                                    try:
+                                        body_start = await response.content.read(1024)  # Read just the start
+                                        if body_start:
+                                            try:
+                                                text = body_start.decode('utf-8', errors='replace')
+                                                attempt_info["body_preview"] = text
+                                            except:
+                                                attempt_info["body_preview"] = "Non-text data"
+                                    except:
+                                        pass  # Skip body reading if it fails
+                        except Exception as get_err:
+                            attempt_info.update({
+                                "method": "GET",
+                                "error": str(get_err),
+                                "result": "error"
+                            })
+            except Exception as config_err:
+                attempt_info.update({
+                    "error": str(config_err),
+                    "result": "config_error"
+                })
+            
+            diagnostic_info["attempts"].append(attempt_info)
+            
+            # If any attempt succeeded, note that
+            if attempt_info.get("result") == "success":
+                diagnostic_info["successful_approach"] = config["name"]
+                break
+                
+        return diagnostic_info
+        
+        # If we get here, all approaches failed
+        raise BundleDownloadError(f"All download approaches failed. Last error: {last_error}")
+            
+    async def _download_approach_basic(self, signed_url: str, temp_file: Path, download_path: Path) -> None:
+        """Basic download approach with minimal configuration."""
+        timeout = aiohttp.ClientTimeout(total=MAX_DOWNLOAD_TIMEOUT)
+        
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            headers = {
+                "User-Agent": "MCP-Server-Troubleshoot/1.0",
+            }
+            
+            logger.info("DEBUG - Using basic approach with minimal headers")
+            await self._perform_download(session, signed_url, headers, temp_file, download_path)
+            
+    async def _download_approach_no_ssl(self, signed_url: str, temp_file: Path, download_path: Path) -> None:
+        """Download approach without SSL verification."""
+        timeout = aiohttp.ClientTimeout(total=MAX_DOWNLOAD_TIMEOUT)
+        connector = aiohttp.TCPConnector(ssl=False)
+        
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+            headers = {
+                "User-Agent": "MCP-Server-Troubleshoot/1.0",
+                "Accept": "*/*",
+            }
+            
+            logger.info("DEBUG - Using approach without SSL verification")
+            await self._perform_download(session, signed_url, headers, temp_file, download_path)
+            
+    async def _download_approach_with_aws_headers(self, signed_url: str, temp_file: Path, download_path: Path) -> None:
+        """Download approach with AWS-specific headers."""
+        timeout = aiohttp.ClientTimeout(total=MAX_DOWNLOAD_TIMEOUT)
+        connector = aiohttp.TCPConnector(ssl=False)
+        
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+            # AWS S3 headers that may help with signed URLs
+            headers = {
+                "User-Agent": "aws-cli/2.0.0 Python/3.8.0",
+                "Accept": "*/*",
+                "Accept-Encoding": "identity",
+                "Connection": "keep-alive",
+            }
+            
+            logger.info("DEBUG - Using approach with AWS-specific headers")
+            await self._perform_download(session, signed_url, headers, temp_file, download_path)
+            
+    async def _download_approach_preserve_query_params(self, signed_url: str, temp_file: Path, download_path: Path) -> None:
+        """
+        Download approach that preserves query parameters exactly as-is.
+        
+        This approach is specifically for S3 pre-signed URLs where the query parameters
+        must be preserved exactly, including their order and encoding.
+        """
+        timeout = aiohttp.ClientTimeout(total=MAX_DOWNLOAD_TIMEOUT)
+        connector = aiohttp.TCPConnector(ssl=False)
+        
+        # Don't use aiohttp's URL parser to avoid any changes to the query parameters
+        # We'll pass the URL exactly as received
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+            headers = {
+                "User-Agent": "boto3/1.24.0 Python/3.9.0",
+                "Accept": "*/*",
+                "Accept-Encoding": "identity",
+            }
+            
+            logger.info("DEBUG - Using approach that preserves query parameters exactly")
+            
+            # We'll create a custom request to ensure the URL is used exactly as-is
+            try:
+                async with session.request(
+                    method="GET",
+                    url=signed_url,  # Pass the URL exactly as-is
+                    headers=headers,
+                    allow_redirects=True,
+                ) as response:
+                    await self._process_response(response, temp_file, download_path)
+            except Exception as e:
+                logger.error(f"Error in preserved query params approach: {e}")
+                raise
+                
+    async def _download_approach_s3_specific(self, signed_url: str, temp_file: Path, download_path: Path) -> None:
+        """
+        S3-specific download approach with specialized client setup.
+        
+        This approach is tailored specifically for AWS S3 pre-signed URLs.
+        """
+        from urllib.parse import urlparse
+        parsed_url = urlparse(signed_url)
+        
+        # Extract the hostname to check if it's an S3 URL
+        hostname = parsed_url.netloc
+        if "s3" not in hostname.lower() and "amazonaws" not in hostname.lower():
+            logger.info(f"DEBUG - URL doesn't appear to be an S3 URL (hostname: {hostname}), skipping S3-specific approach")
+            raise ValueError("Not an S3 URL")
+            
+        logger.info(f"DEBUG - Using S3-specific approach for host: {hostname}")
+        
+        # Configure a specialized session just for S3
+        timeout = aiohttp.ClientTimeout(total=MAX_DOWNLOAD_TIMEOUT)
+        
+        # Use a completely fresh connector with specific SSL settings
+        ssl_context = None
+        try:
+            import ssl
+            # Create a custom SSL context with S3's preferred settings
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+        except ImportError:
+            logger.warning("DEBUG - Could not import ssl module, using default SSL settings")
+            
+        connector = aiohttp.TCPConnector(
+            ssl=ssl_context,
+            force_close=True,
+            enable_cleanup_closed=True,
+            ttl_dns_cache=300,  # Cache DNS lookups for 5 minutes
+        )
+        
+        async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+            # S3-specific headers known to work with presigned URLs
+            headers = {
+                "User-Agent": "aws-cli/2.9.15 Python/3.9.16 Linux/5.15.0-1036",
+                "Accept": "*/*",
+                "Accept-Encoding": "identity",
+                "Connection": "close",  # Important for S3 - use a fresh connection each time
+            }
+            
+            logger.info("DEBUG - Using specialized S3 approach")
+            
+            # Make the request with exact URL handling
+            try:
+                async with session.request(
+                    method="GET",
+                    url=signed_url,
+                    headers=headers,
+                    allow_redirects=True,
+                    skip_auto_headers=['Content-Type'],  # Skip adding content-type which can confuse S3
+                ) as response:
+                    await self._process_response(response, temp_file, download_path)
+            except Exception as e:
+                logger.error(f"Error in S3-specific approach: {e}")
+                raise
+            
+    async def _perform_download(self, session, signed_url, headers, temp_file, download_path):
+        """Common download logic used by all approaches."""
+        # Log the request headers for debugging
+        logger.info(f"DEBUG - Request headers: {headers}")
+        
+        async with session.get(
+            signed_url,
+            headers=headers,
+            allow_redirects=True,
+            max_redirects=5
+        ) as response:
+            await self._process_response(response, temp_file, download_path)
+                
+    async def _process_response(self, response, temp_file, download_path):
+        """Process an HTTP response to download a file."""
+        # Log response details for debugging
+        logger.info(f"DEBUG - Response status: {response.status}")
+        logger.info(f"DEBUG - Response headers: {response.headers}")
+        
+        if response.status != 200:
+            error_text = await response.text()
+            logger.error(f"DEBUG - Error response body: {error_text}")
+            error_msg = f"Failed to download bundle: HTTP {response.status}"
+            if response.status == 403:
+                error_msg = f"Access denied (403 Forbidden): {error_text}"
+            elif response.status == 404:
+                error_msg = f"Bundle not found (404 Not Found): {error_text}"
+            raise BundleDownloadError(error_msg)
+        
+        # Check content length if available
+        content_length = response.content_length
+        if content_length and content_length > MAX_DOWNLOAD_SIZE:
+            raise BundleDownloadError(
+                f"Bundle size ({content_length / 1024 / 1024:.1f} MB) exceeds maximum allowed size "
+                f"({MAX_DOWNLOAD_SIZE / 1024 / 1024:.1f} MB)"
+            )
+        
+        # Ensure parent directory exists
+        download_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Download to temporary file first for atomic operation
+        total_size = 0
+        chunk_size = 1024 * 1024  # 1MB chunks
+        
+        # Open temporary file for writing
+        with temp_file.open("wb") as f:
+            # Download in chunks
+            async for chunk in response.content.iter_chunked(chunk_size):
+                total_size += len(chunk)
+                
+                # Check size limit during download
+                if total_size > MAX_DOWNLOAD_SIZE:
+                    # Close and remove the partial file
+                    f.close()
+                    temp_file.unlink()
+                    raise BundleDownloadError(
+                        f"Bundle download exceeded maximum allowed size "
+                        f"({MAX_DOWNLOAD_SIZE / 1024 / 1024:.1f} MB)"
+                    )
+                
+                # Write chunk to file
+                f.write(chunk)
+                
+                # Log progress for large files
+                if total_size % (10 * chunk_size) == 0:
+                    logger.debug(f"Downloaded {total_size / (1024 * 1024):.1f} MB so far")
+        
+        # Verify download succeeded and file is not empty
+        if total_size == 0:
+            if temp_file.exists():
+                temp_file.unlink()
+            raise BundleDownloadError("Downloaded file is empty")
+        
+        # Move the temporary file to the final location
+        if temp_file.exists():
+            temp_file.rename(download_path)
+            logger.info(f"Successfully downloaded {total_size / (1024 * 1024):.1f} MB to {download_path}")
+        else:
+            raise BundleDownloadError("Temporary download file was not created")
+            
+    async def _diagnostic_request(self, url: str) -> dict:
+        """
+        Make a diagnostic HEAD request to gather information about the URL.
+        
+        Args:
+            url: The URL to diagnose
+            
+        Returns:
+            Dictionary with diagnostic information
+        """
+        diagnostics = {"url": url}
+        
+        try:
+            timeout = aiohttp.ClientTimeout(total=10)  # Short timeout for diagnostic
+            connector = aiohttp.TCPConnector(ssl=False)
+            
+            async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
+                # Try a HEAD request first (less data, just headers)
+                try:
+                    headers = {
+                        "User-Agent": "diagnostics/1.0",
+                    }
+                    
+                    async with session.head(url, headers=headers) as response:
+                        diagnostics["head_status"] = response.status
+                        diagnostics["head_headers"] = dict(response.headers)
+                except Exception as e:
+                    diagnostics["head_error"] = str(e)
+                
+                # Try a small range request
+                try:
+                    headers = {
+                        "User-Agent": "diagnostics/1.0",
+                        "Range": "bytes=0-1023",  # Just get the first KB
+                    }
+                    
+                    async with session.get(url, headers=headers) as response:
+                        diagnostics["range_status"] = response.status
+                        diagnostics["range_headers"] = dict(response.headers)
+                        
+                        # Only read a small amount of content
+                        if response.status == 206:  # Partial content
+                            content = await response.read()
+                            diagnostics["range_size"] = len(content)
+                        elif response.status == 200:  # Full content (range not supported)
+                            diagnostics["range_not_supported"] = True
+                except Exception as e:
+                    diagnostics["range_error"] = str(e)
+                    
+                # Try a request with AWS-specific headers
+                try:
+                    aws_headers = {
+                        "User-Agent": "aws-cli/2.9.15 Python/3.9.16 Linux/5.15.0-1036",
+                        "Accept": "*/*",
+                        "Accept-Encoding": "identity",
+                    }
+                    
+                    async with session.head(url, headers=aws_headers) as response:
+                        diagnostics["aws_head_status"] = response.status
+                        diagnostics["aws_head_headers"] = dict(response.headers)
+                except Exception as e:
+                    diagnostics["aws_head_error"] = str(e)
+            
+            # Also parse the URL to check query parameters
+            try:
+                from urllib.parse import urlparse, parse_qs
+                parsed_url = urlparse(url)
+                
+                # Extract query parameters
+                query_params = parse_qs(parsed_url.query)
+                diagnostics["url_scheme"] = parsed_url.scheme
+                diagnostics["url_hostname"] = parsed_url.hostname
+                diagnostics["url_path"] = parsed_url.path
+                
+                # Check for AWS specific query parameters
+                aws_params = [param for param in query_params if param.startswith('X-Amz-')]
+                diagnostics["has_aws_params"] = len(aws_params) > 0
+                diagnostics["aws_param_count"] = len(aws_params)
+                diagnostics["aws_param_names"] = aws_params
+                
+                # Check signature method
+                if 'X-Amz-Algorithm' in query_params:
+                    diagnostics["signature_method"] = query_params['X-Amz-Algorithm'][0]
+                
+                # Check expiration
+                if 'X-Amz-Expires' in query_params:
+                    diagnostics["expires"] = query_params['X-Amz-Expires'][0]
+                
+                # Check date
+                if 'X-Amz-Date' in query_params:
+                    diagnostics["date"] = query_params['X-Amz-Date'][0]
+            except Exception as parse_err:
+                diagnostics["url_parse_error"] = str(parse_err)
+            
+            return diagnostics
+        except Exception as e:
+            return {"diagnostic_error": str(e)}
 
     async def _initialize_with_sbctl(self, bundle_path: Path, output_dir: Path) -> Path:
         """
@@ -971,7 +2180,7 @@ class BundleManager:
                                 logger.info(f"Starting shutil.rmtree on bundle path: {bundle_path}")
                                 shutil.rmtree(bundle_path)
                                 logger.info(
-                                    f"shutil.rmtree completed, checking if path still exists"
+                                    "shutil.rmtree completed, checking if path still exists"
                                 )
 
                                 if os.path.exists(bundle_path):
@@ -1274,38 +2483,37 @@ class BundleManager:
                 logger.warning(f"Failed to connect to API server at {url}: {str(e)}")
                 continue
 
-        # Try checking with curl as a backup method
+        # Try an alternative aiohttp approach as a backup method
         try:
             for endpoint in endpoints:
                 url = f"http://{host}:{port}{endpoint}"
-                logger.debug(f"Checking API server with curl: {url}")
-
-                curl_proc = await asyncio.create_subprocess_exec(
-                    "curl",
-                    "-s",
-                    "-o",
-                    "/dev/null",
-                    "-w",
-                    "%{http_code}",
-                    url,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
+                logger.debug(f"Checking API server with alternative method: {url}")
 
                 try:
-                    stdout, stderr = await asyncio.wait_for(curl_proc.communicate(), timeout=3.0)
-                    status_code = stdout.decode().strip()
+                    # Configure a very short timeout for quick checks
+                    timeout = aiohttp.ClientTimeout(total=3.0)
+                    headers = {
+                        "User-Agent": "MCP-Server-Troubleshoot/1.0",
+                        "Accept": "*/*"
+                    }
+                    
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                        try:
+                            async with session.get(url, headers=headers, allow_redirects=True) as response:
+                                status_code = response.status
+                                logger.debug(f"Request to {url} returned status code: {status_code}")
 
-                    logger.debug(f"Curl to {url} returned status code: {status_code}")
-
-                    if status_code == "200":
-                        logger.info(f"API server is available at {url} (curl check)")
-                        return True
+                                if status_code == 200:
+                                    logger.info(f"API server is available at {url} (alternative check)")
+                                    return True
+                        except aiohttp.ClientError as client_err:
+                            logger.debug(f"API request error for {url}: {client_err}")
+                            continue
                 except asyncio.TimeoutError:
-                    logger.warning(f"Curl timeout for {url}")
+                    logger.warning(f"Request timeout for {url}")
                     continue
         except Exception as e:
-            logger.warning(f"Error using curl to check API server: {e}")
+            logger.warning(f"Error checking API server with alternative method: {e}")
 
         logger.warning("API server is not available at any endpoint")
         return False
@@ -1435,28 +2643,19 @@ class BundleManager:
             except Exception as e:
                 info["netstat_error"] = str(e)
 
-            # Try curl to test API server on this port
+            # Use aiohttp to test API server on this port
             try:
                 url = f"http://localhost:{port}/api"
-                proc = await asyncio.create_subprocess_exec(
-                    "curl",
-                    "-s",
-                    "-o",
-                    "/dev/null",
-                    "-w",
-                    "%{http_code}",
-                    url,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                stdout, stderr = await proc.communicate()
-
-                if proc.returncode == 0:
-                    info[f"curl_{port}_status_code"] = stdout.decode().strip()
-                else:
-                    info[f"curl_{port}_error"] = stderr.decode()
+                timeout = aiohttp.ClientTimeout(total=3.0)
+                
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    try:
+                        async with session.get(url) as response:
+                            info[f"api_check_{port}_status_code"] = str(response.status)
+                    except Exception as req_err:
+                        info[f"api_check_{port}_error"] = str(req_err)
             except Exception as e:
-                info[f"curl_{port}_error"] = str(e)
+                info[f"api_check_{port}_error"] = str(e)
 
         # Add environment info
         info["env_mock_k8s_api_port"] = os.environ.get("MOCK_K8S_API_PORT", "not set")
