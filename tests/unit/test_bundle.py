@@ -167,13 +167,13 @@ def mock_httpx_client():
     mock_response.text = json.dumps({"signedUri": SIGNED_URL})
 
     mock_client = MagicMock(spec=httpx.AsyncClient)
-        # Make the mock client's get method return the mock_response
-        mock_client.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
-        mock_client.__aexit__ = AsyncMock()
+    # Make the mock client's get method return the mock_response
+    mock_client.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
+    mock_client.__aexit__ = AsyncMock()
 
-        with patch("httpx.AsyncClient", return_value=mock_client) as mock_constructor:
-            # Yield the constructor and the response mock for tests to configure
-            yield mock_constructor, mock_response
+    with patch("httpx.AsyncClient", return_value=mock_client) as mock_constructor:
+        # Yield the constructor and the response mock for tests to configure
+        yield mock_constructor, mock_response
 
 
 @pytest.fixture
