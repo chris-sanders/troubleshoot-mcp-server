@@ -390,27 +390,37 @@ class BundleManager:
                 logger.debug(f"Requesting signed URL from Replicated API: {api_url}")
                 response = await client.get(api_url, headers=headers)
 
-                # Check for errors before trying to parse JSON
+                # Raise specific errors immediately based on status code
                 if response.status_code == 401:
+                    logger.error(f"Replicated API returned 401 Unauthorized for slug {slug}")
                     raise BundleDownloadError(
                         f"Failed to authenticate with Replicated API (status {response.status_code}). "
                         "Check SBCTL_TOKEN/REPLICATED_TOKEN."
                     )
                 elif response.status_code == 404:
+                    logger.error(f"Replicated API returned 404 Not Found for slug {slug}")
                     raise BundleDownloadError(
                         f"Support bundle not found on Replicated Vendor Portal (slug: {slug}, status {response.status_code})."
                     )
                 elif response.status_code != 200:
                     response_text = response.text[:500]  # Limit response text length
+                    logger.error(f"Replicated API returned error {response.status_code} for slug {slug}: {response_text}")
                     raise BundleDownloadError(
                         f"Failed to get signed URL from Replicated API (status {response.status_code}): {response_text}"
                     )
 
-                # Now parse JSON only if status is 200
-                response_data = response.json()
+                # If status is 200, proceed to parse JSON
+                try:
+                    response_data = response.json()
+                except json.JSONDecodeError as e:
+                     logger.exception(f"Error decoding JSON response from Replicated API (status 200): {e}")
+                     # Ensure specific error is raised
+                     raise BundleDownloadError(f"Invalid JSON response from Replicated API: {e}")
+
                 signed_url = response_data.get("signedUri")
 
                 if not signed_url:
+                    logger.error(f"Missing 'signedUri' in Replicated API response for slug {slug}")
                     raise BundleDownloadError(
                         "Could not find 'signedUri' in Replicated API response."
                     )
@@ -420,16 +430,16 @@ class BundleManager:
 
         except httpx.Timeout as e:
              logger.exception(f"Timeout requesting signed URL from Replicated API: {e}")
+             # Ensure specific error is raised
              raise BundleDownloadError(f"Timeout requesting signed URL: {e}")
         except httpx.RequestError as e:
             logger.exception(f"Network error requesting signed URL from Replicated API: {e}")
+            # Ensure specific error is raised
             raise BundleDownloadError(f"Network error requesting signed URL: {e}")
-        except json.JSONDecodeError as e:
-            logger.exception(f"Error decoding JSON response from Replicated API: {e}")
-            raise BundleDownloadError(f"Invalid JSON response from Replicated API: {e}")
-        except BundleDownloadError: # Re-raise specific errors
+        except BundleDownloadError: # Re-raise specific errors if already caught
              raise
         except Exception as e:
+            # Catch any other unexpected errors and wrap them
             logger.exception(f"Unexpected error getting signed URL from Replicated API: {e}")
             raise BundleDownloadError(f"Unexpected error getting signed URL: {str(e)}")
 
@@ -470,14 +480,25 @@ class BundleManager:
 
         # Use original URL to generate filename and ID for consistency
         parsed_original_url = urlparse(original_url)
-        filename = (
-            os.path.basename(parsed_original_url.path)
-            or f"bundle_{self._generate_bundle_id(original_url)}.tar.gz"
-        )
-        # Ensure filename is safe
-        filename = re.sub(r'[^\w\-.]', '_', filename)
-        if not filename: # Handle cases where sanitization results in empty string
-            filename = f"bundle_{self._generate_bundle_id(original_url)}.tar.gz"
+        filename = "" # Initialize filename
+
+        # Generate filename based on URL type
+        if REPLICATED_VENDOR_URL_PATTERN.match(original_url):
+            match = REPLICATED_VENDOR_URL_PATTERN.match(original_url)
+            slug = match.group(1) if match else "unknown_slug"
+            # Sanitize slug for filename
+            safe_slug = re.sub(r'[^\w\-.]', '_', slug)
+            filename = f"replicated_bundle_{safe_slug}.tar.gz"
+        else:
+            # Use basename for non-Replicated URLs
+            filename = (
+                os.path.basename(parsed_original_url.path)
+                or f"bundle_{self._generate_bundle_id(original_url)}.tar.gz"
+            )
+            # Ensure filename is safe
+            filename = re.sub(r'[^\w\-.]', '_', filename)
+            if not filename: # Handle cases where sanitization results in empty string
+                filename = f"bundle_{self._generate_bundle_id(original_url)}.tar.gz"
 
         download_path = self.bundle_dir / filename
 
