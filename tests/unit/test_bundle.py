@@ -160,13 +160,13 @@ def mock_httpx_client():
     mock_response = MagicMock(spec=httpx.Response)
     # === START MODIFICATION ===
     # Default behavior: json() raises error, status is 200 (will be overridden)
+    # mock_response.status_code = 200 # Removed duplicate/incorrectly indented line
+    # Default to success state, tests will override for error cases
     mock_response.status_code = 200
-        # Default to success state, tests will override for error cases
-        mock_response.status_code = 200
-        mock_response.json = MagicMock(return_value={"signedUri": SIGNED_URL})
-        mock_response.text = json.dumps({"signedUri": SIGNED_URL})
+    mock_response.json = MagicMock(return_value={"signedUri": SIGNED_URL})
+    mock_response.text = json.dumps({"signedUri": SIGNED_URL})
 
-        mock_client = MagicMock(spec=httpx.AsyncClient)
+    mock_client = MagicMock(spec=httpx.AsyncClient)
         # Make the mock client's get method return the mock_response
         mock_client.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
         mock_client.__aexit__ = AsyncMock()
