@@ -436,8 +436,8 @@ class BundleManager:
             logger.exception(f"Network error requesting signed URL from Replicated API: {e}")
             # Ensure specific error is raised
             raise BundleDownloadError(f"Network error requesting signed URL: {e}")
-        except BundleDownloadError: # Re-raise specific errors if already caught
-             raise
+        # except BundleDownloadError: # Re-raise specific errors if already caught - Removed redundant block
+        #      raise
         except Exception as e:
             # Catch any other unexpected errors and wrap them
             logger.exception(f"Unexpected error getting signed URL from Replicated API: {e}")

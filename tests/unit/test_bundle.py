@@ -255,7 +255,9 @@ async def test_bundle_manager_download_replicated_url_success_sbctl_token(
             # Verify file was created
             assert download_path.exists()
             # Assert new filename format
-            expected_filename_part = f"replicated_bundle_{REPLICATED_SLUG.replace('@', '_')}"
+            # Replace both '@' and ':' for the assertion to match sanitization
+            safe_slug_for_assertion = REPLICATED_SLUG.replace('@', '_').replace(':', '_')
+            expected_filename_part = f"replicated_bundle_{safe_slug_for_assertion}"
             assert download_path.name.startswith(expected_filename_part)
             assert download_path.read_bytes() == b"chunk1chunk2"
 
