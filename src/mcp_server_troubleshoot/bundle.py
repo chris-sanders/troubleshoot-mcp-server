@@ -383,29 +383,14 @@ class BundleManager:
         api_url = REPLICATED_API_ENDPOINT.format(slug=slug)
         headers = {"Authorization": token, "Content-Type": "application/json"}
 
-        response: Optional[httpx.Response] = None
         try:
             # === START RESTRUCTURE ===
-            # Try the network request
             timeout = httpx.Timeout(MAX_DOWNLOAD_TIMEOUT)
             async with httpx.AsyncClient(timeout=timeout) as client:
                 logger.debug(f"Requesting signed URL from Replicated API: {api_url}")
-                try:
-                    response = await client.get(api_url, headers=headers)
-                except httpx.Timeout as e:
-                    logger.exception(f"Timeout requesting signed URL from Replicated API: {e}")
-                    raise BundleDownloadError(f"Timeout requesting signed URL: {e}")
-                except httpx.RequestError as e:
-                    logger.exception(f"Network error requesting signed URL from Replicated API: {e}")
-                    raise BundleDownloadError(f"Network error requesting signed URL: {e}")
-            # === END RESTRUCTURE ===
+                response = await client.get(api_url, headers=headers)
 
-            # If we got here, the network request itself didn't raise Timeout or RequestError
-            if response is None:
-                 # Should not happen if request succeeded without error, but handle defensively
-                 raise BundleDownloadError("Failed to get response from Replicated API (response is None).")
-
-            # Now process the response status and content
+            # Process the response status and content
             if response.status_code == 401:
                 logger.error(f"Replicated API returned 401 Unauthorized for slug {slug}")
                 raise BundleDownloadError(
@@ -440,7 +425,15 @@ class BundleManager:
 
             logger.info("Successfully retrieved signed URL from Replicated API.")
             return signed_url
+            # === END RESTRUCTURE ===
 
+        except httpx.Timeout as e:
+             logger.exception(f"Timeout requesting signed URL from Replicated API: {e}")
+             raise BundleDownloadError(f"Timeout requesting signed URL: {e}")
+        except httpx.RequestError as e:
+            # This should now correctly catch the RequestError raised by the mock
+            logger.exception(f"Network error requesting signed URL from Replicated API: {e}")
+            raise BundleDownloadError(f"Network error requesting signed URL: {e}")
         except BundleDownloadError:
             # Re-raise specific BundleDownloadErrors we've already identified
             raise
