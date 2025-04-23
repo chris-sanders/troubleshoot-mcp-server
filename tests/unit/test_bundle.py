@@ -158,16 +158,41 @@ SIGNED_URL = "https://signed.example.com/download?token=abc"
 def mock_httpx_client():
     """Fixture to mock httpx.AsyncClient."""
     mock_response = MagicMock(spec=httpx.Response)
+    # === START MODIFICATION ===
+    # Default behavior: json() raises error, status is 200 (will be overridden)
     mock_response.status_code = 200
-    mock_response.json.return_value = {"signedUri": SIGNED_URL}
-    # Ensure text attribute is present for error cases
-    mock_response.text = json.dumps({"signedUri": SIGNED_URL})
+    mock_response.json = MagicMock(side_effect=json.JSONDecodeError("Mock JSON decode error", "", 0))
+    mock_response.text = "Default mock text"
+
+    # Helper to configure for success
+    def configure_success():
+        mock_response.status_code = 200
+        mock_response.json.side_effect = None  # Disable error side effect
+        mock_response.json.return_value = {"signedUri": SIGNED_URL}
+        mock_response.text = json.dumps({"signedUri": SIGNED_URL})
+
+    # Helper to configure for error
+    def configure_error(status_code, text):
+        mock_response.status_code = status_code
+        mock_response.text = text
+        # Ensure json() raises error for non-200 status
+        mock_response.json.side_effect = json.JSONDecodeError("Mock JSON decode error", "", 0)
+        mock_response.json.return_value = None # Reset return value
+
+    # Add helpers to the mock object so tests can call them
+    mock_response.configure_success = configure_success
+    mock_response.configure_error = configure_error
+
+    # Start in success state by default
+    configure_success()
+    # === END MODIFICATION ===
 
     mock_client = MagicMock(spec=httpx.AsyncClient)
     mock_client.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
     mock_client.__aexit__ = AsyncMock()
 
     with patch("httpx.AsyncClient", return_value=mock_client) as mock_constructor:
+        # Yield both mocks so tests can reconfigure the response
         yield mock_constructor, mock_response
 
 
@@ -326,8 +351,10 @@ async def test_bundle_manager_download_replicated_url_missing_token():
 async def test_bundle_manager_download_replicated_url_api_401(mock_httpx_client):
     """Test error handling for Replicated API 401 Unauthorized."""
     mock_httpx_constructor, mock_response = mock_httpx_client
-    mock_response.status_code = 401
-    mock_response.text = "Unauthorized"
+    # === START MODIFICATION ===
+    # Configure the mock response for this specific error case
+    mock_response.configure_error(status_code=401, text="Unauthorized")
+    # === END MODIFICATION ===
 
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
@@ -343,8 +370,10 @@ async def test_bundle_manager_download_replicated_url_api_401(mock_httpx_client)
 async def test_bundle_manager_download_replicated_url_api_404(mock_httpx_client):
     """Test error handling for Replicated API 404 Not Found."""
     mock_httpx_constructor, mock_response = mock_httpx_client
-    mock_response.status_code = 404
-    mock_response.text = "Not Found"
+    # === START MODIFICATION ===
+    # Configure the mock response for this specific error case
+    mock_response.configure_error(status_code=404, text="Not Found")
+    # === END MODIFICATION ===
 
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
@@ -361,8 +390,10 @@ async def test_bundle_manager_download_replicated_url_api_404(mock_httpx_client)
 async def test_bundle_manager_download_replicated_url_api_other_error(mock_httpx_client):
     """Test error handling for other Replicated API errors."""
     mock_httpx_constructor, mock_response = mock_httpx_client
-    mock_response.status_code = 500
-    mock_response.text = "Internal Server Error"
+    # === START MODIFICATION ===
+    # Configure the mock response for this specific error case
+    mock_response.configure_error(status_code=500, text="Internal Server Error")
+    # === END MODIFICATION ===
 
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
@@ -380,7 +411,12 @@ async def test_bundle_manager_download_replicated_url_api_other_error(mock_httpx
 async def test_bundle_manager_download_replicated_url_missing_signed_uri(mock_httpx_client):
     """Test error handling when 'signedUri' is missing from API response."""
     mock_httpx_constructor, mock_response = mock_httpx_client
-    mock_response.json.return_value = {"message": "Success but no URI"} # Missing signedUri
+    # === START MODIFICATION ===
+    # Configure for success status but missing key in JSON
+    mock_response.configure_success() # Start with success config
+    mock_response.json.return_value = {"message": "Success but no URI"} # Override json return
+    mock_response.text = json.dumps({"message": "Success but no URI"})
+     # === END MODIFICATION ===
 
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)

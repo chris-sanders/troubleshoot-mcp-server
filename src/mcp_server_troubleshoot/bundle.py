@@ -499,8 +499,12 @@ class BundleManager:
             timeout = aiohttp.ClientTimeout(total=MAX_DOWNLOAD_TIMEOUT)
 
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                # Use the actual_download_url for the GET request
-                async with session.get(actual_download_url, headers=download_headers) as response:
+                # === START MODIFICATION ===
+                # Explicitly await the get call first
+                response_ctx_mgr = session.get(actual_download_url, headers=download_headers)
+                # Now use the awaited response object in the async with
+                async with await response_ctx_mgr as response:
+                # === END MODIFICATION ===
                     if response.status != 200:
                         # Include response reason for better error messages
                         reason = response.reason or "Unknown Error"
@@ -519,6 +523,7 @@ class BundleManager:
                     # Track total downloaded size
                     total_size = 0
                     with download_path.open("wb") as f:
+                        # Use the 'response' variable from the inner async with
                         async for chunk in response.content.iter_chunked(8192):
                             total_size += len(chunk)
 
