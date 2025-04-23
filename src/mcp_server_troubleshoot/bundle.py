@@ -453,15 +453,18 @@ class BundleManager:
         if REPLICATED_VENDOR_URL_PATTERN.match(url):
             try:
                 actual_download_url = await self._get_replicated_signed_url(url)
+                # Log only after successfully getting the signed URL
                 logger.info(f"Using signed URL for download: {actual_download_url[:80]}...") # Log truncated URL
             except BundleDownloadError as e:
                 # Propagate the error from the signed URL retrieval
+                # No further execution needed in this function if this fails
                 raise e
             except Exception as e:
                 # Catch any other unexpected errors during signed URL retrieval
                 logger.exception(f"Unexpected error getting signed URL for {url}: {e}")
+                # Raise specific error and exit
                 raise BundleDownloadError(f"Failed to get signed URL for {url}: {str(e)}")
-
+        # Log the download start *after* potential signed URL retrieval
         logger.info(f"Starting download from: {actual_download_url[:80]}...")
 
         # Use original URL to generate filename and ID for consistency

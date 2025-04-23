@@ -183,12 +183,14 @@ def mock_aiohttp_download():
     async def async_iterator():
         yield b"chunk1"
         yield b"chunk2"
+    # The content object needs the iter_chunked method
+    mock_aio_response.content = AsyncMock()
     mock_aio_response.content.iter_chunked = AsyncMock(return_value=async_iterator())
     # Mock the __aenter__ and __aexit__ for the response context manager
     mock_aio_response.__aenter__.return_value = mock_aio_response
     mock_aio_response.__aexit__ = AsyncMock(return_value=None)
 
-    # Mock the session's get method to return the mock response
+    # Mock the session's get method to be an AsyncMock that RETURNS the mock response
     mock_get = AsyncMock(return_value=mock_aio_response)
 
     # Mock the session object
@@ -278,7 +280,8 @@ async def test_bundle_manager_download_replicated_url_token_precedence(
 ):
     """Test SBCTL_TOKEN takes precedence over REPLICATED_TOKEN."""
     mock_httpx_constructor, _ = mock_httpx_client
-    mock_aiohttp_constructor, _ = mock_aiohttp_download
+    # Unpack all three values from the fixture
+    mock_aiohttp_constructor, mock_aio_session, mock_aio_response = mock_aiohttp_download
 
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
@@ -488,6 +491,7 @@ async def test_bundle_manager_download_bundle_error():
     mock_aio_response.__aenter__.return_value = mock_aio_response
     mock_aio_response.__aexit__ = AsyncMock(return_value=None)
 
+    # Mock the session's get method to be an AsyncMock that RETURNS the mock response
     mock_get = AsyncMock(return_value=mock_aio_response)
 
     mock_aio_session = AsyncMock(spec=aiohttp.ClientSession)
