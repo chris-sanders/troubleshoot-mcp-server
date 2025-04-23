@@ -190,8 +190,11 @@ def mock_aiohttp_download():
     mock_aio_response.__aenter__.return_value = mock_aio_response
     mock_aio_response.__aexit__ = AsyncMock(return_value=None)
 
-    # Mock the session's get method to be an AsyncMock that RETURNS the mock response
+    # === START MODIFICATION ===
+    # Mock the session's get method. It's an async function that returns the response.
+    # The AsyncMock itself represents the awaitable coroutine.
     mock_get = AsyncMock(return_value=mock_aio_response)
+    # === END MODIFICATION ===
 
     # Mock the session object
     mock_aio_session = AsyncMock(spec=aiohttp.ClientSession)
@@ -491,11 +494,13 @@ async def test_bundle_manager_download_bundle_error():
     mock_aio_response.__aenter__.return_value = mock_aio_response
     mock_aio_response.__aexit__ = AsyncMock(return_value=None)
 
-    # Mock the session's get method to be an AsyncMock that RETURNS the mock response
+    # === START MODIFICATION ===
+    # Mock the session's get method as an AsyncMock returning the response
     mock_get = AsyncMock(return_value=mock_aio_response)
+    # === END MODIFICATION ===
 
     mock_aio_session = AsyncMock(spec=aiohttp.ClientSession)
-    mock_aio_session.get = mock_get
+    mock_aio_session.get = mock_get # Assign the mock get method
     # Mock the context manager methods for the session
     mock_aio_session.__aenter__.return_value = mock_aio_session
     mock_aio_session.__aexit__ = AsyncMock(return_value=None)

@@ -446,6 +446,7 @@ class BundleManager:
         Raises:
             BundleDownloadError: If the bundle could not be downloaded
         """
+        # Initialize actual_download_url with the original URL first
         actual_download_url = url
         original_url = url  # Keep track of the original URL for logging/ID generation
 
