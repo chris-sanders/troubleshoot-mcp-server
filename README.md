@@ -214,7 +214,7 @@ pytest -W error
 - Python 3.13
 - `kubectl` command-line tool
 - `sbctl` command-line tool for bundle management
-- Token for authentication (set as `SBCTL_TOKEN` environment variable)
+- Token for authentication (set as `SBCTL_TOKEN` or `REPLICATED` environment variable)
 
 All dependencies are included in the Docker container, making it the recommended deployment method.
 

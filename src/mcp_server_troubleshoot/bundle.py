@@ -17,9 +17,11 @@ import tarfile
 import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple
+import re
 from urllib.parse import urlparse
 
 import aiohttp
+import httpx  # Added for Replicated API calls
 from pydantic import BaseModel, Field, field_validator
 
 # Set up logging
@@ -52,6 +54,13 @@ logger.debug(f"Using MAX_DOWNLOAD_TIMEOUT: {MAX_DOWNLOAD_TIMEOUT} seconds")
 logger.debug(f"Using MAX_INITIALIZATION_TIMEOUT: {MAX_INITIALIZATION_TIMEOUT} seconds")
 logger.debug(f"Feature flags - Cleanup orphaned processes: {CLEANUP_ORPHANED}")
 logger.debug(f"Feature flags - Allow alternative kubeconfig: {ALLOW_ALTERNATIVE_KUBECONFIG}")
+
+# Constants for Replicated Vendor Portal integration
+REPLICATED_VENDOR_URL_PATTERN = re.compile(
+    r"https://vendor\.replicated\.com/troubleshoot/analyze/([^/]+)"
+)
+# Ensure there is NO space between 'v' and '3'
+REPLICATED_API_ENDPOINT = "https://api.replicated.com/vendor/v3/supportbundle/{slug}"
 
 
 class BundleMetadata(BaseModel):
@@ -343,12 +352,124 @@ class BundleManager:
             logger.exception(f"Unexpected error initializing bundle: {str(e)}")
             raise BundleManagerError(f"Failed to initialize bundle: {str(e)}")
 
-    async def _download_bundle(self, url: str) -> Path:
+    async def _get_replicated_signed_url(self, original_url: str) -> str:
         """
-        Download a support bundle from a URL.
+        Get the temporary signed download URL from the Replicated Vendor Portal API.
 
         Args:
-            url: The URL to download the bundle from
+            original_url: The original Replicated Vendor Portal URL.
+
+        Returns:
+            The signed download URL.
+
+        Raises:
+            BundleDownloadError: If the signed URL cannot be retrieved.
+        """
+        match = REPLICATED_VENDOR_URL_PATTERN.match(original_url)
+        if not match:
+            # This should not happen if called correctly, but handle defensively
+            raise BundleDownloadError(f"Invalid Replicated URL format: {original_url}")
+
+        slug = match.group(1)
+        logger.info(f"Detected Replicated Vendor Portal URL with slug: {slug}")
+
+        # Get token - SBCTL_TOKEN takes precedence over REPLICATED
+        token = os.environ.get("SBCTL_TOKEN") or os.environ.get("REPLICATED")
+        if not token:
+            raise BundleDownloadError(
+                "Cannot download from Replicated Vendor Portal: "
+                "SBCTL_TOKEN or REPLICATED environment variable not set."
+            )
+
+        api_url = REPLICATED_API_ENDPOINT.format(slug=slug)
+        headers = {"Authorization": token, "Content-Type": "application/json"}
+
+        try:
+            # === START RESTRUCTURE ===
+            timeout = httpx.Timeout(MAX_DOWNLOAD_TIMEOUT)
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                logger.debug(f"Requesting signed URL from Replicated API: {api_url}")
+                response = await client.get(api_url, headers=headers)
+
+            # Process the response status and content
+            if response.status_code == 401:
+                logger.error(f"Replicated API returned 401 Unauthorized for slug {slug}")
+                raise BundleDownloadError(
+                    f"Failed to authenticate with Replicated API (status {response.status_code}). "
+                    "Check SBCTL_TOKEN/REPLICATED_TOKEN."
+                )
+            elif response.status_code == 404:
+                logger.error(f"Replicated API returned 404 Not Found for slug {slug}")
+                raise BundleDownloadError(
+                    f"Support bundle not found on Replicated Vendor Portal (slug: {slug}, status {response.status_code})."
+                )
+            elif response.status_code != 200:
+                response_text = response.text[:500]
+                logger.error(f"Replicated API returned error {response.status_code} for slug {slug}: {response_text}")
+                raise BundleDownloadError(
+                    f"Failed to get signed URL from Replicated API (status {response.status_code}): {response_text}"
+                )
+
+            # If status is 200, parse JSON
+            response_data = None # Initialize
+            try:
+                response_data = response.json()
+            except json.JSONDecodeError as json_e:
+                 logger.exception(f"Error decoding JSON response from Replicated API (status 200): {json_e}")
+                 raise BundleDownloadError(f"Invalid JSON response from Replicated API: {json_e}")
+
+            # Add validation: Ensure response_data is a dictionary
+            if not isinstance(response_data, dict):
+                logger.error(f"Replicated API response was not a JSON dictionary: {type(response_data)}")
+                raise BundleDownloadError("Invalid response format from Replicated API (expected JSON dictionary).")
+
+            # === START MODIFICATION ===
+            # Access the nested 'bundle' dictionary first
+            bundle_data = response_data.get("bundle")
+            if not isinstance(bundle_data, dict):
+                logger.error(f"Missing 'bundle' dictionary in Replicated API response. Response data: {response_data}")
+                raise BundleDownloadError("Invalid response format from Replicated API (missing 'bundle' object).")
+
+            # Now get 'signedUri' from the nested dictionary
+            signed_url = bundle_data.get("signedUri")
+            # === END MODIFICATION ===
+
+            if not signed_url:
+                # Log the bundle_data specifically if signedUri is missing from it
+                logger.error(f"Missing 'signedUri' in Replicated API response bundle object for slug {slug}. Bundle data: {bundle_data}")
+                raise BundleDownloadError(
+                    "Could not find 'signedUri' in Replicated API response."
+                )
+
+            logger.info("Successfully retrieved signed URL from Replicated API.")
+            return signed_url
+            # === END RESTRUCTURE ===
+
+        except Exception as e:
+            # === START CONSOLIDATED EXCEPTION HANDLING ===
+            if isinstance(e, BundleDownloadError):
+                # Re-raise specific BundleDownloadErrors we've already identified
+                raise e
+            elif isinstance(e, httpx.Timeout):
+                 logger.exception(f"Timeout requesting signed URL from Replicated API: {e}")
+                 raise BundleDownloadError(f"Timeout requesting signed URL: {e}") from e
+            elif isinstance(e, httpx.RequestError):
+                # This should now correctly catch the RequestError raised by the mock
+                logger.exception(f"Network error requesting signed URL from Replicated API: {e}")
+                raise BundleDownloadError(f"Network error requesting signed URL: {e}") from e
+            else:
+                # Catch any other unexpected errors during the entire process and wrap them
+                distinct_error_msg = f"UNEXPECTED EXCEPTION in _get_replicated_signed_url: {type(e).__name__}: {str(e)}"
+                logger.exception(distinct_error_msg)
+                raise BundleDownloadError(distinct_error_msg) from e
+            # === END CONSOLIDATED EXCEPTION HANDLING ===
+
+    async def _download_bundle(self, url: str) -> Path:
+        """
+        Download a support bundle from a URL, handling Replicated Vendor Portal URLs.
+
+        Args:
+            url: The URL to download the bundle from (can be original or signed)
 
         Returns:
             The path to the downloaded bundle
@@ -356,29 +477,81 @@ class BundleManager:
         Raises:
             BundleDownloadError: If the bundle could not be downloaded
         """
-        logger.info(f"Downloading bundle from: {url}")
+        # Initialize actual_download_url with the original URL first
+        actual_download_url = url
+        original_url = url  # Keep track of the original URL for logging/ID generation
 
-        parsed_url = urlparse(url)
-        filename = (
-            os.path.basename(parsed_url.path) or f"bundle_{self._generate_bundle_id(url)}.tar.gz"
-        )
+        # Check if it's a Replicated Vendor Portal URL
+        if REPLICATED_VENDOR_URL_PATTERN.match(url):
+            try:
+                actual_download_url = await self._get_replicated_signed_url(url)
+                # Log only after successfully getting the signed URL
+                logger.info(f"Using signed URL for download: {actual_download_url[:80]}...") # Log truncated URL
+            except BundleDownloadError as e:
+                # Propagate the error from the signed URL retrieval
+                # No further execution needed in this function if this fails
+                raise e
+            except Exception as e:
+                # Catch any other unexpected errors during signed URL retrieval
+                logger.exception(f"Unexpected error getting signed URL for {url}: {e}")
+                # Raise specific error and exit
+                raise BundleDownloadError(f"Failed to get signed URL for {url}: {str(e)}")
+        # Log the download start *after* potential signed URL retrieval
+        logger.info(f"Starting download from: {actual_download_url[:80]}...")
+
+        # Use original URL to generate filename and ID for consistency
+        parsed_original_url = urlparse(original_url)
+        filename = "" # Initialize filename
+
+        # Generate filename based on URL type
+        if REPLICATED_VENDOR_URL_PATTERN.match(original_url):
+            match = REPLICATED_VENDOR_URL_PATTERN.match(original_url)
+            slug = match.group(1) if match else "unknown_slug"
+            # Sanitize slug for filename
+            safe_slug = re.sub(r'[^\w\-.]', '_', slug)
+            filename = f"replicated_bundle_{safe_slug}.tar.gz"
+        else:
+            # Use basename for non-Replicated URLs
+            filename = (
+                os.path.basename(parsed_original_url.path)
+                or f"bundle_{self._generate_bundle_id(original_url)}.tar.gz"
+            )
+            # Ensure filename is safe
+            filename = re.sub(r'[^\w\-.]', '_', filename)
+            if not filename: # Handle cases where sanitization results in empty string
+                filename = f"bundle_{self._generate_bundle_id(original_url)}.tar.gz"
+
         download_path = self.bundle_dir / filename
 
         try:
-            headers = {}
-            # Add authentication if provided via environment variables
-            token = os.environ.get("SBCTL_TOKEN")
-            if token:
-                headers["Authorization"] = f"Bearer {token}"
+            # Headers for the actual download
+            download_headers = {}
+            # Add auth token ONLY for non-Replicated URLs (signed URLs have auth embedded)
+            if actual_download_url == original_url: # Check if we are using the original URL
+                token = os.environ.get("SBCTL_TOKEN")
+                if token:
+                    download_headers["Authorization"] = f"Bearer {token}"
+                    logger.debug("Added Authorization header for direct download.")
+                else:
+                     logger.debug("No SBCTL_TOKEN found for direct download.")
+            else:
+                logger.debug("Skipping Authorization header for signed Replicated URL.")
 
             # Set a timeout for the download to prevent hanging
             timeout = aiohttp.ClientTimeout(total=MAX_DOWNLOAD_TIMEOUT)
 
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(url, headers=headers) as response:
+                # === START MODIFICATION ===
+                # Explicitly await the get call first
+                response_ctx_mgr = session.get(actual_download_url, headers=download_headers)
+                # Now use the awaited response object in the async with
+                async with await response_ctx_mgr as response:
+                # === END MODIFICATION ===
                     if response.status != 200:
+                        # Include response reason for better error messages
+                        reason = response.reason or "Unknown Error"
                         raise BundleDownloadError(
-                            f"Failed to download bundle from {url}: HTTP {response.status}"
+                            f"Failed to download bundle from {actual_download_url[:80]}...: HTTP {response.status} {reason}"
                         )
 
                     # Check content length if available
@@ -392,6 +565,7 @@ class BundleManager:
                     # Track total downloaded size
                     total_size = 0
                     with download_path.open("wb") as f:
+                        # Use the 'response' variable from the inner async with
                         async for chunk in response.content.iter_chunked(8192):
                             total_size += len(chunk)
 
@@ -399,7 +573,8 @@ class BundleManager:
                             if total_size > MAX_DOWNLOAD_SIZE:
                                 # Close and remove the partial file
                                 f.close()
-                                download_path.unlink()
+                                if download_path.exists():
+                                    download_path.unlink()
                                 raise BundleDownloadError(
                                     f"Bundle download exceeded maximum allowed size "
                                     f"({MAX_DOWNLOAD_SIZE / 1024 / 1024:.1f} MB)"
@@ -407,15 +582,19 @@ class BundleManager:
 
                             f.write(chunk)
 
-                    logger.info(f"Downloaded {total_size / 1024 / 1024:.1f} MB from {url}")
+                    logger.info(f"Downloaded {total_size / 1024 / 1024:.1f} MB from {actual_download_url[:80]}...")
 
             logger.info(f"Bundle downloaded to: {download_path}")
             return download_path
         except Exception as e:
-            logger.exception(f"Error downloading bundle from {url}: {str(e)}")
+            # Use original_url in error messages for clarity
+            logger.exception(f"Error downloading bundle originally from {original_url}: {str(e)}")
             if download_path.exists():
-                download_path.unlink()
-            raise BundleDownloadError(f"Failed to download bundle from {url}: {str(e)}")
+                download_path.unlink(missing_ok=True) # Use missing_ok=True for robustness
+            # Re-raise BundleDownloadError if it's already that type
+            if isinstance(e, BundleDownloadError):
+                raise
+            raise BundleDownloadError(f"Failed to download bundle from {original_url}: {str(e)}")
 
     async def _initialize_with_sbctl(self, bundle_path: Path, output_dir: Path) -> Path:
         """

@@ -47,9 +47,6 @@ mcp-server-troubleshoot = "mcp_server_troubleshoot.__main__:main"
 [project.entry-points.console_scripts]
 mcp-server-troubleshoot-serve = "mcp_server_troubleshoot.cli:main"
 
-[project.entry-points.pytest11]
-asyncio_config = "pytest_asyncio_plugin"
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "strict"
