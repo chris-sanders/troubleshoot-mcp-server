@@ -26,10 +26,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
       
-      - name: Set up Podman
-        uses: redhat-actions/podman-installer@v1
-        with:
-          release-tag: v4.4.1
+      # Podman is pre-installed on the GitHub Ubuntu runner
+      - name: Check Podman version
+        run: podman --version
       
       - name: Extract version from tag
         id: get-version
