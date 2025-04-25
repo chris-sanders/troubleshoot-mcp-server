@@ -1,24 +1,24 @@
-# Docker Usage Instructions
+# Podman Usage Instructions
 
-This document provides instructions for building and running the MCP server for Kubernetes support bundles in a Docker container. The container includes all required dependencies, including Python, `kubectl`, and `sbctl` (from replicatedhq/sbctl).
+This document provides instructions for building and running the MCP server for Kubernetes support bundles in a Podman container. The container includes all required dependencies, including Python, `kubectl`, and `sbctl` (from replicatedhq/sbctl).
 
 ## Building the Container
 
-Build the Docker container with the standard Docker build command:
+Build the Podman container with the standard Podman build command:
 
 ```bash
 # Navigate to the project directory
 cd troubleshoot-mcp-server
 
 # Build the image
-docker build -t mcp-server-troubleshoot:latest .
+podman build -t mcp-server-troubleshoot:latest -f Containerfile .
 ```
 
-This will create a Docker image named `mcp-server-troubleshoot:latest`.
+This will create a Podman image named `mcp-server-troubleshoot:latest`.
 
 ## Running the Container
 
-Run the container directly with Docker, mounting your bundle storage directory and setting required environment variables:
+Run the container directly with Podman, mounting your bundle storage directory and setting required environment variables:
 
 ```bash
 # Create a directory for bundles (if it doesn't exist)
@@ -28,7 +28,7 @@ mkdir -p ./bundles
 export SBCTL_TOKEN="your_token_here"
 
 # Run the container
-docker run -i --rm \
+podman run -i --rm \
   -v "$(pwd)/bundles:/data/bundles" \
   -e SBCTL_TOKEN="$SBCTL_TOKEN" \
   mcp-server-troubleshoot:latest
@@ -85,14 +85,14 @@ These tests:
 
 ## Configuration with MCP Clients
 
-To use the Docker container with MCP clients (such as Claude or other AI models), add the server configuration to your client's settings.
+To use the Podman container with MCP clients (such as Claude or other AI models), add the server configuration to your client's settings.
 
 ### MCP Client Configuration
 
 You can get the recommended configuration by running:
 
 ```bash
-docker run --rm mcp-server-troubleshoot:latest --show-config
+podman run --rm mcp-server-troubleshoot:latest --show-config
 ```
 
 The output will provide a ready-to-use configuration for MCP clients:
@@ -101,7 +101,7 @@ The output will provide a ready-to-use configuration for MCP clients:
 {
   "mcpServers": {
     "troubleshoot": {
-      "command": "docker",
+      "command": "podman",
       "args": [
         "run",
         "-i",
@@ -121,7 +121,7 @@ This configuration assumes:
 
 1. You have the `SBCTL_TOKEN` environment variable set in your environment
 2. You want to store bundles in `${HOME}/bundles` on your host machine
-3. You're using Docker as your container runtime
+3. You're using Podman as your container runtime
 
 Replace `${HOME}/bundles` with the actual path to your bundles directory if needed.
 
@@ -140,7 +140,7 @@ In the Inspector UI:
 2. Enter a name for your server (e.g., "Troubleshoot Server")
 3. For the launch command, use:
    ```
-   docker run -i --rm \
+   podman run -i --rm \
      -v "$(pwd)/bundles:/data/bundles" \
      -e SBCTL_TOKEN="$SBCTL_TOKEN" \
      mcp-server-troubleshoot:latest
@@ -170,8 +170,8 @@ Can you analyze it for common issues?
 ### Container Fails to Start
 
 Check if:
-- The Docker daemon is running
-- You have permissions to run Docker commands
+- Podman is installed and running
+- You have permissions to run Podman commands
 - The required ports are available
 
 ### Cannot Access Bundle Files

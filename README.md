@@ -11,26 +11,26 @@ A Model Context Protocol (MCP) server for AI models to interact with Kubernetes 
 - 🎮 **Command Execution**: Run kubectl commands against bundle's API server
 - 📁 **File Explorer**: Navigate and search files within the bundle
 - 🔐 **Secure Authentication**: Token-based authentication for bundle access
-- 🐳 **Docker Support**: Run as a containerized application
+- 🐳 **Container Support**: Run as a containerized application
 
 ## Quick Start
 
-### Using Docker
+### Using Podman
 
-The easiest way to get started is using Docker:
+The easiest way to get started is using Podman:
 
 ```bash
 # Build the image
-docker build -t mcp-server-troubleshoot:latest .
+podman build -t mcp-server-troubleshoot:latest -f Containerfile .
 
 # Run the server
-docker run -i --rm \
+podman run -i --rm \
   -v "/path/to/bundles:/data/bundles" \
   -e SBCTL_TOKEN="your-token" \
   mcp-server-troubleshoot:latest
 ```
 
-See the [Docker documentation](DOCKER.md) for comprehensive container configuration details.
+See the [Podman documentation](PODMAN.md) for comprehensive container configuration details.
 
 ### Manual Installation
 
@@ -72,7 +72,7 @@ For comprehensive documentation, see:
 - [User Guide](docs/user_guide.md): Installation, configuration, and usage instructions
 - [API Reference](docs/api_reference.md): Detailed API documentation
 - [Developer Guide](docs/developer_guide.md): Information for developers
-- [Docker Guide](DOCKER.md): Container setup and configuration
+- [Podman Guide](PODMAN.md): Container setup and configuration
 - [System Architecture](docs/architecture.md): Overall system design
 - [Troubleshooting Guide](docs/troubleshooting.md): Solutions for common issues 
 
@@ -121,7 +121,7 @@ AI models can interact with the server using the MCP protocol:
 ```
 ├── docs/                      # Documentation
 │   ├── CLAUDE.md              # AI assistant instructions
-│   ├── DOCKER.md              # Docker configuration guide
+│   ├── PODMAN.md              # Podman configuration guide
 │   ├── README.md              # Project overview (this file)
 │   ├── docs/                  # Detailed documentation
 │   │   ├── agentic/           # AI agent documentation
@@ -134,8 +134,8 @@ AI models can interact with the server using the MCP protocol:
 ├── examples/                  # Example configurations (for reference only)
 │   └── mcp-servers/           # MCP server example configs
 ├── scripts/                   # Utility scripts
-│   ├── build.sh               # Docker build script
-│   └── run.sh                 # Docker run script
+│   ├── build.sh               # Podman build script
+│   └── run.sh                 # Podman run script
 ├── src/                       # Source code
 │   └── mcp_server_troubleshoot/
 │       ├── __init__.py
@@ -216,7 +216,7 @@ pytest -W error
 - `sbctl` command-line tool for bundle management
 - Token for authentication (set as `SBCTL_TOKEN` or `REPLICATED` environment variable)
 
-All dependencies are included in the Docker container, making it the recommended deployment method.
+All dependencies are included in the Podman container, making it the recommended deployment method.
 
 ## Contributing
 

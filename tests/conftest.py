@@ -114,10 +114,10 @@ def test_support_bundle(fixtures_dir) -> Path:
 
 
 def is_docker_available():
-    """Check if Docker is available on the system."""
+    """Check if Podman is available on the system."""
     try:
         with subprocess.Popen(
-            ["docker", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            ["podman", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
         ) as process:
             process.communicate(timeout=5)
             return process.returncode == 0
@@ -135,9 +135,9 @@ def safe_open(file_path, mode):
         file.close()
 
 
-def build_docker_image(project_root, use_mock_sbctl=False):
+def build_container_image(project_root, use_mock_sbctl=False):
     """
-    Build the Docker image for tests.
+    Build the Podman image for tests.
 
     Args:
         project_root: The root directory of the project
@@ -156,26 +156,26 @@ def build_docker_image(project_root, use_mock_sbctl=False):
     try:
         # Remove any existing image first to ensure a clean build
         with subprocess.Popen(
-            ["docker", "rmi", "-f", "mcp-server-troubleshoot:latest"],
+            ["podman", "rmi", "-f", "mcp-server-troubleshoot:latest"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         ) as process:
             process.communicate(timeout=30)
 
-        # For test mode with mock sbctl, we need to modify the Dockerfile
+        # For test mode with mock sbctl, we need to modify the Containerfile
         if use_mock_sbctl:
-            # Create a temporary Dockerfile.test
-            dockerfile = project_root / "Dockerfile"
-            if not dockerfile.exists():
-                return False, "Dockerfile not found"
+            # Create a temporary Containerfile.test
+            containerfile = project_root / "Containerfile"
+            if not containerfile.exists():
+                return False, "Containerfile not found"
 
-            # Read the original Dockerfile
-            dockerfile_content = ""
-            with safe_open(dockerfile, "r") as f:
-                dockerfile_content = f.read()
+            # Read the original Containerfile
+            containerfile_content = ""
+            with safe_open(containerfile, "r") as f:
+                containerfile_content = f.read()
 
             # Create a modified version that uses mock_sbctl.py
-            dockerfile_test = project_root / "Dockerfile.test"
+            containerfile_test = project_root / "Containerfile.test"
 
             # Replace the sbctl installation section with the mock version
             mock_sbctl_section = """
@@ -184,31 +184,31 @@ COPY tests/fixtures/mock_sbctl.py /usr/local/bin/sbctl
 RUN chmod +x /usr/local/bin/sbctl
 """
             # Find the right section to replace
-            if "Install the real sbctl binary" in dockerfile_content:
+            if "Install the real sbctl binary" in containerfile_content:
                 # Replace the real sbctl installation with the mock one
-                dockerfile_content = dockerfile_content.replace(
+                containerfile_content = containerfile_content.replace(
                     '# Install the real sbctl binary - AMD64 version for standard container usage\nRUN mkdir -p /tmp/sbctl && cd /tmp/sbctl && \\\n    curl -L -o sbctl.tar.gz "https://github.com/replicatedhq/sbctl/releases/latest/download/sbctl_linux_amd64.tar.gz" && \\\n    tar xzf sbctl.tar.gz && \\\n    chmod +x sbctl && \\\n    mv sbctl /usr/local/bin/ && \\\n    cd / && \\\n    rm -rf /tmp/sbctl && \\\n    sbctl --help',
                     mock_sbctl_section,
                 )
             else:
                 # If we can't find the exact section, just add it before creating the data directory
-                dockerfile_content = dockerfile_content.replace(
+                containerfile_content = containerfile_content.replace(
                     "# Create data directory for bundles",
                     mock_sbctl_section + "\n# Create data directory for bundles",
                 )
 
-            # Write the modified Dockerfile
-            with safe_open(dockerfile_test, "w") as f:
-                f.write(dockerfile_content)
+            # Write the modified Containerfile
+            with safe_open(containerfile_test, "w") as f:
+                f.write(containerfile_content)
 
-            # Build using the temporary Dockerfile
+            # Build using the temporary Containerfile
             result = None
             with subprocess.Popen(
                 [
-                    "docker",
+                    "podman",
                     "build",
                     "-f",
-                    "Dockerfile.test",
+                    "Containerfile.test",
                     "-t",
                     "mcp-server-troubleshoot:latest",
                     ".",
@@ -227,9 +227,9 @@ RUN chmod +x /usr/local/bin/sbctl
                     "CompletedProcess", (), {"returncode": 0, "stdout": stdout, "stderr": stderr}
                 )
 
-            # Clean up the temporary Dockerfile
-            if dockerfile_test.exists():
-                dockerfile_test.unlink()
+            # Clean up the temporary Containerfile
+            if containerfile_test.exists():
+                containerfile_test.unlink()
         else:
             # Use the standard build script
             result = None
@@ -259,7 +259,7 @@ RUN chmod +x /usr/local/bin/sbctl
 @pytest.fixture(scope="session")
 def docker_image(request):
     """
-    Session-scoped fixture that ensures the Docker image is built once for all tests.
+    Session-scoped fixture that ensures the Podman image is built once for all tests.
 
     If the test is marked with 'mock_sbctl', a test image with mock sbctl will be built.
     Otherwise, the standard image will be built.
@@ -270,11 +270,11 @@ def docker_image(request):
         request: The pytest request object
 
     Returns:
-        The name of the Docker image
+        The name of the Podman image
     """
-    # Skip if Docker is not available
+    # Skip if Podman is not available
     if not is_docker_available():
-        pytest.skip("Docker is not available")
+        pytest.skip("Podman is not available")
 
     # Get project root directory
     project_root = Path(__file__).parents[1]
@@ -288,25 +288,25 @@ def docker_image(request):
 
     # Print what we're doing
     if use_mock_sbctl:
-        print("\nBuilding Docker image with mock sbctl for tests...")
+        print("\nBuilding Podman image with mock sbctl for tests...")
     else:
-        print("\nBuilding standard Docker image for tests...")
+        print("\nBuilding standard Podman image for tests...")
 
-    # Build the Docker image
-    success, result = build_docker_image(project_root, use_mock_sbctl)
+    # Build the Podman image
+    success, result = build_container_image(project_root, use_mock_sbctl)
 
     if not success:
         if isinstance(result, str):
-            pytest.skip(f"Failed to build Docker image: {result}")
+            pytest.skip(f"Failed to build Podman image: {result}")
         else:
-            pytest.skip(f"Failed to build Docker image: {result.stderr}")
+            pytest.skip(f"Failed to build Podman image: {result.stderr}")
 
     # Yield to allow tests to run
     yield "mcp-server-troubleshoot:latest"
 
     # Explicitly clean up any running containers
     with subprocess.Popen(
-        ["docker", "ps", "-q", "--filter", "ancestor=mcp-server-troubleshoot:latest"],
+        ["podman", "ps", "-q", "--filter", "ancestor=mcp-server-troubleshoot:latest"],
         stdout=subprocess.PIPE,
         text=True,
     ) as process:
@@ -316,7 +316,7 @@ def docker_image(request):
         if container_id:
             try:
                 with subprocess.Popen(
-                    ["docker", "stop", container_id],
+                    ["podman", "stop", container_id],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 ) as process:

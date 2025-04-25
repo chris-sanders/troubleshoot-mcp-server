@@ -30,7 +30,7 @@ def get_recommended_client_config() -> Dict[str, Any]:
     return {
         "mcpServers": {
             "troubleshoot": {
-                "command": "docker",
+                "command": "podman",
                 "args": [
                     "run",
                     "-i",

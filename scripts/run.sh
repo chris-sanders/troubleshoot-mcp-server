@@ -79,7 +79,7 @@ CONTAINER_NAME="mcp-server-$(date +%s)-$RANDOM"
 # Run the container with the new entrypoint
 if [ "$DEBUG_MODE" = true ]; then
   # Run in interactive debug mode
-  docker run ${INTERACTIVE} --rm \
+  podman run ${INTERACTIVE} --rm \
     -v "${BUNDLE_DIR}:/data/bundles" \
     -e SBCTL_TOKEN="${SBCTL_TOKEN:-}" \
     -e MCP_BUNDLE_STORAGE="/data/bundles" \
@@ -89,7 +89,7 @@ if [ "$DEBUG_MODE" = true ]; then
 else
   # Run in MCP mode (default)
   # Pipe stdin to the container and don't use terminal
-  cat | docker run ${INTERACTIVE} \
+  cat | podman run ${INTERACTIVE} \
     -v "${BUNDLE_DIR}:/data/bundles" \
     -e SBCTL_TOKEN="${SBCTL_TOKEN:-}" \
     --rm \

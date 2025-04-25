@@ -1,7 +1,7 @@
 """
 End-to-end test for MCP server container.
 This test:
-1. Ensures Docker is available
+1. Ensures Podman is available
 2. Ensures the image is built
 3. Tests running the container with simple commands
 4. Tests MCP server functionality
@@ -17,20 +17,20 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parents[2].absolute()
 
 # Mark all tests in this file
-pytestmark = [pytest.mark.e2e, pytest.mark.container, pytest.mark.docker]
+pytestmark = [pytest.mark.e2e, pytest.mark.container]
 
 
 def cleanup_test_container():
     """Remove any existing test container."""
     subprocess.run(
-        ["docker", "rm", "-f", "mcp-test"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        ["podman", "rm", "-f", "mcp-test"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
 
 
 @pytest.fixture
-def docker_setup(docker_image, ensure_bundles_directory):
-    """Setup Docker environment for testing."""
-    # The docker_image fixture ensures Docker is available and the image is built
+def container_setup(docker_image, ensure_bundles_directory):
+    """Setup Podman environment for testing."""
+    # The docker_image fixture ensures Podman is available and the image is built
     # The ensure_bundles_directory fixture creates and returns the bundles directory
 
     # Get bundles directory
@@ -48,13 +48,13 @@ def docker_setup(docker_image, ensure_bundles_directory):
     cleanup_test_container()
 
 
-def test_basic_container_functionality(docker_setup):
+def test_basic_container_functionality(container_setup):
     """Test that the container can run basic commands."""
-    bundles_dir = docker_setup
+    bundles_dir = container_setup
 
     result = subprocess.run(
         [
-            "docker",
+            "podman",
             "run",
             "--name",
             "mcp-test",
@@ -78,13 +78,13 @@ def test_basic_container_functionality(docker_setup):
     assert "Container is working!" in result.stdout
 
 
-def test_python_functionality(docker_setup):
+def test_python_functionality(container_setup):
     """Test that Python works in the container."""
-    bundles_dir = docker_setup
+    bundles_dir = container_setup
 
     result = subprocess.run(
         [
-            "docker",
+            "podman",
             "run",
             "--name",
             "mcp-test",
@@ -109,13 +109,13 @@ def test_python_functionality(docker_setup):
     assert "Python" in version_output
 
 
-def test_mcp_cli(docker_setup):
+def test_mcp_cli(container_setup):
     """Test that the MCP server CLI works in the container."""
-    bundles_dir = docker_setup
+    bundles_dir = container_setup
 
     result = subprocess.run(
         [
-            "docker",
+            "podman",
             "run",
             "--name",
             "mcp-test",
@@ -140,7 +140,7 @@ def test_mcp_cli(docker_setup):
 
 
 @pytest.mark.timeout(30)  # Set a 30-second timeout for this test
-def test_mcp_protocol(docker_setup):
+def test_mcp_protocol(container_setup):
     """
     Test MCP protocol communication with the container.
 
@@ -164,7 +164,7 @@ def test_mcp_protocol(docker_setup):
         try:
             process = subprocess.Popen(
                 [
-                    "docker",
+                    "podman",
                     "run",
                     "--name",
                     container_id,
@@ -188,7 +188,7 @@ def test_mcp_protocol(docker_setup):
         except Exception as e:
             # Clean up the container in case of launch error
             subprocess.run(
-                ["docker", "rm", "-f", container_id],
+                ["podman", "rm", "-f", container_id],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
@@ -200,12 +200,12 @@ def test_mcp_protocol(docker_setup):
 
             # Check if the container started successfully
             ps_check = subprocess.run(
-                ["docker", "ps", "-q", "-f", f"name={container_id}"],
+                ["podman", "ps", "-q", "-f", f"name={container_id}"],
                 stdout=subprocess.PIPE,
                 text=True,
             )
 
-            assert ps_check.stdout.strip(), "Docker container failed to start"
+            assert ps_check.stdout.strip(), "Podman container failed to start"
 
             # Instead of using a full client, we'll use a simpler approach
             # to verify basic MCP functionality
@@ -229,7 +229,7 @@ def test_mcp_protocol(docker_setup):
                 # Instead of checking logs, let's just check the container is running
                 ps_check_detailed = subprocess.run(
                     [
-                        "docker",
+                        "podman",
                         "ps",
                         "--format",
                         "{{.Command}},{{.Status}}",
@@ -293,7 +293,7 @@ def test_mcp_protocol(docker_setup):
             # Clean up the container
             try:
                 subprocess.run(
-                    ["docker", "rm", "-f", container_id],
+                    ["podman", "rm", "-f", container_id],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     check=True,
@@ -303,13 +303,13 @@ def test_mcp_protocol(docker_setup):
                 # If container cleanup fails, try more forceful approach
                 try:
                     subprocess.run(
-                        ["docker", "kill", container_id],
+                        ["podman", "kill", container_id],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                         timeout=5,
                     )
                     subprocess.run(
-                        ["docker", "rm", "-f", container_id],
+                        ["podman", "rm", "-f", container_id],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                         timeout=5,
@@ -321,7 +321,7 @@ def test_mcp_protocol(docker_setup):
 
 if __name__ == "__main__":
     # Allow running as a standalone script
-    from conftest import is_docker_available, build_docker_image  # Import from conftest
+    from conftest import is_docker_available, build_container_image  # Import from conftest
 
     if is_docker_available():
         bundles_dir = PROJECT_ROOT / "bundles"
@@ -330,7 +330,7 @@ if __name__ == "__main__":
         # Always rebuild the image for testing
         print("Rebuilding container image...")
         # Build using the centralized build function
-        success, result = build_docker_image(PROJECT_ROOT)
+        success, result = build_container_image(PROJECT_ROOT)
         if not success:
             print(f"Failed to build image: {result}")
             sys.exit(1)
@@ -347,7 +347,7 @@ if __name__ == "__main__":
         try:
             result = subprocess.run(
                 [
-                    "docker",
+                    "podman",
                     "run",
                     "--name",
                     "mcp-test",
@@ -381,7 +381,7 @@ if __name__ == "__main__":
         try:
             result = subprocess.run(
                 [
-                    "docker",
+                    "podman",
                     "run",
                     "--name",
                     "mcp-test",
@@ -416,7 +416,7 @@ if __name__ == "__main__":
         try:
             result = subprocess.run(
                 [
-                    "docker",
+                    "podman",
                     "run",
                     "--name",
                     "mcp-test",
@@ -452,7 +452,7 @@ if __name__ == "__main__":
             print(f"Stderr: {e.stderr}")
 
         print("\nAll tests completed. The container image is ready for use!")
-        print("To use it with MCP clients, follow the instructions in DOCKER.md.")
+        print("To use it with MCP clients, follow the instructions in PODMAN.md.")
     else:
-        print("Docker is not available. Cannot run container tests.")
+        print("Podman is not available. Cannot run container tests.")
         sys.exit(1)
