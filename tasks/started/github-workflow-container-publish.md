@@ -1,10 +1,13 @@
 # Task: GitHub Workflow for Container Publishing
 
 ## Metadata
-**Status**: started
+**Status**: review
 **Created**: 2025-04-25
 **Started**: 2025-04-25
 **Branch**: task/github-workflow-container-publish
+**PR**: TBD
+**PR URL**: TBD
+**PR Status**: Pending Creation
 
 ## Objective
 Create a GitHub workflow that automatically builds and publishes the container image to GitHub Container Registry (ghcr.io) whenever a SemVer tag (e.g., "1.0.0" without 'v' prefix) is pushed to the primary branch.
