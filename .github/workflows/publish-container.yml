@@ -1,0 +1,93 @@
+name: Publish Container
+
+on:
+  push:
+    tags:
+      # Match SemVer tags without 'v' prefix (e.g., 1.0.0, 2.1.3)
+      - '[0-9]+.[0-9]+.[0-9]+'
+  
+  # Allow manual triggering for testing
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to use for tagging (for testing only)'
+        required: true
+        default: 'test'
+
+jobs:
+  build-and-publish:
+    name: Build and Publish Container
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Set up Podman
+        uses: docker/setup-buildx-action@v2
+        with:
+          driver: podman
+      
+      - name: Extract version from tag
+        id: get-version
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            # For tag push events, use the tag name
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            # For workflow_dispatch, use the input version
+            VERSION=${{ github.event.inputs.version }}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
+      
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Prepare image name
+        id: prep
+        run: |
+          REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_NAME="ghcr.io/${REPO_NAME}/mcp-server-troubleshoot"
+          echo "image=${IMAGE_NAME}" >> $GITHUB_OUTPUT
+          echo "Image name: ${IMAGE_NAME}"
+      
+      - name: Build and tag container
+        env:
+          IMAGE_NAME: ${{ steps.prep.outputs.image }}
+          VERSION: ${{ steps.get-version.outputs.version }}
+        run: |
+          # Modify the build script to use our variables
+          export IMAGE_NAME
+          export IMAGE_TAG=$VERSION
+          
+          # Run the build script
+          bash ./scripts/build.sh
+          
+          # Tag with "latest" if this is not a test run
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            podman tag ${IMAGE_NAME}:${VERSION} ${IMAGE_NAME}:latest
+          fi
+      
+      - name: Push container to GitHub Container Registry
+        env:
+          IMAGE_NAME: ${{ steps.prep.outputs.image }}
+          VERSION: ${{ steps.get-version.outputs.version }}
+        run: |
+          podman push ${IMAGE_NAME}:${VERSION}
+          
+          # Push "latest" tag if this is not a test run
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            podman push ${IMAGE_NAME}:latest
+          fi
+      
+      - name: Output image details
+        run: |
+          echo "::notice::Published image: ghcr.io/${{ github.repository }}/mcp-server-troubleshoot:${{ steps.get-version.outputs.version }}"

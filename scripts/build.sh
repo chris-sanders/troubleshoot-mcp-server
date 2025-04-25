@@ -1,9 +1,10 @@
 #!/bin/bash
 set -e
 
-# Configuration
-IMAGE_NAME="mcp-server-troubleshoot"
-IMAGE_TAG="latest"
+# Configuration - use environment variables if set, otherwise use defaults
+# This allows GitHub Actions to override these values
+IMAGE_NAME=${IMAGE_NAME:-"mcp-server-troubleshoot"}
+IMAGE_TAG=${IMAGE_TAG:-"latest"}
 
 # Print commands before executing them
 set -x
