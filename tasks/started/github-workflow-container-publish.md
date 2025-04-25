@@ -13,12 +13,12 @@ Create a GitHub workflow that automatically builds and publishes the container i
 Currently, the container image for the MCP Server is built manually using the `scripts/build.sh` script. We need to automate the build and publishing process for releases to make it easier to distribute the software. This task will implement a GitHub Actions workflow that triggers on SemVer tag pushes and publishes the container to ghcr.io.
 
 ## Success Criteria
-- [ ] GitHub workflow file created in `.github/workflows/` directory
-- [ ] Workflow triggers on SemVer tag pushes (e.g., "1.0.0", without 'v' prefix)
-- [ ] Workflow uses the existing `scripts/build.sh` script for building the container
-- [ ] Workflow publishes the container to GitHub Container Registry (ghcr.io)
-- [ ] The image is tagged with both the SemVer tag and "latest"
-- [ ] Documentation added explaining how to release new versions
+- [x] GitHub workflow file created in `.github/workflows/` directory
+- [x] Workflow triggers on SemVer tag pushes (e.g., "1.0.0", without 'v' prefix)
+- [x] Workflow uses the existing `scripts/build.sh` script for building the container
+- [x] Workflow publishes the container to GitHub Container Registry (ghcr.io)
+- [x] The image is tagged with both the SemVer tag and "latest"
+- [x] Documentation added explaining how to release new versions
 - [ ] Tested with a test tag to verify the workflow functions correctly
 
 ## Dependencies
@@ -45,10 +45,10 @@ Currently, the container image for the MCP Server is built manually using the `s
 - Note: Since this is a GitHub workflow, full testing can only be done in the GitHub environment
 
 ## Evidence of Completion
-- [ ] Path to created workflow file
+- [x] Path to created workflow file: `.github/workflows/publish-container.yml`
 - [ ] Log output from successful workflow run
 - [ ] Link to published container image in GitHub Container Registry
-- [ ] Documentation added about the release process
+- [x] Documentation added about the release process: `RELEASE.md` and updated `README.md`
 
 ## Notes
 - The workflow needs to handle GitHub Container Registry authentication securely
@@ -56,4 +56,7 @@ Currently, the container image for the MCP Server is built manually using the `s
 - The workflow should leverage the existing build script to maintain consistency with local builds
 
 ## Progress Updates
-2025-04-25: Started task, created branch, moved task to started status</content>
+2025-04-25: Started task, created branch, moved task to started status
+2025-04-25: Created GitHub workflow file for container publishing
+2025-04-25: Updated build.sh to accept environment variables for image name and tag
+2025-04-25: Added RELEASE.md documentation and updated README.md with release process information</content>

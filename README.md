@@ -74,7 +74,8 @@ For comprehensive documentation, see:
 - [Developer Guide](docs/developer_guide.md): Information for developers
 - [Podman Guide](PODMAN.md): Container setup and configuration
 - [System Architecture](docs/architecture.md): Overall system design
-- [Troubleshooting Guide](docs/troubleshooting.md): Solutions for common issues 
+- [Troubleshooting Guide](docs/troubleshooting.md): Solutions for common issues
+- [Release Process](RELEASE.md): How to create new releases
 
 The [examples](examples/) directory contains reference configurations for developers. These files should not be modified.
 
