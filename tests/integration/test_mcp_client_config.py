@@ -17,7 +17,7 @@ def test_config_provides_recommended_defaults():
     # Check for expected structure and values
     assert "mcpServers" in config
     assert "troubleshoot" in config["mcpServers"]
-    assert config["mcpServers"]["troubleshoot"]["command"] == "docker"
+    assert config["mcpServers"]["troubleshoot"]["command"] == "podman"
 
     # Check for important flags and arguments
     args = config["mcpServers"]["troubleshoot"]["args"]

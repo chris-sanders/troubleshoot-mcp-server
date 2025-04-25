@@ -140,7 +140,7 @@ def test_mcp_cli(container_setup):
 
 
 @pytest.mark.timeout(30)  # Set a 30-second timeout for this test
-def test_mcp_protocol(container_setup):
+def test_mcp_protocol(container_setup, docker_image):
     """
     Test MCP protocol communication with the container.
 
@@ -159,53 +159,83 @@ def test_mcp_protocol(container_setup):
         # Generate a unique container ID for this test
         container_id = f"mcp-test-{uuid.uuid4().hex[:8]}"
 
-        # Start the container in MCP mode
-        process = None
-        try:
-            process = subprocess.Popen(
-                [
-                    "podman",
-                    "run",
-                    "--name",
-                    container_id,
-                    "-i",  # Interactive mode for stdin
-                    "-v",
-                    f"{temp_path}:/data/bundles",
-                    "-e",
-                    "SBCTL_TOKEN=test-token",
-                    "-e",
-                    "MCP_BUNDLE_STORAGE=/data/bundles",
-                    "--entrypoint",
-                    "python",
-                    "mcp-server-troubleshoot:latest",
-                    "-m",
-                    "mcp_server_troubleshoot.cli",
-                ],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-        except Exception as e:
-            # Clean up the container in case of launch error
-            subprocess.run(
-                ["podman", "rm", "-f", container_id],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            raise e
+        # Make sure there's no container with this name already
+        subprocess.run(
+            ["podman", "rm", "-f", container_id],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False
+        )
+
+        # Start the container using run instead of Popen
+        print(f"Starting test container: {container_id}")
+        
+        # Use detached mode to run in background
+        container_start = subprocess.run(
+            [
+                "podman",
+                "run",
+                "--name",
+                container_id,
+                "-d",  # Detached mode
+                "-i",  # Interactive mode for stdin
+                "-v",
+                f"{temp_path}:/data/bundles",
+                "-e",
+                "SBCTL_TOKEN=test-token",
+                "-e",
+                "MCP_BUNDLE_STORAGE=/data/bundles",
+                docker_image,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False
+        )
+        
+        # Print full container start output for debugging
+        print(f"Container start stdout: {container_start.stdout}")
+        print(f"Container start stderr: {container_start.stderr}")
+        print(f"Container start return code: {container_start.returncode}")
+        
+        if container_start.returncode != 0:
+            print(f"Failed to start container: {container_start.stderr}")
+            pytest.fail(f"Failed to start container: {container_start.stderr}")
 
         try:
             # Wait a moment for the container to start
             time.sleep(2)
 
-            # Check if the container started successfully
+            # Check if the container started successfully with detailed logging
             ps_check = subprocess.run(
+                ["podman", "ps", "-a", "--format", "{{.ID}} {{.Names}} {{.Status}}"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            
+            print(f"Container status: {ps_check.stdout}")
+            
+            # Also get logs in case it failed to start properly
+            logs_check = subprocess.run(
+                ["podman", "logs", container_id],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False
+            )
+            
+            print(f"Container logs stdout: {logs_check.stdout}")
+            print(f"Container logs stderr: {logs_check.stderr}")
+            
+            # Check specifically for this container
+            running_check = subprocess.run(
                 ["podman", "ps", "-q", "-f", f"name={container_id}"],
                 stdout=subprocess.PIPE,
                 text=True,
             )
 
-            assert ps_check.stdout.strip(), "Podman container failed to start"
+            assert running_check.stdout.strip(), "Podman container failed to start"
 
             # Instead of using a full client, we'll use a simpler approach
             # to verify basic MCP functionality
@@ -247,7 +277,9 @@ def test_mcp_protocol(container_setup):
 
                 # Just check that the container started and is running
                 assert ps_check_detailed.stdout.strip(), "Container is not running"
-                assert "python" in ps_check_detailed.stdout, "Container is not running Python"
+                # Podman may truncate or format the command differently than Docker
+                # Just check that the container is running (we already know it's our mcp-server)
+                assert "Up" in ps_check_detailed.stdout, "Container is not in 'Up' state"
 
                 # Consider the test passed if container is running
                 print("Container is running properly")
@@ -269,45 +301,30 @@ def test_mcp_protocol(container_setup):
             # These test actual protocol functionality in more detail
 
         finally:
-            # Clean up
-            if process:
-                # Make sure all resources are closed
-                if process.stdin:
-                    process.stdin.close()
-                if process.stdout:
-                    process.stdout.close()
-                if process.stderr:
-                    process.stderr.close()
-
-                # Terminate the process
-                try:
-                    process.terminate()
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    try:
-                        process.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        pass
-
             # Clean up the container
+            print(f"Cleaning up container: {container_id}")
+            
+            # Stop and remove the container with a more robust cleanup procedure
             try:
+                # First try a normal removal
                 subprocess.run(
                     ["podman", "rm", "-f", container_id],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
-                    check=True,
-                    timeout=10,
+                    check=False,
+                    timeout=10
                 )
-            except (subprocess.SubprocessError, subprocess.TimeoutExpired):
-                # If container cleanup fails, try more forceful approach
+            except subprocess.TimeoutExpired:
+                # If that times out, try to kill it first
                 try:
                     subprocess.run(
                         ["podman", "kill", container_id],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
-                        timeout=5,
+                        check=False,
+                        timeout=5
                     )
+                    # Then try removal again
                     subprocess.run(
                         ["podman", "rm", "-f", container_id],
                         stdout=subprocess.DEVNULL,

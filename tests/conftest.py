@@ -116,12 +116,16 @@ def test_support_bundle(fixtures_dir) -> Path:
 def is_docker_available():
     """Check if Podman is available on the system."""
     try:
-        with subprocess.Popen(
-            ["podman", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        ) as process:
-            process.communicate(timeout=5)
-            return process.returncode == 0
-    except (subprocess.SubprocessError, FileNotFoundError):
+        result = subprocess.run(
+            ["podman", "--version"], 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE, 
+            text=True,
+            timeout=5,
+            check=False
+        )
+        return result.returncode == 0
+    except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
         return False
 
 
@@ -155,12 +159,13 @@ def build_container_image(project_root, use_mock_sbctl=False):
 
     try:
         # Remove any existing image first to ensure a clean build
-        with subprocess.Popen(
+        subprocess.run(
             ["podman", "rmi", "-f", "mcp-server-troubleshoot:latest"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-        ) as process:
-            process.communicate(timeout=30)
+            timeout=30,
+            check=False
+        )
 
         # For test mode with mock sbctl, we need to modify the Containerfile
         if use_mock_sbctl:
@@ -202,8 +207,7 @@ RUN chmod +x /usr/local/bin/sbctl
                 f.write(containerfile_content)
 
             # Build using the temporary Containerfile
-            result = None
-            with subprocess.Popen(
+            result = subprocess.run(
                 [
                     "podman",
                     "build",
@@ -217,37 +221,24 @@ RUN chmod +x /usr/local/bin/sbctl
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-            ) as process:
-                stdout, stderr = process.communicate(timeout=300)
-                if process.returncode != 0:
-                    raise subprocess.CalledProcessError(
-                        process.returncode, process.args, stdout, stderr
-                    )
-                result = type(
-                    "CompletedProcess", (), {"returncode": 0, "stdout": stdout, "stderr": stderr}
-                )
+                timeout=300,
+                check=True
+            )
 
             # Clean up the temporary Containerfile
             if containerfile_test.exists():
                 containerfile_test.unlink()
         else:
             # Use the standard build script
-            result = None
-            with subprocess.Popen(
+            result = subprocess.run(
                 [str(build_script)],
                 cwd=str(project_root),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-            ) as process:
-                stdout, stderr = process.communicate(timeout=300)
-                if process.returncode != 0:
-                    raise subprocess.CalledProcessError(
-                        process.returncode, process.args, stdout, stderr
-                    )
-                result = type(
-                    "CompletedProcess", (), {"returncode": 0, "stdout": stdout, "stderr": stderr}
-                )
+                timeout=300,
+                check=True
+            )
 
         return True, result
     except subprocess.CalledProcessError as e:
@@ -279,6 +270,20 @@ def docker_image(request):
     # Get project root directory
     project_root = Path(__file__).parents[1]
 
+    # Check if image already exists to avoid rebuilding
+    image_check = subprocess.run(
+        ["podman", "image", "exists", "mcp-server-troubleshoot:latest"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False
+    )
+    
+    # Image exists already, just use it
+    if image_check.returncode == 0:
+        print("\nUsing existing Podman image for tests...")
+        yield "mcp-server-troubleshoot:latest"
+        return
+        
     # Determine if we should use mock sbctl based on markers
     use_mock_sbctl = request.node.get_closest_marker("mock_sbctl") is not None
 
@@ -305,22 +310,26 @@ def docker_image(request):
     yield "mcp-server-troubleshoot:latest"
 
     # Explicitly clean up any running containers
-    with subprocess.Popen(
+    containers_result = subprocess.run(
         ["podman", "ps", "-q", "--filter", "ancestor=mcp-server-troubleshoot:latest"],
         stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-    ) as process:
-        containers = process.communicate(timeout=10)[0].strip().split("\n")
+        timeout=10,
+        check=False
+    )
+    containers = containers_result.stdout.strip().split("\n") if containers_result.stdout else []
 
     for container_id in containers:
         if container_id:
             try:
-                with subprocess.Popen(
+                subprocess.run(
                     ["podman", "stop", container_id],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
-                ) as process:
-                    process.communicate(timeout=10)
+                    timeout=10,
+                    check=False
+                )
             except Exception:
                 pass
 
