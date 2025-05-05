@@ -23,18 +23,18 @@ logger = logging.getLogger(__name__)
 class KubectlError(Exception):
     """Exception raised when a kubectl command fails."""
 
-    def __init__(self, message: str, exit_code: int, stderr: str) -> None:
+    def __init__(self, message: str, exit_code: int | None, stderr: str) -> None:
         """
         Initialize a KubectlError exception.
 
         Args:
             message: The error message
-            exit_code: The command exit code
+            exit_code: The command exit code, may be None
             stderr: The standard error output
         """
-        self.exit_code = exit_code
+        self.exit_code = exit_code if exit_code is not None else 1
         self.stderr = stderr
-        super().__init__(f"{message} (exit code {exit_code}): {stderr}")
+        super().__init__(f"{message} (exit code {self.exit_code}): {stderr}")
 
 
 class KubectlCommandArgs(BaseModel):
@@ -95,6 +95,13 @@ class KubectlResult(BaseModel):
     output: Any = Field(description="The parsed output, if applicable")
     is_json: bool = Field(description="Whether the output is JSON")
     duration_ms: int = Field(description="The duration of the command execution in milliseconds")
+    
+    @field_validator("exit_code")
+    def validate_exit_code(cls, v: int | None) -> int:
+        """Validate that exit_code is an integer and not None."""
+        if v is None:
+            return 1  # Default exit code for errors
+        return v
 
 
 class KubectlExecutor:

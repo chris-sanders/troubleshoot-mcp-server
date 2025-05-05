@@ -9,7 +9,7 @@ import logging
 import signal
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Callable
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import TextContent
@@ -25,6 +25,11 @@ from .files import FileExplorer, FileSystemError, GrepFilesArgs, ListFilesArgs, 
 from .lifecycle import app_lifespan, AppContext
 
 logger = logging.getLogger(__name__)
+
+# Initialize global variables for singleton pattern
+_bundle_manager: Optional[BundleManager] = None
+_kubectl_executor: Optional[KubectlExecutor] = None
+_file_explorer: Optional[FileExplorer] = None
 
 # Create FastMCP server with lifecycle management
 # We don't enable stdio mode here - it will be configured in __main__.py
@@ -566,7 +571,7 @@ async def grep_files(args: GrepFilesArgs) -> List[TextContent]:
         # If we have matches, show them
         if result.matches:
             # Group matches by file
-            matches_by_file = {}
+            matches_by_file: dict[str, list] = {}
             for match in result.matches:
                 if match.path not in matches_by_file:
                     matches_by_file[match.path] = []
@@ -697,10 +702,10 @@ def register_signal_handlers() -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-    def signal_handler(sig_name: str):
+    def signal_handler(sig_name: str) -> Callable[[], None]:
         """Create a signal handler that triggers cleanup."""
 
-        def handler():
+        def handler() -> None:
             logger.info(f"Received {sig_name}, initiating graceful shutdown")
             if not loop.is_closed():
                 # Schedule the cleanup task

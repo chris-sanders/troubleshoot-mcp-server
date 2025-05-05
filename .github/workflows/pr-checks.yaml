@@ -35,6 +35,9 @@ jobs:
           
           # Install development dependencies
           uv pip install -e ".[dev]"
+          
+          # Install additional type stubs for CI
+          uv pip install types-PyYAML
       
       - name: Run unit tests
         run: uv run pytest -m unit -v

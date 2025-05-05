@@ -16,7 +16,7 @@ import signal
 import tarfile
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Dict, Union
 from urllib.parse import urlparse
 
 import aiohttp
@@ -25,6 +25,27 @@ from pydantic import BaseModel, Field, field_validator
 
 # Set up logging
 logger = logging.getLogger(__name__)
+
+
+def safe_copy_file(src_path: Optional[Path], dst_path: Optional[Path]) -> bool:
+    """
+    Safely copy a file, handling None paths by converting to strings.
+    
+    Args:
+        src_path: Source path, may be None
+        dst_path: Destination path, may be None
+        
+    Returns:
+        True if the copy was successful, False otherwise
+    """
+    if not src_path or not dst_path:
+        return False
+    
+    try:
+        shutil.copy2(str(src_path), str(dst_path))
+        return True
+    except Exception:
+        return False
 
 # Constants for resource limits - can be overridden by environment variables
 DEFAULT_DOWNLOAD_SIZE = 1024 * 1024 * 1024  # 1 GB
@@ -829,7 +850,7 @@ class BundleManager:
                             try:
                                 import shutil
 
-                                shutil.copy2(alt_path, kubeconfig_path)
+                                safe_copy_file(alt_path, kubeconfig_path)
                                 logger.info(
                                     f"Copied kubeconfig from {alt_path} to {kubeconfig_path}"
                                 )
@@ -856,7 +877,7 @@ class BundleManager:
                         try:
                             import shutil
 
-                            shutil.copy2(found_kubeconfig_path, kubeconfig_path)
+                            safe_copy_file(found_kubeconfig_path, kubeconfig_path)
                             logger.info(
                                 f"Copied kubeconfig from {found_kubeconfig_path} to {kubeconfig_path}"
                             )
@@ -1625,7 +1646,7 @@ class BundleManager:
                     else:
                         info[f"port_{port}_listening"] = False
                 else:
-                    info["netstat_error"] = stderr.decode()
+                    info["netstat_error"] = stderr.decode() if stderr else ""
             except Exception as e:
                 info["netstat_error"] = str(e)
 
@@ -1646,9 +1667,9 @@ class BundleManager:
                 stdout, stderr = await proc.communicate()
 
                 if proc.returncode == 0:
-                    info[f"curl_{port}_status_code"] = stdout.decode().strip()
+                    info[f"curl_{port}_status_code"] = int(stdout.decode().strip())
                 else:
-                    info[f"curl_{port}_error"] = stderr.decode()
+                    info[f"curl_{port}_error"] = stderr.decode() if stderr else ""
             except Exception as e:
                 info[f"curl_{port}_error"] = str(e)
 
@@ -1669,7 +1690,7 @@ class BundleManager:
         """
         logger.info(f"Listing available bundles in {self.bundle_dir}")
 
-        bundles = []
+        bundles: List[Dict[str, Any]] = []
 
         # Check if bundle directory exists
         if not self.bundle_dir.exists():
@@ -1677,7 +1698,7 @@ class BundleManager:
             return bundles
 
         # Find files with bundle extensions
-        bundle_files = []
+        bundle_files: List[Path] = []
         bundle_extensions = [".tar.gz", ".tgz"]
 
         for ext in bundle_extensions:
