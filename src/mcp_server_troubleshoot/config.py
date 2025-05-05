@@ -53,7 +53,8 @@ def load_config_from_path(config_path: str) -> Dict[str, Any]:
         raise FileNotFoundError(f"Configuration file not found: {path}")
 
     with open(path, "r") as f:
-        return json.load(f)
+        result: Dict[str, Any] = json.load(f)
+        return result
 
 
 def load_config_from_env() -> Optional[Dict[str, Any]]:
