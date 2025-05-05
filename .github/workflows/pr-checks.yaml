@@ -40,6 +40,8 @@ jobs:
         run: uv run pytest -m unit -v
       
       - name: Run integration tests
+        env:
+          USE_MOCK_SBCTL: "true"
         run: uv run pytest -m integration -v
       
       - name: Run linting
