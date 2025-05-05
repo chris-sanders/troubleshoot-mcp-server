@@ -117,12 +117,12 @@ def is_docker_available():
     """Check if Podman is available on the system."""
     try:
         result = subprocess.run(
-            ["podman", "--version"], 
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.PIPE, 
+            ["podman", "--version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
             timeout=5,
-            check=False
+            check=False,
         )
         return result.returncode == 0
     except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
@@ -164,7 +164,7 @@ def build_container_image(project_root, use_mock_sbctl=False):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             timeout=30,
-            check=False
+            check=False,
         )
 
         # For test mode with mock sbctl, we need to modify the Containerfile
@@ -222,7 +222,7 @@ RUN chmod +x /usr/local/bin/sbctl
                 stderr=subprocess.PIPE,
                 text=True,
                 timeout=300,
-                check=True
+                check=True,
             )
 
             # Clean up the temporary Containerfile
@@ -237,7 +237,7 @@ RUN chmod +x /usr/local/bin/sbctl
                 stderr=subprocess.PIPE,
                 text=True,
                 timeout=300,
-                check=True
+                check=True,
             )
 
         return True, result
@@ -275,15 +275,15 @@ def docker_image(request):
         ["podman", "image", "exists", "mcp-server-troubleshoot:latest"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        check=False
+        check=False,
     )
-    
+
     # Image exists already, just use it
     if image_check.returncode == 0:
         print("\nUsing existing Podman image for tests...")
         yield "mcp-server-troubleshoot:latest"
         return
-        
+
     # Determine if we should use mock sbctl based on markers
     use_mock_sbctl = request.node.get_closest_marker("mock_sbctl") is not None
 
@@ -316,7 +316,7 @@ def docker_image(request):
         stderr=subprocess.PIPE,
         text=True,
         timeout=10,
-        check=False
+        check=False,
     )
     containers = containers_result.stdout.strip().split("\n") if containers_result.stdout else []
 
@@ -328,7 +328,7 @@ def docker_image(request):
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     timeout=10,
-                    check=False
+                    check=False,
                 )
             except Exception:
                 pass

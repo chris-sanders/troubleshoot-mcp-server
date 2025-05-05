@@ -1,7 +1,7 @@
 """
 Tests for real support bundle integration.
 
-These tests verify the behavior of the MCP server components 
+These tests verify the behavior of the MCP server components
 with actual support bundles, focusing on user-visible behavior
 rather than implementation details.
 """

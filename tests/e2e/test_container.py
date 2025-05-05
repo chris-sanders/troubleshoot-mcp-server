@@ -164,12 +164,12 @@ def test_mcp_protocol(container_setup, docker_image):
             ["podman", "rm", "-f", container_id],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            check=False
+            check=False,
         )
 
         # Start the container using run instead of Popen
         print(f"Starting test container: {container_id}")
-        
+
         # Use detached mode to run in background
         container_start = subprocess.run(
             [
@@ -190,14 +190,14 @@ def test_mcp_protocol(container_setup, docker_image):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            check=False
+            check=False,
         )
-        
+
         # Print full container start output for debugging
         print(f"Container start stdout: {container_start.stdout}")
         print(f"Container start stderr: {container_start.stderr}")
         print(f"Container start return code: {container_start.returncode}")
-        
+
         if container_start.returncode != 0:
             print(f"Failed to start container: {container_start.stderr}")
             pytest.fail(f"Failed to start container: {container_start.stderr}")
@@ -213,21 +213,21 @@ def test_mcp_protocol(container_setup, docker_image):
                 stderr=subprocess.PIPE,
                 text=True,
             )
-            
+
             print(f"Container status: {ps_check.stdout}")
-            
+
             # Also get logs in case it failed to start properly
             logs_check = subprocess.run(
                 ["podman", "logs", container_id],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                check=False
+                check=False,
             )
-            
+
             print(f"Container logs stdout: {logs_check.stdout}")
             print(f"Container logs stderr: {logs_check.stderr}")
-            
+
             # Check specifically for this container
             running_check = subprocess.run(
                 ["podman", "ps", "-q", "-f", f"name={container_id}"],
@@ -303,7 +303,7 @@ def test_mcp_protocol(container_setup, docker_image):
         finally:
             # Clean up the container
             print(f"Cleaning up container: {container_id}")
-            
+
             # Stop and remove the container with a more robust cleanup procedure
             try:
                 # First try a normal removal
@@ -312,7 +312,7 @@ def test_mcp_protocol(container_setup, docker_image):
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     check=False,
-                    timeout=10
+                    timeout=10,
                 )
             except subprocess.TimeoutExpired:
                 # If that times out, try to kill it first
@@ -322,7 +322,7 @@ def test_mcp_protocol(container_setup, docker_image):
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                         check=False,
-                        timeout=5
+                        timeout=5,
                     )
                     # Then try removal again
                     subprocess.run(

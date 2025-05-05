@@ -105,7 +105,9 @@ def test_podman_build():
 
         # Build the image with progress output
         print("\nBuilding Podman image...")
-        output = run_command(f"podman build --progress=plain -t {test_tag} -f Containerfile .", cwd=str(project_dir))
+        output = run_command(
+            f"podman build --progress=plain -t {test_tag} -f Containerfile .", cwd=str(project_dir)
+        )
         print(f"\nBuild output:\n{output}\n")
 
         # Check if the image exists
