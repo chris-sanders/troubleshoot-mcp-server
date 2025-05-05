@@ -1,0 +1,5 @@
+# Ruff configuration for test fixtures
+# Fixtures have special requirements and often use non-standard
+# import orders and unconventional patterns for mocking
+
+extend = "../.ruff.toml"

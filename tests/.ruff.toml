@@ -1,0 +1,5 @@
+# Ruff configuration for tests directory
+# This applies more relaxed rules for test files which often use
+# non-standard import orders, mocks, and test fixtures
+
+extend = "../.github/linters/.ruff.toml"

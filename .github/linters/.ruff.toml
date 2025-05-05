@@ -1,0 +1,14 @@
+# Ruff configuration for test fixtures
+# This configuration relaxes rules for test fixtures which are
+# often using non-standard import orders and mock functionality
+
+extend = "../../pyproject.toml"
+
+[lint]
+ignore = [
+    "E402",  # Module level import not at top of file (common in test fixtures)
+    "F401",  # Unused import (needed for test fixtures)
+    "F811",  # Redefinition of unused name (common in test fixtures)
+    "F821",  # Undefined name (often happens with dynamically created objects)
+    "F841",  # Local variable assigned but never used (common in test fixtures)
+]
