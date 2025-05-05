@@ -74,6 +74,15 @@ timeout = 30
 [tool.ruff]
 line-length = 100
 target-version = "py313"
+exclude = [
+    ".git",
+    ".github",
+    "__pycache__",
+    "build",
+    "dist",
+    "*.yml",
+    "*.yaml",
+]
 
 [tool.black]
 line-length = 100
