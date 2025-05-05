@@ -48,14 +48,11 @@ If you prefer to set up manually:
 # Create a virtual environment with UV using Python 3.13
 uv venv -p python3.13 .venv
 
-# Activate the environment
-source .venv/bin/activate
-
-# Install development dependencies
+# Install development dependencies directly with UV
 uv pip install -e ".[dev]"
 
 # Run tests to verify setup
-pytest -m unit
+uv run pytest -m unit
 ```
 
 ## Working with Dependencies
@@ -79,7 +76,7 @@ When you identify a new dependency requirement during development:
 
 4. **Verify tests pass with the new dependency**:
    ```bash
-   pytest
+   uv run pytest
    ```
 
 5. **Commit changes**:
@@ -99,7 +96,7 @@ When upgrading dependencies:
    ```
 3. **Run all tests to verify compatibility**:
    ```bash
-   pytest
+   uv run pytest
    ```
 
 ## Testing Workflow
@@ -110,29 +107,28 @@ To ensure consistent testing across all environments:
    ```bash
    # Create fresh test environment with UV
    uv venv -p python3.13 test-env
-   source test-env/bin/activate
    
    # Install project with test dependencies
    uv pip install -e ".[dev]"
    ```
 
-2. **Run tests**:
+2. **Run tests using UV directly**:
    ```bash
    # Run all tests
-   pytest
+   uv run pytest
    
    # Run specific test categories
-   pytest -m unit
-   pytest -m integration
-   pytest -m e2e
+   uv run pytest -m unit
+   uv run pytest -m integration
+   uv run pytest -m e2e
    
    # Run with coverage
-   pytest --cov=src
+   uv run pytest --cov=src
    ```
 
 3. **Clean up after testing**:
    ```bash
-   deactivate
+   rm -rf test-env
    ```
 
 ## Troubleshooting Dependency Issues
@@ -141,7 +137,6 @@ If you encounter dependency-related problems:
 
 1. **Recreate the virtual environment**:
    ```bash
-   deactivate
    rm -rf .venv
    ./scripts/setup_env.sh --force-recreate
    ```
@@ -175,7 +170,7 @@ When working with Docker:
 
 2. **Test within the container**:
    ```bash
-   docker run -it --rm mcp-server-troubleshoot:latest python -m pytest
+   docker run -it --rm mcp-server-troubleshoot:latest uv run pytest
    ```
 
 3. **When adding dependencies, rebuild the container**:
@@ -194,6 +189,7 @@ When working with Docker:
 
 - **Use modern Python**: Always use Python 3.10 or later (preferably 3.13)
 - **Manage environments with UV**: Use UV for both package and virtual environment management
+- **Use UV's direct execution**: Use `uv run` to execute commands instead of manually activating environments
 - **Minimize dependencies**: Only add dependencies that are truly necessary
 - **Use specific versions**: Pin versions to avoid unexpected upgrades
 - **Document requirements**: Add comments for non-obvious dependencies

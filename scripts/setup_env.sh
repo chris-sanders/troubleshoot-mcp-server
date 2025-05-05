@@ -1,5 +1,6 @@
 #!/bin/bash
-# Setup a clean development environment using uv
+# Setup a clean development environment using UV best practices
+# UV manages the environment completely, we don't manually activate it
 set -e
 
 # Get the directory of this script
@@ -50,7 +51,7 @@ if [ -z "$PYTHON_BIN" ]; then
   PYTHON_BIN=$(command -v python3)
 fi
 
-# Verify Python version is at least 3.9
+# Verify Python version
 PYTHON_VERSION=$($PYTHON_BIN --version | cut -d' ' -f2)
 echo "Using Python $PYTHON_VERSION ($PYTHON_BIN)"
 
@@ -74,36 +75,34 @@ if [ -d "$VENV_DIR" ]; then
   fi
 fi
 
-# Create virtual environment if it doesn't exist using uv
+# Create virtual environment if it doesn't exist using UV
 if [ ! -d "$VENV_DIR" ]; then
-  echo "Creating virtual environment with uv..."
+  echo "Creating virtual environment with UV..."
   cd "$PROJECT_ROOT"
+  
+  # Use UV to create venv with specified Python interpreter
   uv venv -p $PYTHON_BIN .venv
 fi
 
-# Activate virtual environment
-echo "Activating virtual environment..."
-source "$VENV_DIR/bin/activate"
-
-# Install dependencies using uv
+# Install dependencies using UV directly (no manual activation needed)
 cd "$PROJECT_ROOT"
 echo "Installing development dependencies..."
 uv pip install -e ".[dev]"
 
-# Run test suite to verify setup
-echo "Verifying installation by running unit tests..."
-python -m pytest -m unit -v
+# Run a simple check to verify installation
+echo "Verifying installation by running a basic test..."
+uv run pytest tests/unit/test_components.py -v
 
-# Show activation command
+# Show usage information
 echo
 echo "Development environment setup complete!"
-echo "To activate this environment in the future, run:"
-echo "source $VENV_DIR/bin/activate"
 echo
-echo "To run tests:"
-echo "pytest"
+echo "To run commands in this environment use UV:"
+echo "uv run pytest                # Run all tests"
+echo "uv run pytest -m unit        # Run specific test category" 
+echo "uv run ruff check .          # Run linting"
+echo "uv run black .               # Format code"
+echo "uv run mypy src              # Run type checking"
 echo
-echo "To run specific test categories:"
-echo "pytest -m unit"
-echo "pytest -m integration"
-echo "pytest -m e2e"
+echo "Note: UV automatically detects and uses the virtual environment"
+echo "      at $VENV_DIR - no manual activation needed!"

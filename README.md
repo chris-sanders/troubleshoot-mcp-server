@@ -35,7 +35,7 @@ See the [Podman documentation](PODMAN.md) for comprehensive container configurat
 ### Manual Installation
 
 1. Ensure you have Python 3.13 installed
-2. Create a virtual environment with UV (recommended):
+2. Set up environment with UV (recommended):
 
 ```bash
 # Automatically creates and sets up environment with best available Python
@@ -43,13 +43,6 @@ See the [Podman documentation](PODMAN.md) for comprehensive container configurat
 
 # OR create manually with UV
 uv venv -p python3.13 .venv
-source .venv/bin/activate
-```
-
-3. Install the package:
-
-```bash
-# Using uv
 uv pip install -e ".[dev]"  # For development with testing tools
 ```
 
@@ -59,10 +52,10 @@ uv pip install -e ".[dev]"  # For development with testing tools
 export SBCTL_TOKEN=your-token
 ```
 
-4. Run the server:
+4. Run the server using UV:
 
 ```bash
-python -m mcp_server_troubleshoot
+uv run python -m mcp_server_troubleshoot
 ```
 
 ## Documentation
@@ -167,11 +160,11 @@ For development, install the package in editable mode with development dependenc
 git clone https://github.com/your-username/mcp-server-troubleshoot.git
 cd mcp-server-troubleshoot
 
-# Create a virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+# Set up the development environment using UV
+./scripts/setup_env.sh
 
-# Install with development dependencies
+# Or manually with UV
+uv venv -p python3.13 .venv
 uv pip install -e ".[dev]"
 ```
 
@@ -183,31 +176,35 @@ Code formatting is done using Black and Ruff:
 
 ```bash
 # Format code with Black
-black .
+uv run black .
 
 # Lint code with Ruff
-ruff check .
+uv run ruff check .
 ```
 
 ### Testing
 
 ```bash
 # Run all tests
-pytest
+uv run pytest
 
 # Run with verbose output
-pytest -v
+uv run pytest -v
 
 # Run a specific test type using markers
-pytest -m unit
-pytest -m integration
-pytest -m e2e
+uv run pytest -m unit
+uv run pytest -m integration
+uv run pytest -m e2e
 
 # Run tests with detailed warnings
-pytest -W all
+uv run pytest -W all
 
 # Run tests with warnings as errors
-pytest -W error
+uv run pytest -W error
+
+# Or use the helper script
+./scripts/run_tests.sh unit
+./scripts/run_tests.sh integration
 ```
 
 ## Requirements

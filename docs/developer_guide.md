@@ -77,24 +77,18 @@ git clone https://github.com/user/troubleshoot-mcp-server.git
 cd troubleshoot-mcp-server
 ```
 
-2. **Set Up Development Environment**
+2. **Set Up Development Environment using UV**
 
 ```bash
-# Create virtual environment (optional but recommended)
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Use the setup script (recommended)
+./scripts/setup_env.sh
 
-# Install dependencies in development mode
-uv pip install -e .
+# Or manually set up with UV
+uv venv -p python3.13 .venv
+uv pip install -e ".[dev]"
 ```
 
-3. **Install Development Tools**
-
-```bash
-uv pip install pytest pytest-asyncio black ruff
-```
-
-4. **Install System Dependencies**
+3. **Install System Dependencies**
 
 Ensure you have `kubectl` and `sbctl` installed on your system.
 
@@ -103,36 +97,44 @@ Ensure you have `kubectl` and `sbctl` installed on your system.
 ### Running All Tests
 
 ```bash
-pytest
+# Using UV directly
+uv run pytest
+
+# Using the helper script
+./scripts/run_tests.sh
 ```
 
 ### Running Specific Tests
 
 ```bash
 # Run a specific test file
-pytest tests/test_bundle.py
+uv run pytest tests/test_bundle.py
 
 # Run a specific test function
-pytest tests/test_bundle.py::TestBundleManager::test_initialize_bundle
+uv run pytest tests/test_bundle.py::TestBundleManager::test_initialize_bundle
 
 # Run with verbose output
-pytest -v
+uv run pytest -v
 ```
 
 ### Running Integration Tests
 
 ```bash
-pytest tests/test_integration.py
+# Using UV directly
+uv run pytest tests/test_integration.py
+
+# Using the helper script with category
+./scripts/run_tests.sh integration
 ```
 
 ### Code Formatting and Linting
 
 ```bash
 # Format code with Black
-black .
+uv run black .
 
 # Lint code with Ruff
-ruff check .
+uv run ruff check .
 ```
 
 ## Error Handling

@@ -8,17 +8,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Follow the structured workflow in `/docs/` for tasks, PRs, and code reviews
 - Understand system architecture from `docs/architecture.md` before coding
 
-## Build & Test Commands
+## Development Environment Setup
 - Setup dev environment: `./scripts/setup_env.sh`
-- Create virtual environment with UV: `uv venv -p python3.13 .venv && source .venv/bin/activate`
+- Create virtual environment manually (if needed): `uv venv -p python3.13 .venv`
 - Install dependencies: `uv pip install -e ".[dev]"`
-- Run tests: `pytest`
-- Run test categories: `pytest -m unit`, `pytest -m integration`, `pytest -m e2e`
-- Run single test: `pytest path/to/test.py::TestClass::test_function -v`
-- Run with coverage: `pytest --cov=src`
-- Lint code: `ruff check .`
-- Format code: `black .`
-- Type check: `mypy src`
+
+## Testing Commands
+- Run all tests: `uv run pytest`
+- Run test categories: `uv run pytest -m unit`, `uv run pytest -m integration`, `uv run pytest -m e2e`
+- Run single test: `uv run pytest tests/unit/test_bundle.py -v`
+- Run with coverage: `uv run pytest --cov=src`
+- Run tests with helper script: `./scripts/run_tests.sh [test_type]`
+
+## Code Quality Commands
+- Lint code: `uv run ruff check .`
+- Format code: `uv run black .`
+- Type check: `uv run mypy src`
 
 ## Code Style Guidelines
 - Python: Follow PEP 8 and use type annotations
@@ -37,3 +42,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Create branches with pattern: `task/[task-filename-without-extension]`
 - Commit messages: Start with present-tense verb, be descriptive
 - When completing tasks, update all metadata and move to correct folder
+
+## UV Best Practices
+- Always use `uv run` to execute commands in the virtual environment
+- No need to manually activate the virtual environment
+- Use `uv pip` for dependency management
+- UV automatically detects the virtual environment in .venv

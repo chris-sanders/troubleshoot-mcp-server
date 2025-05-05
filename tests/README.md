@@ -12,40 +12,53 @@ The tests are organized into the following directories:
 - `fixtures/`: Test data and fixtures
 - `util/`: Utility scripts for testing
 
+## Setting Up the Test Environment
+
+Before running tests, set up your development environment:
+
+```bash
+# Setup environment with our helper script (recommended)
+./scripts/setup_env.sh
+
+# Or manually set up the environment
+uv venv -p python3.13 .venv
+uv pip install -e ".[dev]"
+```
+
 ## Running Tests
 
-You can run tests using the provided scripts:
+You can run tests using the provided script:
 
 ```bash
 # Run all tests
 ./scripts/run_tests.sh
 
-# Run end-to-end tests with different levels
-./scripts/run_e2e_tests.sh --level=basic    # Run basic tests only
-./scripts/run_e2e_tests.sh --level=docker   # Run Docker build tests
-./scripts/run_e2e_tests.sh --level=container # Run container tests
-./scripts/run_e2e_tests.sh --level=all      # Run all tests
+# Run specific test types
+./scripts/run_tests.sh unit        # Run unit tests only
+./scripts/run_tests.sh integration # Run integration tests
+./scripts/run_tests.sh e2e         # Run end-to-end tests
+./scripts/run_tests.sh quick       # Run quick verification tests
 ```
 
-Alternatively, you can run tests directly with pytest:
+Alternatively, you can run tests directly with UV:
 
 ```bash
 # Run all tests
-pytest
+uv run pytest
 
-# Run specific test categories
-pytest tests/unit/
-pytest tests/integration/
-pytest tests/e2e/
+# Run specific test categories with markers
+uv run pytest -m unit
+uv run pytest -m integration
+uv run pytest -m e2e
 
 # Run specific test files
-pytest tests/unit/test_bundle.py
+uv run pytest tests/unit/test_bundle.py
 
 # Run with verbosity
-pytest -v
+uv run pytest -v
 
 # Run with timeouts to prevent hanging tests
-pytest --timeout=30
+uv run pytest --timeout=30
 ```
 
 ## Test Categories
@@ -83,7 +96,7 @@ The integration tests test multiple components working together:
 
 The e2e tests test the full system:
 
-- `test_container.py`: Tests the Docker container functionality
+- `test_container.py`: Tests the container functionality
 - `test_docker.py`: Tests Docker-specific functionality
 - `quick_check.py`: Fast tests for basic functionality checks
 

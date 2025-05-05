@@ -1,15 +1,11 @@
 #!/bin/bash
-# Simple script to run tests for the MCP server with proper markers
+# Script to run tests for the MCP server with proper markers using UV
+# UV manages the environment, no manual activation needed
 set -e
 
 # Get the directory of this script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-
-# Activate the virtual environment if it exists
-if [ -d "$PROJECT_ROOT/venv/bin" ]; then
-  source "$PROJECT_ROOT/venv/bin/activate"
-fi
 
 # Go to the project root
 cd "$PROJECT_ROOT"
@@ -19,18 +15,18 @@ function usage() {
   echo "Usage: $0 [test_type] [options]"
   echo
   echo "Test Types:"
-  echo "  unit         Run unit tests                          (pytest -m unit)"
-  echo "  integration  Run integration tests                   (pytest -m integration)"
-  echo "  e2e          Run end-to-end tests                    (pytest -m e2e)"
-  echo "  quick        Run quick verification tests            (pytest -m quick)"
-  echo "  docker       Run tests that need Docker              (pytest -m docker)"
-  echo "  all          Run all tests (default)                 (pytest)"
+  echo "  unit         Run unit tests                          (uv run pytest -m unit)"
+  echo "  integration  Run integration tests                   (uv run pytest -m integration)"
+  echo "  e2e          Run end-to-end tests                    (uv run pytest -m e2e)"
+  echo "  quick        Run quick verification tests            (uv run pytest -m quick)"
+  echo "  docker       Run tests that need Docker              (uv run pytest -m docker)"
+  echo "  all          Run all tests (default)                 (uv run pytest)"
   echo
   echo "Options:"
-  echo "  -v, --verbose     Run with verbose output            (pytest -v)"
-  echo "  --no-timeout      Disable test timeouts              (pytest --timeout 0)"
+  echo "  -v, --verbose     Run with verbose output            (uv run pytest -v)"
+  echo "  --no-timeout      Disable test timeouts              (uv run pytest --timeout 0)"
   echo "  --mock-sbctl      Use mock sbctl for tests           (USE_MOCK_SBCTL=true)" 
-  echo "  --                Pass remaining options to pytest   (pytest ...)"
+  echo "  --                Pass remaining options to pytest   (uv run pytest ...)"
   echo
   echo "Examples:"
   echo "  $0                   # Run all tests"
@@ -104,6 +100,11 @@ case "$TEST_TYPE" in
     ;;
 esac
 
-# Run the tests
+# Run the tests using UV directly
 echo "Running tests: $TEST_TYPE"
-$MOCK_SBCTL python -m pytest $MARKER $VERBOSE $TIMEOUT "$@"
+if [ -n "$MOCK_SBCTL" ]; then
+  # Use env prefix for environment variables with UV
+  $MOCK_SBCTL uv run pytest $MARKER $VERBOSE $TIMEOUT "$@"
+else
+  uv run pytest $MARKER $VERBOSE $TIMEOUT "$@"
+fi
