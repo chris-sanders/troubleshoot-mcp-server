@@ -39,9 +39,15 @@ jobs:
       - name: Run unit tests
         run: uv run pytest -m unit -v
       
+      - name: Install sbctl
+        run: |
+          curl -L -o sbctl.tar.gz "https://github.com/replicatedhq/sbctl/releases/latest/download/sbctl_linux_amd64.tar.gz"
+          tar xzf sbctl.tar.gz
+          chmod +x sbctl
+          sudo mv sbctl /usr/local/bin/
+          sbctl --version || echo "sbctl installed but version command not available"
+          
       - name: Run integration tests
-        env:
-          USE_MOCK_SBCTL: "true"
         run: uv run pytest -m integration -v
       
       - name: Run linting
