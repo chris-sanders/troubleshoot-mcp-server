@@ -260,7 +260,7 @@ async def test_bundle_manager_download_replicated_url_success_sbctl_token(
             assert download_path.exists()
             # Assert new filename format
             # Replace both '@' and ':' for the assertion to match sanitization
-            safe_slug_for_assertion = REPLICATED_SLUG.replace('@', '_').replace(':', '_')
+            safe_slug_for_assertion = REPLICATED_SLUG.replace("@", "_").replace(":", "_")
             expected_filename_part = f"replicated_bundle_{safe_slug_for_assertion}"
             assert download_path.name.startswith(expected_filename_part)
             assert download_path.read_bytes() == b"chunk1chunk2"
@@ -415,10 +415,8 @@ async def test_bundle_manager_download_replicated_url_api_other_error(mock_httpx
                 # Call _download_bundle instead of _get_replicated_signed_url
                 await manager._download_bundle(REPLICATED_URL)
                 # === END MODIFICATION ===
-            assert "Failed to get signed URL from Replicated API (status 500)" in str(
-                excinfo.value
-            )
-            assert "Internal Server Error" in str(excinfo.value) # Check response text included
+            assert "Failed to get signed URL from Replicated API (status 500)" in str(excinfo.value)
+            assert "Internal Server Error" in str(excinfo.value)  # Check response text included
 
 
 @pytest.mark.asyncio
@@ -430,7 +428,7 @@ async def test_bundle_manager_download_replicated_url_missing_signed_uri(mock_ht
     # === START MODIFICATION ===
     # Mock the nested structure but without 'signedUri' inside 'bundle'
     mock_response.json.return_value = {"bundle": {"message": "Success but no URI"}}
-    mock_response.json.side_effect = None # Allow json() call
+    mock_response.json.side_effect = None  # Allow json() call
     mock_response.text = json.dumps({"bundle": {"message": "Success but no URI"}})
     # === END MODIFICATION ===
 
@@ -466,7 +464,7 @@ async def test_bundle_manager_download_replicated_url_network_error():
 
                 # Assert that the correct error (raised by the except httpx.RequestError block) is caught
                 assert "Network error requesting signed URL" in str(excinfo.value)
-                assert "Network timeout" in str(excinfo.value) # Check original error is included
+                assert "Network timeout" in str(excinfo.value)  # Check original error is included
     # === END MODIFICATION ===
 
 
@@ -503,7 +501,7 @@ async def test_bundle_manager_download_non_replicated_url(mock_aiohttp_download)
 
 
 @pytest.mark.asyncio
-async def test_bundle_manager_download_bundle(mock_aiohttp_download): # Use fixture as argument
+async def test_bundle_manager_download_bundle(mock_aiohttp_download):  # Use fixture as argument
     """Test that the bundle manager can download a non-Replicated bundle."""
     # Unpack the fixture results
     mock_aiohttp_constructor, mock_aio_session, mock_aio_response = mock_aiohttp_download
@@ -516,7 +514,7 @@ async def test_bundle_manager_download_bundle(mock_aiohttp_download): # Use fixt
         # Mock _initialize_with_sbctl as it's not the focus here
         kubeconfig_path = bundle_dir / "test_kubeconfig"
         manager._initialize_with_sbctl = AsyncMock(return_value=kubeconfig_path)
-        manager._wait_for_initialization = AsyncMock() # Also mock wait
+        manager._wait_for_initialization = AsyncMock()  # Also mock wait
 
         # Call initialize_bundle which internally calls _download_bundle
         with patch.dict(os.environ, {"SBCTL_TOKEN": "token_val"}, clear=True):
@@ -532,10 +530,10 @@ async def test_bundle_manager_download_bundle(mock_aiohttp_download): # Use fixt
             assert result.source == non_replicated_url
             assert result.kubeconfig_path == kubeconfig_path
             # Check that the bundle path inside the metadata points to the downloaded file's dir
-            expected_bundle_dir_name_part = "bundle_" # From filename generation
+            expected_bundle_dir_name_part = "bundle_"  # From filename generation
             assert expected_bundle_dir_name_part in result.path.name
             # Check the generated filename used for download path
-            expected_filename = "bundle.tar.gz" # Based on URL parsing
+            expected_filename = "bundle.tar.gz"  # Based on URL parsing
             assert (manager.bundle_dir / expected_filename).exists()
 
 
@@ -551,11 +549,14 @@ async def test_bundle_manager_download_bundle_error():
     # === START MODIFICATION ===
     # Mock the content object and iter_chunked for the error response
     mock_content = AsyncMock()
+
     async def async_iterator_error():
-         if False: yield # pragma: no cover # Empty iterator
+        if False:
+            yield  # pragma: no cover # Empty iterator
+
     mock_content.iter_chunked = MagicMock(return_value=async_iterator_error())
     mock_aio_response.content = mock_content
-     # === END MODIFICATION ===
+    # === END MODIFICATION ===
 
     # Mock the context manager methods for the response
     mock_aio_response.__aenter__.return_value = mock_aio_response
@@ -576,7 +577,7 @@ async def test_bundle_manager_download_bundle_error():
 
         # Patch ClientSession to return our defined mock session
         with patch("aiohttp.ClientSession", return_value=mock_aio_session):
-             with pytest.raises(BundleDownloadError) as excinfo:
+            with pytest.raises(BundleDownloadError) as excinfo:
                 await manager._download_bundle(url)
 
         # Assert the expected HTTP error message

@@ -37,3 +37,5 @@ ENV/
 # Testing files
 ./mcp-server-troubleshoot/tests/fixtures
 .aider*
+
+**/.claude/settings.local.json
