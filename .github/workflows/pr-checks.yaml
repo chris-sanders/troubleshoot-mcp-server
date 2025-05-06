@@ -63,14 +63,8 @@ jobs:
           echo "PATH: $PATH"
           sbctl --help
       
-      - name: Run unit tests
-        run: uv run pytest -m unit -v
-      
-      - name: Run integration tests
-        run: uv run pytest -m integration -v
-      
       - name: Run all tests with coverage
-        run: uv run pytest --cov=src --cov-report=xml
+        run: uv run pytest --cov=src --cov-report=xml -v
       
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
