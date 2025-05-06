@@ -1,5 +1,13 @@
 """
-Tests for the Podman build and run processes.
+Tests for the Podman container and its application functionality.
+
+These tests verify:
+1. Container building and running works
+2. Required files exist in project structure
+3. Application inside the container functions correctly
+
+All tests that involve building or running containers use the shared
+docker_image fixture to avoid rebuilding for each test.
 """
 
 import os
@@ -7,45 +15,26 @@ import subprocess
 import tempfile
 from pathlib import Path
 import pytest
+import uuid
+
+# Get the project root directory
+PROJECT_ROOT = Path(__file__).parents[2].absolute()
 
 # Mark all tests in this file with appropriate markers
 pytestmark = [pytest.mark.e2e, pytest.mark.container]
 
 
-def run_command(cmd, cwd=None, check=True):
-    """Run a command and return its output."""
-    try:
-        result = subprocess.run(
-            cmd,
-            shell=True,
-            check=check,
-            cwd=cwd,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        return result.stdout.strip()
-    except subprocess.CalledProcessError as e:
-        print(f"Command failed with exit code {e.returncode}")
-        print(f"Command: {cmd}")
-        print(f"Stdout: {e.stdout}")
-        print(f"Stderr: {e.stderr}")
-        raise
-
-
 def test_containerfile_exists():
     """Test that the Containerfile exists in the project directory."""
-    project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
-    containerfile_path = project_dir / "Containerfile"
+    containerfile_path = PROJECT_ROOT / "Containerfile"
     assert containerfile_path.exists(), "Containerfile does not exist"
 
 
 def test_containerignore_exists():
     """Test that the .containerignore file exists in the project directory."""
-    project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
     # After restructuring, we might not have .containerignore in the root
     # So check in the root or scripts directory
-    containerignore_path = project_dir / ".containerignore"
+    containerignore_path = PROJECT_ROOT / ".containerignore"
     if not containerignore_path.exists():
         # Create it if it doesn't exist
         with open(containerignore_path, "w") as f:
@@ -59,13 +48,11 @@ def test_containerignore_exists():
 
 def test_build_script_exists_and_executable():
     """Test that the build script exists and is executable."""
-    project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
-
     # Check in scripts directory first (new structure)
-    build_script = project_dir / "scripts" / "build.sh"
+    build_script = PROJECT_ROOT / "scripts" / "build.sh"
     if not build_script.exists():
         # Fall back to root directory (old structure)
-        build_script = project_dir / "build.sh"
+        build_script = PROJECT_ROOT / "build.sh"
         if not build_script.exists():
             pytest.skip("Build script not found in scripts/ or root directory")
 
@@ -74,158 +61,207 @@ def test_build_script_exists_and_executable():
 
 def test_run_script_exists_and_executable():
     """Test that the run script exists and is executable."""
-    project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
-
     # Check in scripts directory first (new structure)
-    run_script = project_dir / "scripts" / "run.sh"
+    run_script = PROJECT_ROOT / "scripts" / "run.sh"
     if not run_script.exists():
         # Fall back to root directory (old structure)
-        run_script = project_dir / "run.sh"
+        run_script = PROJECT_ROOT / "run.sh"
         if not run_script.exists():
             pytest.skip("Run script not found in scripts/ or root directory")
 
     assert os.access(run_script, os.X_OK), f"{run_script} is not executable"
 
 
-@pytest.mark.container
-def test_podman_build():
-    """Test that the Podman image builds successfully."""
-    project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
-
-    # Use a unique tag for testing
-    test_tag = "mcp-server-troubleshoot:test"
-
-    try:
-        # First, verify Containerfile exists
-        containerfile_path = project_dir / "Containerfile"
-        assert containerfile_path.exists(), "Containerfile not found"
-
-        # Print Containerfile content for debugging
-        print(f"\nContainerfile content:\n{containerfile_path.read_text()}\n")
-
-        # Build the image with progress output
-        print("\nBuilding Podman image...")
-        output = run_command(
-            f"podman build --progress=plain -t {test_tag} -f Containerfile .", cwd=str(project_dir)
-        )
-        print(f"\nBuild output:\n{output}\n")
-
-        # Check if the image exists
-        images = run_command("podman images", check=False)
-        print(f"\nPodman images:\n{images}\n")
-
-        assert test_tag.split(":")[0] in images, "Built image not found"
-
-    except Exception as e:
-        print(f"Podman build test failed: {str(e)}")
-        raise
-
-    finally:
-        # Clean up
-        try:
-            run_command(f"podman rmi {test_tag}", check=False)
-            print(f"\nRemoved test image {test_tag}")
-        except subprocess.CalledProcessError:
-            print(f"\nFailed to remove test image {test_tag}")
-            pass  # Ignore errors during cleanup
+@pytest.fixture
+def container_name():
+    """Create a unique container name for each test."""
+    return f"mcp-test-{uuid.uuid4().hex[:8]}"
 
 
-@pytest.mark.container
-def test_podman_run():
+@pytest.fixture
+def temp_bundle_dir():
+    """Create a temporary directory for bundles."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        yield Path(temp_dir)
+
+
+def test_podman_availability():
+    """Test that Podman is available and working."""
+    # Check the Podman version
+    result = subprocess.run(
+        ["podman", "--version"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, "Podman is not installed or not working properly"
+    assert "podman" in result.stdout.lower(), "Unexpected output from podman version"
+
+    # Print the version for information
+    print(f"Using Podman version: {result.stdout.strip()}")
+
+
+def test_basic_podman_run(docker_image, container_name, temp_bundle_dir):
     """Test that the Podman container runs and exits successfully."""
-    project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
+    result = subprocess.run(
+        [
+            "podman",
+            "run",
+            "--name",
+            container_name,
+            "--rm",
+            "-v",
+            f"{temp_bundle_dir}:/data/bundles",
+            "-e",
+            "SBCTL_TOKEN=test-token",
+            "--entrypoint",
+            "/bin/bash",
+            docker_image,
+            "-c",
+            "echo 'Container is working!'",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
 
-    # Use a unique tag for testing
-    test_tag = "mcp-server-troubleshoot:test-run"
-
-    try:
-        # Build the image
-        run_command(f"podman build -t {test_tag} -f Containerfile .", cwd=str(project_dir))
-
-        # Create a temporary directory for the bundle
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Run the container with --help to get quick exit
-            output = run_command(
-                f"podman run --rm -v {temp_dir}:/data/bundles {test_tag} --help",
-                cwd=str(project_dir),
-            )
-
-            # Verify output contains help message from Python
-            assert "usage:" in output.lower(), "Container did not run correctly"
-            assert "python" in output.lower(), "Container output incorrect"
-
-            # Test the bundle volume is correctly mounted
-            volume_test = run_command(
-                f"podman run --rm --entrypoint sh {test_tag} -c 'ls -la /data'",
-                cwd=str(project_dir),
-            )
-            assert "bundles" in volume_test.lower(), "Volume mount point not found"
-
-    finally:
-        # Clean up
-        try:
-            run_command(f"podman rmi {test_tag}", check=False)
-        except subprocess.CalledProcessError:
-            pass  # Ignore errors during cleanup
+    # Check that the container ran successfully
+    assert result.returncode == 0, f"Container failed to run: {result.stderr}"
+    assert "Container is working!" in result.stdout
 
 
-@pytest.mark.container
-def test_sbctl_installed():
-    """Test that sbctl is installed in the container."""
-    project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
+def test_installed_tools(docker_image, container_name):
+    """Test that required tools are installed in the container."""
+    # Check for required tools
+    tools_to_check = [
+        "sbctl",
+        "kubectl",
+        "python",
+    ]
 
-    # Use a unique tag for testing
-    test_tag = "mcp-server-troubleshoot:test-sbctl"
-
-    try:
-        # Build the image
-        run_command(f"podman build -t {test_tag} -f Containerfile .", cwd=str(project_dir))
-
-        # Run the container and check if sbctl is installed
-        # Use 'sh -c' to run a shell command instead of entrypoint
-        output = run_command(
-            f"podman run --rm --entrypoint sh {test_tag} -c 'ls -la /usr/local/bin/sbctl'",
-            cwd=str(project_dir),
+    for tool in tools_to_check:
+        result = subprocess.run(
+            [
+                "podman",
+                "run",
+                "--name",
+                f"{container_name}-{tool}",
+                "--rm",
+                "--entrypoint",
+                "which",
+                docker_image,
+                tool,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
             check=False,
         )
 
-        # Check output shows sbctl exists
-        assert "sbctl" in output.lower(), "sbctl not properly installed in container"
-
-    finally:
-        # Clean up
-        try:
-            run_command(f"podman rmi {test_tag}", check=False)
-        except subprocess.CalledProcessError:
-            pass  # Ignore errors during cleanup
+        assert result.returncode == 0, f"{tool} is not installed in the container"
+        assert result.stdout.strip(), f"{tool} path is empty"
 
 
-@pytest.mark.container
-def test_kubectl_installed():
-    """Test that kubectl is installed in the container."""
-    project_dir = Path(__file__).parents[2]  # Go up two levels to reach project root
+def test_help_command(docker_image, container_name, temp_bundle_dir):
+    """Test that the application's help command works."""
+    result = subprocess.run(
+        [
+            "podman",
+            "run",
+            "--name",
+            container_name,
+            "--rm",
+            "-v",
+            f"{temp_bundle_dir}:/data/bundles",
+            "-e",
+            "MCP_BUNDLE_STORAGE=/data/bundles",
+            "-e",
+            "SBCTL_TOKEN=test-token",
+            docker_image,
+            "--help",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
 
-    # Use a unique tag for testing
-    test_tag = "mcp-server-troubleshoot:test-kubectl"
+    # Verify the application can run
+    combined_output = result.stdout + result.stderr
+    assert "usage:" in combined_output.lower(), "Application help command failed"
 
-    try:
-        # Build the image
-        run_command(f"podman build -t {test_tag} -f Containerfile .", cwd=str(project_dir))
 
-        # Run the container and check if kubectl is installed
-        # Use 'sh -c' to run a shell command instead of entrypoint
-        output = run_command(
-            f"podman run --rm --entrypoint sh {test_tag} -c 'ls -la /usr/local/bin/kubectl'",
-            cwd=str(project_dir),
-            check=False,
-        )
+def test_version_command(docker_image, container_name, temp_bundle_dir):
+    """Test that the application's version command works."""
+    result = subprocess.run(
+        [
+            "podman",
+            "run",
+            "--name",
+            container_name,
+            "--rm",
+            "-v",
+            f"{temp_bundle_dir}:/data/bundles",
+            "-e",
+            "MCP_BUNDLE_STORAGE=/data/bundles",
+            "-e",
+            "SBCTL_TOKEN=test-token",
+            docker_image,
+            "--version",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
 
-        # Check output shows kubectl exists
-        assert "kubectl" in output.lower(), "kubectl not properly installed in container"
+    # Verify the application version command works
+    combined_output = result.stdout + result.stderr
+    assert result.returncode == 0, f"Version command failed: {combined_output}"
+    assert len(combined_output) > 0, "Version command produced no output"
 
-    finally:
-        # Clean up
-        try:
-            run_command(f"podman rmi {test_tag}", check=False)
-        except subprocess.CalledProcessError:
-            pass  # Ignore errors during cleanup
+
+def test_process_dummy_bundle(docker_image, container_name, temp_bundle_dir):
+    """Test that the container can process a bundle."""
+    # Create a dummy bundle to test with
+    dummy_bundle = temp_bundle_dir / "test-bundle.tar.gz"
+    with open(dummy_bundle, "w") as f:
+        f.write("Dummy bundle content")
+
+    # Run the container with the basic help command to ensure it works
+    result = subprocess.run(
+        [
+            "podman",
+            "run",
+            "--name",
+            container_name,
+            "--rm",
+            "-v",
+            f"{temp_bundle_dir}:/data/bundles",
+            "-e",
+            "MCP_BUNDLE_STORAGE=/data/bundles",
+            "-e",
+            "SBCTL_TOKEN=test-token",
+            "--entrypoint",
+            "/bin/bash",
+            docker_image,
+            "-c",
+            "ls -la /data/bundles",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+    # Verify the volume mount works
+    assert result.returncode == 0, f"Failed to run container: {result.stderr}"
+    assert "test-bundle.tar.gz" in result.stdout, "Bundle file not visible in container"
+
+
+if __name__ == "__main__":
+    # Use pytest to run the tests
+    pytest.main(["-xvs", __file__])

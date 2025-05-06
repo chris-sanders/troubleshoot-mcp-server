@@ -1,56 +1,89 @@
 """
 Quick test-checking module for e2e tests with strict timeouts.
+
 This module offers test runners that verify only basic functionality works
-without running the full test suite.
+without running the full test suite. It's especially useful for:
+1. Pre-build validation
+2. CI environments that need fast feedback
+3. Quick sanity checks during development
 """
 
 import pytest
 import asyncio
 import subprocess
-from pathlib import Path
+import uuid
+
+from .utils import (
+    get_container_runtime,
+    get_project_root,
+    sanitize_container_name,
+    get_system_info,
+)
+
+# Mark all tests in this file appropriately
+pytestmark = [pytest.mark.e2e, pytest.mark.quick]
 
 
-# Run a basic container test to verify Docker works
-@pytest.mark.e2e
-@pytest.mark.docker
-@pytest.mark.quick
-def test_basic_container_check():
-    """Basic check to verify Docker container functionality."""
+@pytest.fixture(scope="module")
+def system_info():
+    """Get information about the testing environment."""
+    info = get_system_info()
+
+    # Log the environment info for debugging
+    print("\nTest Environment:")
+    for key, value in info.items():
+        print(f"  {key}: {value}")
+
+    return info
+
+
+@pytest.fixture(scope="module")
+def container_runner(system_info):
+    """
+    Set up the appropriate container runner (podman or docker).
+
+    Returns:
+        str: The container command to use ('podman' or 'docker')
+    """
+    runtime, available = get_container_runtime()
+
+    if not available:
+        pytest.skip(f"No container runtime available (tried {runtime})")
+
+    return runtime
+
+
+@pytest.fixture
+def unique_container_name():
+    """Generate a unique container name for tests."""
+    name = f"mcp-test-{uuid.uuid4().hex[:8]}"
+    return sanitize_container_name(name)
+
+
+# Run a basic container test to verify container functionality
+@pytest.mark.container
+def test_basic_container_check(container_runner, unique_container_name, system_info):
+    """Basic check to verify container functionality."""
     # Get project root
-    project_root = Path(__file__).parents[2]
+    project_root = get_project_root()
 
-    # Verify Dockerfile exists
-    dockerfile = project_root / "Dockerfile"
-    assert dockerfile.exists(), f"Dockerfile not found at {dockerfile}"
+    # Verify Containerfile exists
+    containerfile = project_root / "Containerfile"
+    assert containerfile.exists(), f"Containerfile not found at {containerfile}"
 
     # Verify scripts exist
     build_script = project_root / "scripts" / "build.sh"
     assert build_script.exists(), f"Build script not found at {build_script}"
     assert build_script.is_file(), f"{build_script} is not a file"
 
-    # Run docker version command
-    docker_check = subprocess.run(
-        ["docker", "--version"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        timeout=5,
-    )
-    assert docker_check.returncode == 0, "Docker is not available"
-
-    # Create a unique container name
-    import uuid
-
-    container_name = f"mcp-test-{uuid.uuid4().hex[:8]}"
-
-    # Run a simple container command
+    # Run a simple container command with a standard Python image
     container_test = subprocess.run(
         [
-            "docker",
+            container_runner,
             "run",
             "--rm",
             "--name",
-            container_name,
+            unique_container_name,
             "python:3.11-slim",
             "python",
             "-c",
@@ -60,22 +93,29 @@ def test_basic_container_check():
         stderr=subprocess.PIPE,
         text=True,
         timeout=15,
+        check=False,
     )
 
-    assert container_test.returncode == 0, f"Container test failed: {container_test.stderr}"
+    # Enhance error messages with detailed output
+    assert container_test.returncode == 0, (
+        f"Container test failed with code {container_test.returncode}:\n"
+        f"STDOUT: {container_test.stdout}\n"
+        f"STDERR: {container_test.stderr}"
+    )
+
     assert (
         "Basic container test passed" in container_test.stdout
     ), "Container didn't produce expected output"
 
     # Report success
-    print("Basic Docker functionality tests passed")
+    print("Basic container functionality tests passed")
 
 
 @pytest.mark.asyncio
 @pytest.mark.timeout(15)
 async def test_mcp_protocol_basic():
     """Basic test for MCP protocol functionality."""
-    # Create a simple MCP server process
+    # Set a lower log level for tests
     env = {"MCP_LOG_LEVEL": "ERROR"}
 
     # Start the process with a timeout
@@ -135,7 +175,34 @@ async def test_mcp_protocol_basic():
         pytest.skip("Timeout starting MCP server process")
 
 
+# Simple application test that doesn't rely on containers
+@pytest.mark.timeout(10)
+def test_application_version():
+    """Test that the application can report its version."""
+    import sys
+
+    # Run the application with the version flag
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "mcp_server_troubleshoot.cli",
+            "--version",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=5,
+        check=False,
+    )
+
+    # Check for successful run
+    combined_output = result.stdout + result.stderr
+    assert result.returncode == 0, f"Version command failed: {combined_output}"
+    assert combined_output.strip(), "No version information was returned"
+
+
 if __name__ == "__main__":
-    # Run the tests
-    test_basic_container_check()
-    print("All tests passed!")
+    # Run the tests directly for quick checking
+    print("Running quick container check...")
+    pytest.main(["-xvs", __file__])

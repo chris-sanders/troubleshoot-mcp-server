@@ -1,53 +1,72 @@
 # End-to-End Tests
 
-This directory contains end-to-end tests that verify the full functionality of the MCP server, including the Docker container build and execution.
+This directory contains end-to-end tests that verify the full functionality of the MCP server, including the Podman container build and execution.
 
 ## Test Types
 
-1. **Docker Build Tests** (`test_docker.py`): Test that the Docker image builds correctly and contains all required components.
-2. **Container Basic Tests** (`test_container.py`): Test basic functionality of the container like running commands and verifying Python is installed.
-3. **MCP Protocol Tests** (`test_mcp_protocol.py`): Test the MCP protocol communication directly with the Python module.
-4. **Container MCP Tests** (`test_container_mcp.py`): Test MCP protocol communication with the containerized server.
+1. **Container Infrastructure Tests** (`test_podman.py`): Tests basic Podman functionality, container building, and verifies the container has all required components and tools.
+2. **Container Application Tests** (`test_podman_container.py`): Tests the MCP server application running inside the container with features like bundle processing.
+3. **Quick Checks** (`quick_check.py`): Fast tests with strict timeouts to verify basic functionality without running the full test suite.
 
 ## Setup
 
 Before running the e2e tests, you need to prepare the environment:
 
 ```bash
-# Run the preparation script
-./scripts/prepare_tests.sh
+# Install dependencies
+uv pip install -e ".[dev]"
+
+# Make sure Podman is installed
+podman --version
 ```
 
-This script will:
-1. Build the test Docker image with a mock version of sbctl
-2. Prepare test fixtures and support bundles 
-3. Create environment variables for testing
+The test suite supports both Docker and Podman, with Podman being the preferred container runtime.
 
 ## Running Tests
 
-After preparation, you can run the tests:
+You can run the tests using the following commands:
 
 ```bash
-# Source the environment variables
-source tests/fixtures/env.sh
-
 # Run all e2e tests
-python -m pytest tests/e2e/
+uv run pytest -m e2e
+
+# Run container-specific tests
+uv run pytest -m container
 
 # Run a specific test file
-python -m pytest tests/e2e/test_docker.py
+uv run pytest tests/e2e/test_podman_container.py
 
 # Run a specific test function
-python -m pytest tests/e2e/test_container.py::test_basic_container_functionality -v
+uv run pytest tests/e2e/test_podman_container.py::test_bundle_processing -v
 ```
+
+## Container Image Reuse
+
+The test suite uses a session-scoped fixture that builds the container image once and reuses it across all tests. This significantly improves test performance by avoiding rebuilding the image for each test.
+
+```python
+@pytest.fixture(scope="session")
+def docker_image():
+    # This fixture builds the image once for all tests
+    # ...
+```
+
+## Environment-Aware Testing
+
+The tests are designed to work in different environments:
+
+1. **Local Development**: Full tests with all features
+2. **CI Environment**: Some tests may be skipped or modified depending on the CI capabilities
+
+The tests automatically detect when they are running in CI environments like GitHub Actions and adjust accordingly.
 
 ## Troubleshooting
 
 If tests are hanging or failing, check the following:
 
-1. **Docker availability**: Make sure Docker is running
-2. **Mock sbctl**: Ensure `mock_sbctl.py` is executable and working correctly
-3. **Test image**: Verify the test image was built with `docker images`
+1. **Podman availability**: Make sure Podman is running
+2. **Mock sbctl**: Ensure `mock_sbctl.py` is executable when needed
+3. **Test image**: Verify the test image was built with `podman images`
 4. **Debug mode**: Set `MCP_CLIENT_DEBUG=true` to see detailed logs
 
 ## Test Timeouts
