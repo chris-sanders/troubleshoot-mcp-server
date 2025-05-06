@@ -52,10 +52,11 @@ def setup_logging(verbose: bool = False, mcp_mode: bool = False) -> None:
         # Configure root logger to use stderr
         root_logger = logging.getLogger()
         for handler in root_logger.handlers:
-            handler.stream = sys.stderr
+            if hasattr(handler, "stream"):
+                handler.stream = sys.stderr
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for the MCP server."""
     parser = argparse.ArgumentParser(description="MCP server for Kubernetes support bundles")
     parser.add_argument("--bundle-dir", type=Path, help="Directory to store bundles")
@@ -81,18 +82,31 @@ def parse_args():
         default=3600,
         help="Interval in seconds for periodic cleanup (default: 3600)",
     )
+    parser.add_argument(
+        "--version",
+        action="store_true",
+        help="Show version information",
+    )
 
     return parser.parse_args()
 
 
-def handle_show_config():
+def handle_show_config() -> None:
     """Output recommended client configuration."""
     config = get_recommended_client_config()
     json.dump(config, sys.stdout, indent=2)
     sys.exit(0)
 
 
-def main():
+def handle_version() -> None:
+    """Output version information."""
+    from mcp_server_troubleshoot import __version__
+
+    print(f"mcp-server-troubleshoot version {__version__}")
+    sys.exit(0)
+
+
+def main() -> None:
     """
     Main entry point that adapts based on how it's called.
     This allows the module to be used both as a direct CLI and
@@ -104,6 +118,10 @@ def main():
     if args.show_config:
         handle_show_config()
         return  # This should never be reached as handle_show_config exits
+
+    if args.version:
+        handle_version()
+        return  # This should never be reached as handle_version exits
 
     # Determine if we're in stdio mode
     # Use explicit flag or detect from terminal
@@ -138,7 +156,7 @@ def main():
     # Configure the MCP server for stdio mode if needed
     if mcp_mode:
         logger.debug("Configuring MCP server for stdio mode")
-        mcp.use_stdio = True
+        os.environ["MCP_USE_STDIO"] = "true"
         # Set up signal handlers specifically for stdio mode
         setup_signal_handlers()
 

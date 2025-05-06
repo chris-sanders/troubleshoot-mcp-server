@@ -10,23 +10,22 @@ Usage:
   python mcp_client_test.py
 """
 
-# Set up logging
-import logging
-
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
-    handlers=[logging.StreamHandler()],
-)
-logger = logging.getLogger("mcp_client_test")
-
 import json
+import logging
 import os
 import subprocess
 import sys
 import tempfile
 import time
 from pathlib import Path
+
+# Set up logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+    handlers=[logging.StreamHandler()],
+)
+logger = logging.getLogger("mcp_client_test")
 
 # Path to the fixtures directory containing test bundles
 FIXTURES_DIR = Path(__file__).parents[1] / "fixtures"

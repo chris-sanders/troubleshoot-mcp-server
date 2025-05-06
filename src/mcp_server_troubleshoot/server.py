@@ -9,7 +9,7 @@ import logging
 import signal
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import TextContent
@@ -21,7 +21,14 @@ from .bundle import (
     ListAvailableBundlesArgs,
 )
 from .kubectl import KubectlError, KubectlExecutor, KubectlCommandArgs
-from .files import FileExplorer, FileSystemError, GrepFilesArgs, ListFilesArgs, ReadFileArgs
+from .files import (
+    FileExplorer,
+    FileSystemError,
+    GrepFilesArgs,
+    ListFilesArgs,
+    ReadFileArgs,
+    GrepMatch,
+)
 from .lifecycle import app_lifespan, AppContext
 
 logger = logging.getLogger(__name__)
@@ -32,6 +39,11 @@ mcp = FastMCP("troubleshoot-mcp-server", lifespan=app_lifespan)
 
 # Flag to track if we're shutting down
 _is_shutting_down = False
+
+# Global variables for singleton pattern (initialized as None)
+_bundle_manager: Optional[BundleManager] = None
+_kubectl_executor: Optional[KubectlExecutor] = None
+_file_explorer: Optional[FileExplorer] = None
 
 # Global app context for legacy function compatibility
 _app_context = None
@@ -61,7 +73,7 @@ def get_bundle_manager(bundle_dir: Optional[Path] = None) -> BundleManager:
 
     # Legacy fallback - create a new instance
     global _bundle_manager
-    if "_bundle_manager" not in globals() or _bundle_manager is None:
+    if _bundle_manager is None:
         _bundle_manager = BundleManager(bundle_dir)
     return _bundle_manager
 
@@ -79,7 +91,7 @@ def get_kubectl_executor() -> KubectlExecutor:
 
     # Legacy fallback - create a new instance
     global _kubectl_executor
-    if "_kubectl_executor" not in globals() or _kubectl_executor is None:
+    if _kubectl_executor is None:
         _kubectl_executor = KubectlExecutor(get_bundle_manager())
     return _kubectl_executor
 
@@ -97,7 +109,7 @@ def get_file_explorer() -> FileExplorer:
 
     # Legacy fallback - create a new instance
     global _file_explorer
-    if "_file_explorer" not in globals() or _file_explorer is None:
+    if _file_explorer is None:
         _file_explorer = FileExplorer(get_bundle_manager())
     return _file_explorer
 
@@ -566,7 +578,7 @@ async def grep_files(args: GrepFilesArgs) -> List[TextContent]:
         # If we have matches, show them
         if result.matches:
             # Group matches by file
-            matches_by_file = {}
+            matches_by_file: dict[str, list[GrepMatch]] = {}
             for match in result.matches:
                 if match.path not in matches_by_file:
                     matches_by_file[match.path] = []
@@ -697,10 +709,10 @@ def register_signal_handlers() -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-    def signal_handler(sig_name: str):
+    def signal_handler(sig_name: str) -> Callable[[], None]:
         """Create a signal handler that triggers cleanup."""
 
-        def handler():
+        def handler() -> None:
             logger.info(f"Received {sig_name}, initiating graceful shutdown")
             if not loop.is_closed():
                 # Schedule the cleanup task

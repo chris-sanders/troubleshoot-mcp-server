@@ -36,12 +36,6 @@ jobs:
           # Install development dependencies
           uv pip install -e ".[dev]"
       
-      - name: Run unit tests
-        run: uv run pytest -m unit -v
-      
-      - name: Run integration tests
-        run: uv run pytest -m integration -v
-      
       - name: Run linting
         run: uv run ruff check .
       
@@ -50,9 +44,27 @@ jobs:
       
       - name: Run type checking
         run: uv run mypy src
+        
+      - name: Install sbctl
+        run: |
+          # Install sbctl binary for integration tests
+          # Several tests verify direct sbctl functionality and should not be skipped
+          # This ensures tests like test_real_bundle.py's test_sbctl_help_behavior pass
+          mkdir -p /tmp/sbctl && cd /tmp/sbctl
+          curl -L -o sbctl.tar.gz "https://github.com/replicatedhq/sbctl/releases/latest/download/sbctl_linux_amd64.tar.gz"
+          tar xzf sbctl.tar.gz
+          chmod +x sbctl
+          sudo mv sbctl /usr/local/bin/
+          cd / && rm -rf /tmp/sbctl
+          
+          # Debug sbctl installation
+          which sbctl
+          ls -la /usr/local/bin/sbctl
+          echo "PATH: $PATH"
+          sbctl --help
       
       - name: Run all tests with coverage
-        run: uv run pytest --cov=src --cov-report=xml
+        run: uv run pytest --cov=src --cov-report=xml -v
       
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
@@ -87,6 +99,16 @@ jobs:
           
           # Install development dependencies
           uv pip install -e ".[dev]"
+      
+      - name: Install sbctl
+        run: |
+          mkdir -p /tmp/sbctl && cd /tmp/sbctl
+          curl -L -o sbctl.tar.gz "https://github.com/replicatedhq/sbctl/releases/latest/download/sbctl_linux_amd64.tar.gz"
+          tar xzf sbctl.tar.gz
+          chmod +x sbctl
+          sudo mv sbctl /usr/local/bin/
+          cd / && rm -rf /tmp/sbctl
+          sbctl --help
       
       - name: Check Podman version
         run: podman --version
@@ -141,6 +163,16 @@ jobs:
           
           # Install development dependencies
           uv pip install -e ".[dev]"
+      
+      - name: Install sbctl
+        run: |
+          mkdir -p /tmp/sbctl && cd /tmp/sbctl
+          curl -L -o sbctl.tar.gz "https://github.com/replicatedhq/sbctl/releases/latest/download/sbctl_linux_amd64.tar.gz"
+          tar xzf sbctl.tar.gz
+          chmod +x sbctl
+          sudo mv sbctl /usr/local/bin/
+          cd / && rm -rf /tmp/sbctl
+          sbctl --help
       
       - name: Run E2E tests (excluding container tests)
         run: uv run pytest -m "e2e and not container" -v

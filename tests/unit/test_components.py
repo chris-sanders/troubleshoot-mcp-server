@@ -5,17 +5,16 @@ Standalone component test for the MCP server.
 This script directly tests the key components without relying on the MCP protocol.
 """
 
-import pytest
-
-# Mark all tests in this file as unit tests
-pytestmark = pytest.mark.unit
-
 import argparse
 import asyncio
 import logging
 import os
+import pytest
 import sys
 from pathlib import Path
+
+# Mark all tests in this file as unit tests
+pytestmark = pytest.mark.unit
 
 # Set up logging
 logging.basicConfig(

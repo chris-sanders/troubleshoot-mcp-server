@@ -9,9 +9,6 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from pydantic import ValidationError
 
-# Mark all tests in this file as unit tests
-pytestmark = pytest.mark.unit
-
 from mcp_server_troubleshoot.bundle import BundleManager, BundleMetadata
 from mcp_server_troubleshoot.kubectl import (
     KubectlCommandArgs,
@@ -19,6 +16,9 @@ from mcp_server_troubleshoot.kubectl import (
     KubectlExecutor,
     KubectlResult,
 )
+
+# Mark all tests in this file as unit tests
+pytestmark = pytest.mark.unit
 
 
 def test_kubectl_command_args_validation():

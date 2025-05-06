@@ -324,7 +324,8 @@ def serve_bundle(bundle_path):
 
     # Create a kubeconfig in the current directory
     logger.debug(f"Current directory: {os.getcwd()}")
-    kubeconfig_path = create_kubeconfig(os.getcwd())
+    # Generate kubeconfig but don't need to store the path
+    create_kubeconfig(os.getcwd())
 
     # Create and write PID file to help manage process cleanup
     pid_file = Path(os.getcwd()) / "mock_sbctl.pid"
@@ -367,8 +368,8 @@ def main():
     parser = argparse.ArgumentParser(description="Mock sbctl implementation for testing")
     subparsers = parser.add_subparsers(dest="command", help="Sub-command to execute")
 
-    # Version command
-    version_parser = subparsers.add_parser("version", help="Show version information")
+    # Version command - creates 'version' subcommand
+    subparsers.add_parser("version", help="Show version information")
 
     # Serve command
     serve_parser = subparsers.add_parser("serve", help="Start a mock API server")

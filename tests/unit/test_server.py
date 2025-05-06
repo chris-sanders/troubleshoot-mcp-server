@@ -9,9 +9,6 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from mcp.types import TextContent
 
-# Mark all tests in this file as unit tests and quick tests
-pytestmark = [pytest.mark.unit, pytest.mark.quick]
-
 from mcp_server_troubleshoot.bundle import BundleMetadata
 from mcp_server_troubleshoot.files import (
     FileContentResult,
@@ -32,6 +29,9 @@ from mcp_server_troubleshoot.server import (
     read_file,
     grep_files,
 )
+
+# Mark all tests in this file as unit tests and quick tests
+pytestmark = [pytest.mark.unit, pytest.mark.quick]
 
 
 def test_global_instances():

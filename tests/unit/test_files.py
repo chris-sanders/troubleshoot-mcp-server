@@ -8,9 +8,6 @@ from unittest.mock import Mock
 import pytest
 from pydantic import ValidationError
 
-# Mark all tests in this file as unit tests
-pytestmark = pytest.mark.unit
-
 from mcp_server_troubleshoot.bundle import BundleManager, BundleMetadata
 from mcp_server_troubleshoot.files import (
     FileContentResult,
@@ -25,6 +22,9 @@ from mcp_server_troubleshoot.files import (
     ReadFileArgs,
     ReadFileError,
 )
+
+# Mark all tests in this file as unit tests
+pytestmark = pytest.mark.unit
 
 
 # We use the test_file_setup fixture from conftest.py instead of this function

@@ -37,7 +37,7 @@ class AppContext:
     file_explorer: FileExplorer
     kubectl_executor: KubectlExecutor
     temp_dir: str = ""
-    background_tasks: Dict[str, asyncio.Task] = field(default_factory=dict)
+    background_tasks: Dict[str, asyncio.Task[Any]] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -205,7 +205,7 @@ def handle_signal(signum: int, frame: Any) -> None:
                         import shutil
 
                         shutil.rmtree(bundle_path)
-                        logger.info(f"Successfully removed bundle directory")
+                        logger.info("Successfully removed bundle directory")
                     except Exception as e:
                         logger.error(f"Error removing bundle directory: {e}")
         except Exception as e:

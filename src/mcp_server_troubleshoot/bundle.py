@@ -16,7 +16,7 @@ import signal
 import tarfile
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 import aiohttp
@@ -47,6 +47,28 @@ CLEANUP_ORPHANED = os.environ.get("SBCTL_CLEANUP_ORPHANED", "true").lower() in (
 ALLOW_ALTERNATIVE_KUBECONFIG = os.environ.get(
     "SBCTL_ALLOW_ALTERNATIVE_KUBECONFIG", "true"
 ).lower() in ("true", "1", "yes")
+
+
+# Helper function for safe file copying
+def safe_copy_file(src: Union[Path, None], dst: Union[Path, None]) -> None:
+    """
+    Safely copy a file, handling Path | None types.
+
+    Args:
+        src: Source path (may be None)
+        dst: Destination path (may be None)
+
+    Raises:
+        ValueError: If src or dst is None
+    """
+    if src is None:
+        raise ValueError("Source path cannot be None")
+    if dst is None:
+        raise ValueError("Destination path cannot be None")
+
+    # Both paths are valid, perform the copy
+    shutil.copy2(src, dst)
+
 
 logger.debug(f"Using MAX_DOWNLOAD_SIZE: {MAX_DOWNLOAD_SIZE / 1024 / 1024:.1f} MB")
 logger.debug(f"Using MAX_DOWNLOAD_TIMEOUT: {MAX_DOWNLOAD_TIMEOUT} seconds")
@@ -453,7 +475,8 @@ class BundleManager:
                 raise BundleDownloadError("Could not find 'signedUri' in Replicated API response.")
 
             logger.info("Successfully retrieved signed URL from Replicated API.")
-            return signed_url
+            # Ensure we're returning a string type
+            return str(signed_url)
             # === END RESTRUCTURE ===
 
         except Exception as e:
@@ -729,20 +752,40 @@ class BundleManager:
 
         # Attempt to read process output for diagnostic purposes
         if self.sbctl_process and self.sbctl_process.stdout and self.sbctl_process.stderr:
-            stdout_data = ""
-            stderr_data = ""
+            stdout_data = b""
+            stderr_data = b""
 
             try:
                 # Try to read without blocking the entire process
-                stdout_data = await asyncio.wait_for(
-                    self.sbctl_process.stdout.read(1024), timeout=1.0
-                )
-                stderr_data = await asyncio.wait_for(
-                    self.sbctl_process.stderr.read(1024), timeout=1.0
-                )
+                # We need to handle the coroutines properly for type checking
+                if self.sbctl_process.stdout is not None:
+                    try:
+                        # We expect bytes returned from the process stdout
+                        stdout_data = await asyncio.wait_for(
+                            self.sbctl_process.stdout.read(1024), timeout=1.0
+                        )
+                    except (asyncio.TimeoutError, Exception):
+                        stdout_data = b""
+                else:
+                    stdout_data = b""
+
+                if self.sbctl_process.stderr is not None:
+                    try:
+                        # We expect bytes returned from the process stderr
+                        stderr_data = await asyncio.wait_for(
+                            self.sbctl_process.stderr.read(1024), timeout=1.0
+                        )
+                    except (asyncio.TimeoutError, Exception):
+                        stderr_data = b""
+                else:
+                    stderr_data = b""
 
                 if stdout_data:
-                    stdout_text = stdout_data.decode("utf-8", errors="replace")
+                    stdout_text = (
+                        stdout_data.decode("utf-8", errors="replace")
+                        if isinstance(stdout_data, bytes)
+                        else str(stdout_data)
+                    )
                     logger.debug(f"sbctl stdout: {stdout_text}")
 
                     # Look for exported KUBECONFIG path in the output
@@ -759,8 +802,13 @@ class BundleManager:
                             alternative_kubeconfig_paths.append(alt_kubeconfig)
 
                 if stderr_data:
-                    logger.debug(f"sbctl stderr: {stderr_data.decode('utf-8', errors='replace')}")
-                    error_message = stderr_data.decode("utf-8", errors="replace")
+                    stderr_text = (
+                        stderr_data.decode("utf-8", errors="replace")
+                        if isinstance(stderr_data, bytes)
+                        else str(stderr_data)
+                    )
+                    logger.debug(f"sbctl stderr: {stderr_text}")
+                    error_message = stderr_text
             except (asyncio.TimeoutError, Exception) as e:
                 logger.debug(f"Error reading process output: {str(e)}")
 
@@ -827,9 +875,8 @@ class BundleManager:
 
                             # Try to copy to expected location
                             try:
-                                import shutil
 
-                                shutil.copy2(alt_path, kubeconfig_path)
+                                safe_copy_file(alt_path, kubeconfig_path)
                                 logger.info(
                                     f"Copied kubeconfig from {alt_path} to {kubeconfig_path}"
                                 )
@@ -854,9 +901,7 @@ class BundleManager:
                     # make sure it's copied to the expected location
                     if found_kubeconfig_path != kubeconfig_path:
                         try:
-                            import shutil
-
-                            shutil.copy2(found_kubeconfig_path, kubeconfig_path)
+                            safe_copy_file(found_kubeconfig_path, kubeconfig_path)
                             logger.info(
                                 f"Copied kubeconfig from {found_kubeconfig_path} to {kubeconfig_path}"
                             )
@@ -879,9 +924,7 @@ class BundleManager:
                         # Make sure we have a kubeconfig at expected location
                         if found_kubeconfig_path != kubeconfig_path:
                             try:
-                                import shutil
 
-                                shutil.copy2(found_kubeconfig_path, kubeconfig_path)
                                 logger.info(
                                     f"Copied kubeconfig from {found_kubeconfig_path} to {kubeconfig_path}"
                                 )
@@ -891,19 +934,22 @@ class BundleManager:
                         return
 
                     # If we've found the kubeconfig and waited long enough, continue anyway
-                    time_since_kubeconfig = asyncio.get_event_loop().time() - kubeconfig_found_time
-                    if time_since_kubeconfig > (timeout * api_server_wait_percentage):
-                        logger.warning(
-                            f"API server not responding after {time_since_kubeconfig:.1f}s "
-                            f"({api_server_wait_percentage*100:.0f}% of timeout). Proceeding anyway."
+                    # Make sure kubeconfig_found_time is not None before subtraction
+                    if kubeconfig_found_time is not None:
+                        time_since_kubeconfig = (
+                            asyncio.get_event_loop().time() - kubeconfig_found_time
                         )
+                        if time_since_kubeconfig > (timeout * api_server_wait_percentage):
+                            logger.warning(
+                                f"API server not responding after {time_since_kubeconfig:.1f}s "
+                                f"({api_server_wait_percentage*100:.0f}% of timeout). Proceeding anyway."
+                            )
 
                         # Make sure we have a kubeconfig at expected location
                         if found_kubeconfig_path != kubeconfig_path:
                             try:
-                                import shutil
-
-                                shutil.copy2(found_kubeconfig_path, kubeconfig_path)
+                                # Use our safe_copy_file helper instead of shutil.copy2 directly
+                                safe_copy_file(found_kubeconfig_path, kubeconfig_path)
                                 logger.info(
                                     f"Copied kubeconfig from {found_kubeconfig_path} to {kubeconfig_path}"
                                 )
@@ -945,9 +991,8 @@ class BundleManager:
             # Make sure we have a kubeconfig at expected location
             if found_kubeconfig_path != kubeconfig_path:
                 try:
-                    import shutil
-
-                    shutil.copy2(found_kubeconfig_path, kubeconfig_path)
+                    # Use our safe_copy_file helper instead of shutil.copy2 directly
+                    safe_copy_file(found_kubeconfig_path, kubeconfig_path)
                     logger.info(
                         f"Copied kubeconfig from {found_kubeconfig_path} to {kubeconfig_path}"
                     )
@@ -1442,9 +1487,11 @@ class BundleManager:
                 url = f"http://{host}:{port}{endpoint}"
                 logger.debug(f"Checking API server at {url}")
 
+                # Create a properly typed timeout object
+                timeout = aiohttp.ClientTimeout(total=2.0)
                 async with aiohttp.ClientSession() as session:
                     try:
-                        async with session.get(url, timeout=2.0) as response:
+                        async with session.get(url, timeout=timeout) as response:
                             logger.debug(
                                 f"API server endpoint {url} returned status {response.status}"
                             )
@@ -1504,7 +1551,7 @@ class BundleManager:
         logger.warning("API server is not available at any endpoint")
         return False
 
-    async def get_diagnostic_info(self) -> dict:
+    async def get_diagnostic_info(self) -> dict[str, object]:
         """
         Get diagnostic information about the current bundle and sbctl.
 
@@ -1567,14 +1614,14 @@ class BundleManager:
             logger.warning(f"Error checking sbctl availability: {str(e)}")
             return False
 
-    async def _get_system_info(self) -> dict:
+    async def _get_system_info(self) -> dict[str, object]:
         """
         Get system information.
 
         Returns:
-            A dictionary with system information
+            A dictionary with system information, values can be any type
         """
-        info = {}
+        info: dict[str, object] = {}
 
         # Get the API port from environment or default
         ports_to_check = [8080]  # Default port
@@ -1625,9 +1672,9 @@ class BundleManager:
                     else:
                         info[f"port_{port}_listening"] = False
                 else:
-                    info["netstat_error"] = stderr.decode()
+                    info["netstat_error_text"] = stderr.decode()
             except Exception as e:
-                info["netstat_error"] = str(e)
+                info["netstat_exception_text"] = str(e)
 
             # Try curl to test API server on this port
             try:
@@ -1648,9 +1695,9 @@ class BundleManager:
                 if proc.returncode == 0:
                     info[f"curl_{port}_status_code"] = stdout.decode().strip()
                 else:
-                    info[f"curl_{port}_error"] = stderr.decode()
+                    info[f"curl_{port}_error_text"] = stderr.decode()
             except Exception as e:
-                info[f"curl_{port}_error"] = str(e)
+                info[f"curl_{port}_exception_text"] = str(e)
 
         # Add environment info
         info["env_mock_k8s_api_port"] = os.environ.get("MOCK_K8S_API_PORT", "not set")
@@ -1669,7 +1716,7 @@ class BundleManager:
         """
         logger.info(f"Listing available bundles in {self.bundle_dir}")
 
-        bundles = []
+        bundles: List[BundleFileInfo] = []
 
         # Check if bundle directory exists
         if not self.bundle_dir.exists():
@@ -1677,7 +1724,7 @@ class BundleManager:
             return bundles
 
         # Find files with bundle extensions
-        bundle_files = []
+        bundle_files: List[Path] = []
         bundle_extensions = [".tar.gz", ".tgz"]
 
         for ext in bundle_extensions:

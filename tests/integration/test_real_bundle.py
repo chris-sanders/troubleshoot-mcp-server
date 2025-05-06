@@ -1,14 +1,13 @@
 """
 Tests for real support bundle integration.
 
-These tests verify the behavior of the MCP server components 
+These tests verify the behavior of the MCP server components
 with actual support bundles, focusing on user-visible behavior
 rather than implementation details.
 """
 
 import time
 import asyncio
-import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -17,16 +16,13 @@ import pytest_asyncio
 
 # Import components for testing
 from mcp_server_troubleshoot.bundle import BundleManager
-from mcp_server_troubleshoot.files import FileExplorer, PathNotFoundError
-from mcp_server_troubleshoot.kubectl import KubectlExecutor
+from mcp_server_troubleshoot.files import FileExplorer
 
 # Mark all tests in this file as integration tests
 pytestmark = pytest.mark.integration
 
-from mcp_server_troubleshoot.bundle import BundleManager
 
 # Import pytest_asyncio for proper fixture setup
-import pytest_asyncio
 
 
 @pytest_asyncio.fixture
@@ -60,10 +56,6 @@ async def bundle_manager_fixture(test_support_bundle):
             await manager.cleanup()
 
 
-@pytest.mark.skipif(
-    os.environ.get("PYTEST_CURRENT_TEST") is not None,
-    reason="Skipping sbctl test when running in test environment due to signal handling conflicts",
-)
 def test_sbctl_help_behavior(test_support_bundle):
     """
     Test the basic behavior of the sbctl command.
@@ -80,8 +72,16 @@ def test_sbctl_help_behavior(test_support_bundle):
         test_support_bundle: Path to the test support bundle (pytest fixture)
     """
     # Verify sbctl is available (basic behavior)
+    # Log which sbctl is being used for debugging
     result = subprocess.run(["which", "sbctl"], capture_output=True, text=True)
-    assert result.returncode == 0, "sbctl command should be available"
+    assert result.returncode == 0, "sbctl command should be available (which sbctl failed)"
+    print(f"Using sbctl at: {result.stdout.strip()}")
+
+    # Also check if executable permission is set
+    sbctl_path = result.stdout.strip()
+    if sbctl_path:
+        perm_result = subprocess.run(["ls", "-la", sbctl_path], capture_output=True, text=True)
+        print(f"sbctl permissions: {perm_result.stdout.strip()}")
 
     # Check help output behavior
     help_result = subprocess.run(["sbctl", "--help"], capture_output=True, text=True, timeout=5)
@@ -159,7 +159,7 @@ async def test_bundle_lifecycle(bundle_manager_fixture):
     assert active_bundle.id == result.id, "Active bundle should match initialized bundle"
 
     # Verify API server functionality (behavior, not implementation)
-    api_available = await manager.check_api_server_available()
+    await manager.check_api_server_available()
     # We don't assert this is always True since it depends on the test environment,
     # but we verify the method runs without error
 
@@ -187,7 +187,6 @@ async def test_bundle_initialization_workflow(bundle_manager_fixture, test_asser
     Args:
         bundle_manager_fixture: Fixture that provides a BundleManager and bundle path
     """
-    from mcp_server_troubleshoot.files import FileExplorer
 
     # Unpack the fixture
     manager, bundle_path = bundle_manager_fixture

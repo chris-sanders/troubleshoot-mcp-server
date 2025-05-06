@@ -20,6 +20,71 @@ PROJECT_ROOT = Path(__file__).parents[2].absolute()
 pytestmark = [pytest.mark.e2e, pytest.mark.container]
 
 
+def test_containerfile_exists():
+    """Test that the Containerfile exists in the project directory."""
+    containerfile_path = PROJECT_ROOT / "Containerfile"
+    assert containerfile_path.exists(), "Containerfile does not exist"
+
+
+def test_container_build():
+    """Test that the container image builds successfully."""
+    containerfile_path = PROJECT_ROOT / "Containerfile"
+
+    # Check Containerfile exists
+    assert containerfile_path.exists(), "Containerfile does not exist"
+
+    # Check that Podman is available
+    try:
+        subprocess.run(
+            ["podman", "--version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            timeout=5,
+        )
+    except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
+        pytest.skip("Podman is not available")
+
+    # Use a unique tag for testing
+    test_tag = "mcp-server-troubleshoot:test-build"
+
+    try:
+        # Build the image
+        result = subprocess.run(
+            ["podman", "build", "-t", test_tag, "-f", "Containerfile", "."],
+            cwd=str(PROJECT_ROOT),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+            timeout=300,  # 5 minutes timeout for build
+        )
+
+        # Check if build succeeded
+        assert result.returncode == 0, f"Container build failed: {result.stderr}"
+
+        # Verify image exists
+        image_check = subprocess.run(
+            ["podman", "image", "exists", test_tag],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        assert image_check.returncode == 0, f"Image {test_tag} not found after build"
+
+    except subprocess.CalledProcessError as e:
+        pytest.fail(f"Container build failed with error: {e.stderr}")
+
+    finally:
+        # Clean up the test image
+        subprocess.run(
+            ["podman", "rmi", "-f", test_tag],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+
+
 def cleanup_test_container():
     """Remove any existing test container."""
     subprocess.run(
@@ -164,12 +229,12 @@ def test_mcp_protocol(container_setup, docker_image):
             ["podman", "rm", "-f", container_id],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            check=False
+            check=False,
         )
 
         # Start the container using run instead of Popen
         print(f"Starting test container: {container_id}")
-        
+
         # Use detached mode to run in background
         container_start = subprocess.run(
             [
@@ -190,14 +255,14 @@ def test_mcp_protocol(container_setup, docker_image):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            check=False
+            check=False,
         )
-        
+
         # Print full container start output for debugging
         print(f"Container start stdout: {container_start.stdout}")
         print(f"Container start stderr: {container_start.stderr}")
         print(f"Container start return code: {container_start.returncode}")
-        
+
         if container_start.returncode != 0:
             print(f"Failed to start container: {container_start.stderr}")
             pytest.fail(f"Failed to start container: {container_start.stderr}")
@@ -213,21 +278,21 @@ def test_mcp_protocol(container_setup, docker_image):
                 stderr=subprocess.PIPE,
                 text=True,
             )
-            
+
             print(f"Container status: {ps_check.stdout}")
-            
+
             # Also get logs in case it failed to start properly
             logs_check = subprocess.run(
                 ["podman", "logs", container_id],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                check=False
+                check=False,
             )
-            
+
             print(f"Container logs stdout: {logs_check.stdout}")
             print(f"Container logs stderr: {logs_check.stderr}")
-            
+
             # Check specifically for this container
             running_check = subprocess.run(
                 ["podman", "ps", "-q", "-f", f"name={container_id}"],
@@ -245,7 +310,13 @@ def test_mcp_protocol(container_setup, docker_image):
 
             def timeout_handler():
                 print("Test timed out, terminating container...")
-                process.terminate()
+                subprocess.run(
+                    ["podman", "rm", "-f", container_id],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                    timeout=5,
+                )
                 pytest.fail("Test timed out waiting for response")
 
             # Set a timer for timeout
@@ -303,7 +374,7 @@ def test_mcp_protocol(container_setup, docker_image):
         finally:
             # Clean up the container
             print(f"Cleaning up container: {container_id}")
-            
+
             # Stop and remove the container with a more robust cleanup procedure
             try:
                 # First try a normal removal
@@ -312,7 +383,7 @@ def test_mcp_protocol(container_setup, docker_image):
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     check=False,
-                    timeout=10
+                    timeout=10,
                 )
             except subprocess.TimeoutExpired:
                 # If that times out, try to kill it first
@@ -322,7 +393,7 @@ def test_mcp_protocol(container_setup, docker_image):
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                         check=False,
-                        timeout=5
+                        timeout=5,
                     )
                     # Then try removal again
                     subprocess.run(
