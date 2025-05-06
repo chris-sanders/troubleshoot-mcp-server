@@ -287,10 +287,10 @@ def test_podman_version():
         text=True,
         check=False,
     )
-    
+
     assert result.returncode == 0, "Podman is not installed or not working properly"
     assert "podman" in result.stdout.lower(), "Unexpected output from podman version"
-    
+
     # Print the version for information
     print(f"Using Podman version: {result.stdout.strip()}")
 
