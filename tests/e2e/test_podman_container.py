@@ -409,7 +409,7 @@ def test_volume_mounting(container_image, test_container):
     # This approach creates the file from inside the container
     test_filename = "test_volume_mount.txt"
     test_content = "This is a test file for volume mounting"
-    
+
     try:
         # Create the test file from inside the container to avoid permission issues
         create_result = subprocess.run(
@@ -432,12 +432,12 @@ def test_volume_mounting(container_image, test_container):
             text=True,
             check=False,  # Don't raise exception on non-zero exit
         )
-        
+
         # If the file creation succeeded, check if we can read it
         if create_result.returncode == 0:
             read_result = subprocess.run(
                 [
-                    "podman", 
+                    "podman",
                     "run",
                     "--name",
                     container_name,
@@ -455,12 +455,12 @@ def test_volume_mounting(container_image, test_container):
                 text=True,
                 check=False,  # Don't raise exception on non-zero exit
             )
-            
+
             # Check if the content matches what we expected
             if read_result.returncode == 0:
                 assert test_content in read_result.stdout, "File content does not match expected"
                 return
-        
+
         # If we get here, either file creation or reading failed
         # Fall back to just verifying the directory exists
         verify_dir = subprocess.run(
@@ -483,10 +483,10 @@ def test_volume_mounting(container_image, test_container):
             text=True,
             check=True,  # This should succeed
         )
-        
+
         # Just verify the directory exists and is accessible
         assert "bundles" in verify_dir.stdout, "Volume directory not found or accessible"
-        
+
     except subprocess.CalledProcessError as e:
         # If this fails, something is seriously wrong with the volume mounting
         assert False, f"Volume mounting test failed: {e.stderr}"
