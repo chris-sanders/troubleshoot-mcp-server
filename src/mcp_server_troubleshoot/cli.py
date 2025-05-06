@@ -101,6 +101,7 @@ def handle_show_config() -> None:
 def handle_version() -> None:
     """Output version information."""
     from mcp_server_troubleshoot import __version__
+
     print(f"mcp-server-troubleshoot version {__version__}")
     sys.exit(0)
 
@@ -117,7 +118,7 @@ def main() -> None:
     if args.show_config:
         handle_show_config()
         return  # This should never be reached as handle_show_config exits
-    
+
     if args.version:
         handle_version()
         return  # This should never be reached as handle_version exits
