@@ -131,13 +131,10 @@ jobs:
           fi
       
       - name: Run container tests
-        run: uv run pytest tests/e2e/test_podman.py -v
-      
-      - name: Run container build test
-        run: uv run pytest tests/e2e/test_container.py::test_containerfile_exists tests/e2e/test_container.py::test_container_build -v
+        run: uv run pytest tests/e2e/test_container_consolidated.py -v
   
   e2e:
-    name: Other E2E Tests
+    name: E2E Tests
     runs-on: ubuntu-latest
     needs: test  # Only run E2E tests if unit and integration tests pass
     
@@ -175,4 +172,4 @@ jobs:
           sbctl --help
       
       - name: Run E2E tests (excluding container tests)
-        run: uv run pytest -m "e2e and not container" -v
+        run: uv run pytest tests/e2e/test_functional.py -v

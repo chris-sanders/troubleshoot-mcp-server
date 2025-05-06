@@ -96,9 +96,14 @@ The integration tests test multiple components working together:
 
 The e2e tests test the full system:
 
-- `test_container.py`: Tests the container functionality
-- `test_docker.py`: Tests Docker-specific functionality
-- `quick_check.py`: Fast tests for basic functionality checks
+- `test_functional.py`: Tests basic functionality without container dependencies
+- `test_container_consolidated.py`: Tests container functionality with an optimized fixture model
+- `test_non_container.py`: Tests basic package imports and functionality
+
+The following files are being phased out in favor of consolidated tests:
+- `test_container.py`: Legacy container tests (use test_container_consolidated.py instead)
+- `test_docker.py`: Legacy Docker tests (use test_container_consolidated.py instead)
+- `quick_check.py`: Legacy functionality checks (use test_functional.py instead)
 
 ## Test Implementation Patterns
 
@@ -136,6 +141,16 @@ Several fixtures provide standardized test environments:
 - `mock_bundle_manager`: Provides a pre-configured mock bundle manager
 - `mock_command_environment`: Sets up isolated command testing environment
 - `error_setup`: Provides standard error scenarios for testing
+
+## Test Suite Improvements
+
+The test suite has been improved to:
+
+1. **Reduce Test Redundancy**: Consolidated multiple overlapping tests into single files
+2. **Improve Test Efficiency**: Build container images only once per test run
+3. **Focus on Functionality**: Removed tests that only check file existence without functional value
+4. **Streamline CI**: Optimized CI workflow to run faster and with better organized test phases
+5. **Simplify Maintenance**: New tests are more maintainable with better fixtures and organization
 
 ## Best Practices
 
