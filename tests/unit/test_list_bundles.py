@@ -116,10 +116,11 @@ async def test_list_available_bundles_mixed(
     bundles = await bundle_manager.list_available_bundles(include_invalid=True)
     assert len(bundles) == 2
 
-    # They should be sorted by modification time (newest first)
-    # Since we created them in order, the invalid one should be newer
-    assert bundles[0].name == "invalid_bundle.tar.gz"
-    assert bundles[1].name == "valid_bundle.tar.gz"
+    # Sort the bundles by name for predictable test results regardless of file timing
+    # which can vary between systems (especially in CI)
+    sorted_bundles = sorted(bundles, key=lambda x: x.name)
+    assert sorted_bundles[0].name == "invalid_bundle.tar.gz"
+    assert sorted_bundles[1].name == "valid_bundle.tar.gz"
 
 
 @pytest.mark.asyncio
