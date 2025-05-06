@@ -441,6 +441,10 @@ def test_volume_mounting(container_image, test_container):
             check=False,
         )
 
+        # Check if we were able to create the file
+        if "Write failed" in create_result.stdout:
+            print("Unable to write to mounted volume, trying read test anyway")
+
         # Check if we can read from the volume
         read_result = subprocess.run(
             [
