@@ -72,8 +72,16 @@ def test_sbctl_help_behavior(test_support_bundle):
         test_support_bundle: Path to the test support bundle (pytest fixture)
     """
     # Verify sbctl is available (basic behavior)
+    # Log which sbctl is being used for debugging
     result = subprocess.run(["which", "sbctl"], capture_output=True, text=True)
-    assert result.returncode == 0, "sbctl command should be available"
+    assert result.returncode == 0, "sbctl command should be available (which sbctl failed)"
+    print(f"Using sbctl at: {result.stdout.strip()}")
+
+    # Also check if executable permission is set
+    sbctl_path = result.stdout.strip()
+    if sbctl_path:
+        perm_result = subprocess.run(["ls", "-la", sbctl_path], capture_output=True, text=True)
+        print(f"sbctl permissions: {perm_result.stdout.strip()}")
 
     # Check help output behavior
     help_result = subprocess.run(["sbctl", "--help"], capture_output=True, text=True, timeout=5)

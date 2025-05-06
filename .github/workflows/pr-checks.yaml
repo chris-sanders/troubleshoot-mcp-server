@@ -47,6 +47,11 @@ jobs:
           chmod +x sbctl
           sudo mv sbctl /usr/local/bin/
           cd / && rm -rf /tmp/sbctl
+          
+          # Debug sbctl installation
+          which sbctl
+          ls -la /usr/local/bin/sbctl
+          echo "PATH: $PATH"
           sbctl --help
       
       - name: Run unit tests
