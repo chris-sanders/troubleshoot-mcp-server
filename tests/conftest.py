@@ -345,3 +345,40 @@ def ensure_bundles_directory():
     fixtures_dir = Path(__file__).parent / "fixtures"
     assert fixtures_dir.exists(), f"Fixtures directory not found at {fixtures_dir}"
     return fixtures_dir
+
+
+@pytest.fixture
+def temp_bundles_directory():
+    """
+    Create a temporary directory for bundles during tests.
+
+    This isolates each test to use a separate bundles directory, preventing
+    cross-test contamination.
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        yield temp_path
+
+
+@pytest.fixture
+def container_test_env():
+    """
+    Create a test environment for container tests.
+
+    This sets up common environment variables and resources for container testing.
+    """
+    # Store original environment
+    original_env = os.environ.copy()
+
+    # Set up test environment
+    os.environ["SBCTL_TOKEN"] = "test-token"
+    os.environ["MCP_BUNDLE_STORAGE"] = "/data/bundles"
+
+    # Yield to run the test
+    yield os.environ
+
+    # Restore original environment
+    os.environ.clear()
+    os.environ.update(original_env)

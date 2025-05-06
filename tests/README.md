@@ -96,9 +96,26 @@ The integration tests test multiple components working together:
 
 The e2e tests test the full system:
 
-- `test_container.py`: Tests the container functionality
-- `test_docker.py`: Tests Docker-specific functionality
-- `quick_check.py`: Fast tests for basic functionality checks
+#### Test Files
+
+- `test_non_container.py`: Tests that verify basic e2e functionality without needing containers
+  - Tests package imports and API functionality
+  - Verifies CLI commands work correctly
+  - Tests actual API components initialization and interaction
+
+- `test_podman_container.py`: Podman container tests with efficient fixtures
+  - Uses module-scoped fixtures to build container image only once
+  - Provides isolated container instances for each test
+  - Tests multiple container aspects (startup, tools, volume mounting)
+  - Verifies required files exist (Containerfile, scripts)
+  - Checks that tools are properly installed (sbctl, kubectl)
+
+- `test_podman.py`: Additional Podman tests focused on container build and run processes
+  - Tests file existence (Containerfile, .containerignore)
+  - Tests script executability (build.sh, run.sh)
+  - Tests container building, running, and tool installation
+
+- `quick_check.py`: Basic checks for development and testing environment
 
 ## Test Implementation Patterns
 
@@ -136,6 +153,45 @@ Several fixtures provide standardized test environments:
 - `mock_bundle_manager`: Provides a pre-configured mock bundle manager
 - `mock_command_environment`: Sets up isolated command testing environment
 - `error_setup`: Provides standard error scenarios for testing
+
+## Test Suite Improvements
+
+The test suite has been optimized with a focus on Podman for container testing:
+
+### 1. Podman-Focused Container Testing
+
+- **Podman-Only**: Tests now use Podman exclusively for container operations
+- **Module-Scoped Fixtures**: Container images are built only once per test module
+- **Concurrent Test Execution**: Tests are designed to run in parallel where possible
+- **Reduced Redundancy**: Eliminated duplicate code across container test files
+
+### 2. Maintainability Improvements
+
+- **Focused Test Files**: Each test file has a clear, specific purpose
+- **Better Documentation**: Improved docstrings and README documentation
+- **Consistent Patterns**: Used consistent fixture and test patterns throughout
+- **Simplified Structure**: Clear separation between container and non-container tests
+
+### 3. Functionality Focus
+
+- **Value-Based Testing**: Tests focus on actual behavior rather than implementation details
+- **Better Test Coverage**: Tests cover real functionality and edge cases
+- **API-Driven Tests**: Tests verify API contracts and component interactions
+- **Real-World Scenarios**: Tests simulate actual usage patterns
+
+### 4. Container Testing Optimization
+
+- **Single Build Process**: Podman container is built only once during test suite execution
+- **Isolated Test Instances**: Each test gets a fresh container instance without rebuilding
+- **Proper Resource Cleanup**: All containers and images are properly cleaned up
+- **Clear Container Lifecycle**: Tests clearly separate build, run, and cleanup phases
+
+### 5. CI Workflow Improvements
+
+- **Targeted Test Selection**: CI workflow runs tests based on their category
+- **Better Failure Reporting**: Test failures are more clearly reported
+- **Faster Feedback Loop**: Developers get faster feedback on their changes
+- **Simplified CI Configuration**: Workflow steps clearly match test categories
 
 ## Best Practices
 
