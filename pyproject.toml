@@ -33,6 +33,7 @@ dev = [
     "black",
     "ruff",
     "mypy",
+    "types-PyYAML",  # Type stubs for PyYAML
 ]
 
 [tool.setuptools.packages.find]
