@@ -3,19 +3,18 @@
 Test script to verify the grep_files function fix.
 """
 
-import pytest
-
-# Mark all tests in this file as unit tests
-pytestmark = pytest.mark.unit
-
 import asyncio
-import tempfile
+import pytest
 import shutil
+import tempfile
 from pathlib import Path
+from unittest.mock import Mock
 
 from mcp_server_troubleshoot.bundle import BundleManager, BundleMetadata
 from mcp_server_troubleshoot.files import FileExplorer
-from unittest.mock import Mock
+
+# Mark all tests in this file as unit tests
+pytestmark = pytest.mark.unit
 
 
 @pytest.mark.asyncio

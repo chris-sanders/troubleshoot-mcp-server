@@ -151,7 +151,7 @@ async def test_bundle_lifecycle(bundle_manager_fixture):
     assert active_bundle.id == result.id, "Active bundle should match initialized bundle"
 
     # Verify API server functionality (behavior, not implementation)
-    api_available = await manager.check_api_server_available()
+    await manager.check_api_server_available()
     # We don't assert this is always True since it depends on the test environment,
     # but we verify the method runs without error
 

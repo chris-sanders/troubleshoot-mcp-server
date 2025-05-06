@@ -124,7 +124,7 @@ class TestFactory:
         path: Optional[Path] = None,
         kubeconfig_path: Optional[Path] = None,
         initialized: bool = True,
-    ) -> "BundleMetadata":
+    ):
         """
         Create a BundleMetadata instance with sensible defaults.
 
@@ -169,7 +169,7 @@ class TestFactory:
         stderr: str = "",
         is_json: bool = True,
         duration_ms: int = 100,
-    ) -> "KubectlResult":
+    ):
         """
         Create a KubectlResult instance with sensible defaults.
 
