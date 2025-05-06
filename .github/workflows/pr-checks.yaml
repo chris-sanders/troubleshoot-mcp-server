@@ -36,6 +36,15 @@ jobs:
           # Install development dependencies
           uv pip install -e ".[dev]"
       
+      - name: Run linting
+        run: uv run ruff check .
+      
+      - name: Run formatting check
+        run: uv run black --check .
+      
+      - name: Run type checking
+        run: uv run mypy src
+        
       - name: Install sbctl
         run: |
           # Install sbctl binary for integration tests
@@ -59,15 +68,6 @@ jobs:
       
       - name: Run integration tests
         run: uv run pytest -m integration -v
-      
-      - name: Run linting
-        run: uv run ruff check .
-      
-      - name: Run formatting check
-        run: uv run black --check .
-      
-      - name: Run type checking
-        run: uv run mypy src
       
       - name: Run all tests with coverage
         run: uv run pytest --cov=src --cov-report=xml
