@@ -130,8 +130,8 @@ jobs:
             cat .containerignore
           fi
       
-      - name: Run container tests
-        run: uv run pytest tests/e2e/test_container_consolidated.py -v
+      - name: Run Podman container tests
+        run: uv run pytest tests/e2e/test_podman_container.py -v
   
   e2e:
     name: E2E Tests
@@ -172,4 +172,4 @@ jobs:
           sbctl --help
       
       - name: Run E2E tests (excluding container tests)
-        run: uv run pytest tests/e2e/test_functional.py -v
+        run: uv run pytest tests/e2e/test_non_container.py -v

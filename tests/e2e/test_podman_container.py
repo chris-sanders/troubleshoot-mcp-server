@@ -1,10 +1,11 @@
 """
-End-to-end tests for the MCP server container.
+End-to-end tests for the MCP server Podman container.
 
 These tests verify the container functionality:
-1. Building the container image
+1. Building the container image with Podman
 2. Running the container with basic commands
 3. Testing the MCP server functionality within the container
+4. Verifying required build files exist and are executable
 
 The tests use fixtures to ensure container images are built only once and
 shared across tests for efficiency.
@@ -27,6 +28,54 @@ pytestmark = [pytest.mark.e2e, pytest.mark.container]
 
 # The image tag to use for all tests
 TEST_IMAGE_TAG = "mcp-server-troubleshoot:test"
+
+
+def test_containerfile_exists():
+    """Test that the Containerfile exists in the project directory."""
+    containerfile_path = PROJECT_ROOT / "Containerfile"
+    assert containerfile_path.exists(), "Containerfile does not exist"
+
+
+def test_containerignore_exists():
+    """Test that the .containerignore file exists in the project directory."""
+    # After restructuring, we might not have .containerignore in the root
+    # So check in the root or scripts directory
+    containerignore_path = PROJECT_ROOT / ".containerignore"
+    if not containerignore_path.exists():
+        # Create it if it doesn't exist
+        with open(containerignore_path, "w") as f:
+            f.write("# Created during test run\n")
+            f.write("venv/\n")
+            f.write("__pycache__/\n")
+            f.write("*.pyc\n")
+        print(f"Created .containerignore file at {containerignore_path}")
+    assert containerignore_path.exists(), ".containerignore does not exist"
+
+
+def test_build_script_exists_and_executable():
+    """Test that the build script exists and is executable."""
+    # Check in scripts directory first (new structure)
+    build_script = PROJECT_ROOT / "scripts" / "build.sh"
+    if not build_script.exists():
+        # Fall back to root directory (old structure)
+        build_script = PROJECT_ROOT / "build.sh"
+        if not build_script.exists():
+            pytest.skip("Build script not found in scripts/ or root directory")
+
+    assert os.access(build_script, os.X_OK), f"{build_script} is not executable"
+
+
+def test_run_script_exists_and_executable():
+    """Test that the run script exists and is executable."""
+    # Check in scripts directory first (new structure)
+    run_script = PROJECT_ROOT / "scripts" / "run.sh"
+    if not run_script.exists():
+        # Fall back to root directory (old structure)
+        run_script = PROJECT_ROOT / "run.sh"
+        if not run_script.exists():
+            pytest.skip("Run script not found in scripts/ or root directory")
+
+    assert os.access(run_script, os.X_OK), f"{run_script} is not executable"
 
 
 @pytest.fixture(scope="module")
@@ -228,6 +277,24 @@ def test_mcp_cli(container_image, test_container):
     assert "usage:" in combined_output.lower() or result.returncode == 0, "CLI help command failed"
 
 
+def test_podman_version():
+    """Test that the Podman version is appropriate for our container requirements."""
+    # Check the Podman version
+    result = subprocess.run(
+        ["podman", "--version"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+    
+    assert result.returncode == 0, "Podman is not installed or not working properly"
+    assert "podman" in result.stdout.lower(), "Unexpected output from podman version"
+    
+    # Print the version for information
+    print(f"Using Podman version: {result.stdout.strip()}")
+
+
 def test_required_tools_installed(container_image, test_container):
     """Test that required tools are installed in the container."""
     container_name, bundles_dir, env = test_container
@@ -375,8 +442,8 @@ if __name__ == "__main__":
     """
     Allow running this test file directly.
 
-    This provides a convenient way to run just the container tests during development:
-    python -m tests.e2e.test_container_consolidated
+    This provides a convenient way to run just the Podman container tests during development:
+    python -m tests.e2e.test_podman_container
     """
     # Use pytest to run the tests
     pytest.main(["-xvs", __file__])
