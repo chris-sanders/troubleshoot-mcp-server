@@ -24,15 +24,15 @@ def test_containerfile_exists():
     """Test that the Containerfile exists in the project directory."""
     containerfile_path = PROJECT_ROOT / "Containerfile"
     assert containerfile_path.exists(), "Containerfile does not exist"
-    
-    
+
+
 def test_container_build():
     """Test that the container image builds successfully."""
     containerfile_path = PROJECT_ROOT / "Containerfile"
-    
+
     # Check Containerfile exists
     assert containerfile_path.exists(), "Containerfile does not exist"
-    
+
     # Check that Podman is available
     try:
         subprocess.run(
@@ -44,10 +44,10 @@ def test_container_build():
         )
     except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
         pytest.skip("Podman is not available")
-    
+
     # Use a unique tag for testing
     test_tag = "mcp-server-troubleshoot:test-build"
-    
+
     try:
         # Build the image
         result = subprocess.run(
@@ -59,10 +59,10 @@ def test_container_build():
             check=True,
             timeout=300,  # 5 minutes timeout for build
         )
-        
+
         # Check if build succeeded
         assert result.returncode == 0, f"Container build failed: {result.stderr}"
-        
+
         # Verify image exists
         image_check = subprocess.run(
             ["podman", "image", "exists", test_tag],
@@ -71,10 +71,10 @@ def test_container_build():
             check=False,
         )
         assert image_check.returncode == 0, f"Image {test_tag} not found after build"
-        
+
     except subprocess.CalledProcessError as e:
         pytest.fail(f"Container build failed with error: {e.stderr}")
-        
+
     finally:
         # Clean up the test image
         subprocess.run(
