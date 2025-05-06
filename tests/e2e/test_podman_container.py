@@ -17,6 +17,7 @@ import tempfile
 import time
 import uuid
 from pathlib import Path
+from typing import Generator, Dict, Any, Tuple
 
 import pytest
 
@@ -38,13 +39,13 @@ pytestmark = [pytest.mark.e2e, pytest.mark.container]
 TEST_IMAGE_TAG = "mcp-server-troubleshoot:test"
 
 
-def test_containerfile_exists():
+def test_containerfile_exists() -> None:
     """Test that the Containerfile exists in the project directory."""
     containerfile_path = PROJECT_ROOT / "Containerfile"
     assert containerfile_path.exists(), "Containerfile does not exist"
 
 
-def test_containerignore_exists():
+def test_containerignore_exists() -> None:
     """Test that the .containerignore file exists in the project directory."""
     # After restructuring, we might not have .containerignore in the root
     # So check in the root or scripts directory
@@ -60,7 +61,7 @@ def test_containerignore_exists():
     assert containerignore_path.exists(), ".containerignore does not exist"
 
 
-def test_build_script_exists_and_executable():
+def test_build_script_exists_and_executable() -> None:
     """Test that the build script exists and is executable."""
     # Check in scripts directory first (new structure)
     build_script = PROJECT_ROOT / "scripts" / "build.sh"
@@ -73,7 +74,7 @@ def test_build_script_exists_and_executable():
     assert os.access(build_script, os.X_OK), f"{build_script} is not executable"
 
 
-def test_run_script_exists_and_executable():
+def test_run_script_exists_and_executable() -> None:
     """Test that the run script exists and is executable."""
     # Check in scripts directory first (new structure)
     run_script = PROJECT_ROOT / "scripts" / "run.sh"
@@ -87,7 +88,7 @@ def test_run_script_exists_and_executable():
 
 
 @pytest.fixture(scope="module")
-def system_info():
+def system_info() -> Dict[str, Any]:
     """Get information about the testing environment."""
     info = get_system_info()
 
@@ -100,7 +101,7 @@ def system_info():
 
 
 @pytest.fixture(scope="module")
-def container_image(system_info):
+def container_image(system_info: Dict[str, Any]) -> Generator[str, None, None]:
     """
     Build the container image once for all tests.
 
@@ -174,14 +175,16 @@ def container_image(system_info):
 
 
 @pytest.fixture
-def bundles_directory():
+def bundles_directory() -> Generator[Path, None, None]:
     """Create a temporary directory for bundles."""
     with tempfile.TemporaryDirectory() as temp_dir:
         yield Path(temp_dir)
 
 
 @pytest.fixture
-def test_container(container_image, bundles_directory):
+def test_container(
+    container_image: str, bundles_directory: Path
+) -> Generator[Tuple[str, Path, Dict[str, str]], None, None]:
     """
     Setup and teardown for an individual container test.
 
@@ -212,7 +215,7 @@ def test_container(container_image, bundles_directory):
     )
 
 
-def test_basic_container_functionality(container_image, test_container):
+def test_basic_container_functionality(container_image: str, test_container: tuple) -> None:
     """Test that the container can run basic commands."""
     container_name, bundles_dir, env = test_container
 
@@ -244,7 +247,7 @@ def test_basic_container_functionality(container_image, test_container):
     assert "Container is working!" in result.stdout
 
 
-def test_python_functionality(container_image, test_container):
+def test_python_functionality(container_image: str, test_container: tuple) -> None:
     """Test that Python works correctly in the container."""
     container_name, bundles_dir, env = test_container
 
@@ -279,7 +282,7 @@ def test_python_functionality(container_image, test_container):
     assert "Python" in version_output, f"Unexpected output: {version_output}"
 
 
-def test_mcp_cli(container_image, test_container):
+def test_mcp_cli(container_image: str, test_container: tuple) -> None:
     """Test that the MCP server CLI works in the container."""
     container_name, bundles_dir, env = test_container
 
@@ -312,7 +315,7 @@ def test_mcp_cli(container_image, test_container):
     ), f"CLI help command failed with code {result.returncode}: {combined_output}"
 
 
-def test_podman_version():
+def test_podman_version() -> None:
     """Test that the Podman version is appropriate for our container requirements."""
     # Check if we should skip this test in CI
     should_skip, reason = should_skip_in_ci("test_podman_version")
@@ -335,7 +338,7 @@ def test_podman_version():
     print(f"Using Podman version: {result.stdout.strip()}")
 
 
-def test_required_tools_installed(container_image, test_container):
+def test_required_tools_installed(container_image: str, test_container: tuple) -> None:
     """Test that required tools are installed in the container."""
     container_name, bundles_dir, env = test_container
 
@@ -370,7 +373,7 @@ def test_required_tools_installed(container_image, test_container):
 
 
 @pytest.mark.timeout(30)  # Set a timeout for the test
-def test_mcp_server_startup(container_image, test_container):
+def test_mcp_server_startup(container_image: str, test_container: tuple) -> None:
     """
     Test that the MCP server starts up correctly in the container.
 
@@ -446,7 +449,7 @@ def test_mcp_server_startup(container_image, test_container):
         pass
 
 
-def test_bundle_processing(container_image, test_container):
+def test_bundle_processing(container_image: str, test_container: tuple) -> None:
     """
     Test that the container can process a bundle correctly.
 
@@ -467,48 +470,9 @@ def test_bundle_processing(container_image, test_container):
 
     # Separate approach based on environment to ensure reliability
     if is_ci_environment():
-        # In CI, we'll first create a container, then copy the file in and test
-        # Step 1: Create a container with minimal settings
-        create_result = subprocess.run(
-            [
-                "podman",
-                "create",
-                "--name",
-                container_name,
-                "-e",
-                "SBCTL_TOKEN=test-token",
-                "-e",
-                "MCP_BUNDLE_STORAGE=/data/bundles",
-                container_image,
-                "--version",  # Simple command that will execute quickly
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=False,
-        )
-
-        assert create_result.returncode == 0, f"Failed to create container: {create_result.stderr}"
-
+        # In CI, we'll use direct container runs to test functionality
+        # No need to create a persistent container
         try:
-            # Step 2: Start the container once to ensure it's available for commands
-            subprocess.run(
-                ["podman", "start", container_name],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                check=False,
-            )
-
-            # Wait for container to exit
-            subprocess.run(
-                ["podman", "wait", container_name],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                check=False,
-                timeout=10,
-            )
 
             # Step 3: Test basic CLI functionality
             help_result = subprocess.run(
