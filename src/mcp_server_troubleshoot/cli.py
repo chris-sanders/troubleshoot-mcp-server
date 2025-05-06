@@ -52,10 +52,11 @@ def setup_logging(verbose: bool = False, mcp_mode: bool = False) -> None:
         # Configure root logger to use stderr
         root_logger = logging.getLogger()
         for handler in root_logger.handlers:
-            handler.stream = sys.stderr
+            if hasattr(handler, 'stream'):
+                handler.stream = sys.stderr
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for the MCP server."""
     parser = argparse.ArgumentParser(description="MCP server for Kubernetes support bundles")
     parser.add_argument("--bundle-dir", type=Path, help="Directory to store bundles")
@@ -85,14 +86,14 @@ def parse_args():
     return parser.parse_args()
 
 
-def handle_show_config():
+def handle_show_config() -> None:
     """Output recommended client configuration."""
     config = get_recommended_client_config()
     json.dump(config, sys.stdout, indent=2)
     sys.exit(0)
 
 
-def main():
+def main() -> None:
     """
     Main entry point that adapts based on how it's called.
     This allows the module to be used both as a direct CLI and
@@ -138,7 +139,7 @@ def main():
     # Configure the MCP server for stdio mode if needed
     if mcp_mode:
         logger.debug("Configuring MCP server for stdio mode")
-        mcp.use_stdio = True
+        os.environ["MCP_USE_STDIO"] = "true"
         # Set up signal handlers specifically for stdio mode
         setup_signal_handlers()
 

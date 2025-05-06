@@ -54,10 +54,11 @@ def setup_logging(verbose: bool = False, mcp_mode: bool = False) -> None:
         # Configure root logger to use stderr
         root_logger = logging.getLogger()
         for handler in root_logger.handlers:
-            handler.stream = sys.stderr
+            if hasattr(handler, 'stream'):
+                handler.stream = sys.stderr
 
 
-def handle_show_config():
+def handle_show_config() -> None:
     """Output recommended client configuration."""
     config = get_recommended_client_config()
     json.dump(config, sys.stdout, indent=2)
@@ -133,10 +134,10 @@ def main(args: Optional[List[str]] = None) -> None:
             logger.debug(f"Using bundle directory: {bundle_dir}")
 
     # Configure the MCP server based on the mode
-    # In stdio mode, we enable use_stdio=True
+    # In stdio mode, we use environment variable to control behavior
     if mcp_mode:
         logger.debug("Configuring MCP server for stdio mode")
-        mcp.use_stdio = True
+        os.environ["MCP_USE_STDIO"] = "true"
         # Set up signal handlers specifically for stdio mode
         setup_signal_handlers()
 
