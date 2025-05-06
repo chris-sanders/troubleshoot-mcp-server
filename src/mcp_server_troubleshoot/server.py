@@ -9,7 +9,7 @@ import logging
 import signal
 import sys
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Any
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import TextContent
@@ -21,7 +21,7 @@ from .bundle import (
     ListAvailableBundlesArgs,
 )
 from .kubectl import KubectlError, KubectlExecutor, KubectlCommandArgs
-from .files import FileExplorer, FileSystemError, GrepFilesArgs, ListFilesArgs, ReadFileArgs
+from .files import FileExplorer, FileSystemError, GrepFilesArgs, ListFilesArgs, ReadFileArgs, GrepMatch
 from .lifecycle import app_lifespan, AppContext
 
 logger = logging.getLogger(__name__)
@@ -33,10 +33,10 @@ mcp = FastMCP("troubleshoot-mcp-server", lifespan=app_lifespan)
 # Flag to track if we're shutting down
 _is_shutting_down = False
 
-# Global variables for singleton pattern
-_bundle_manager = None
-_kubectl_executor = None
-_file_explorer = None
+# Global variables for singleton pattern (initialized as None)
+_bundle_manager: Optional[BundleManager] = None
+_kubectl_executor: Optional[KubectlExecutor] = None
+_file_explorer: Optional[FileExplorer] = None
 
 # Global app context for legacy function compatibility
 _app_context = None
@@ -571,7 +571,7 @@ async def grep_files(args: GrepFilesArgs) -> List[TextContent]:
         # If we have matches, show them
         if result.matches:
             # Group matches by file
-            matches_by_file: dict[str, list] = {}
+            matches_by_file: dict[str, list[GrepMatch]] = {}
             for match in result.matches:
                 if match.path not in matches_by_file:
                     matches_by_file[match.path] = []

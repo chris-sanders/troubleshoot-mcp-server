@@ -37,7 +37,7 @@ class AppContext:
     file_explorer: FileExplorer
     kubectl_executor: KubectlExecutor
     temp_dir: str = ""
-    background_tasks: Dict[str, asyncio.Task] = field(default_factory=dict)
+    background_tasks: Dict[str, asyncio.Task[Any]] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 

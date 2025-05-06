@@ -1536,7 +1536,7 @@ class BundleManager:
         logger.warning("API server is not available at any endpoint")
         return False
 
-    async def get_diagnostic_info(self) -> dict:
+    async def get_diagnostic_info(self) -> dict[str, object]:
         """
         Get diagnostic information about the current bundle and sbctl.
 
