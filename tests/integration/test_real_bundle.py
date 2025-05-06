@@ -6,7 +6,6 @@ with actual support bundles, focusing on user-visible behavior
 rather than implementation details.
 """
 
-import os
 import time
 import asyncio
 import subprocess
@@ -57,7 +56,7 @@ async def bundle_manager_fixture(test_support_bundle):
             await manager.cleanup()
 
 
-def test_sbctl_help_behavior(test_support_bundle, fixtures_dir):
+def test_sbctl_help_behavior(test_support_bundle):
     """
     Test the basic behavior of the sbctl command.
 
@@ -71,100 +70,56 @@ def test_sbctl_help_behavior(test_support_bundle, fixtures_dir):
 
     Args:
         test_support_bundle: Path to the test support bundle (pytest fixture)
-        fixtures_dir: Fixture that provides the path to test fixtures directory
     """
-    # Check if sbctl is available
+    # Verify sbctl is available (basic behavior)
     result = subprocess.run(["which", "sbctl"], capture_output=True, text=True)
+    assert result.returncode == 0, "sbctl command should be available"
 
-    # If sbctl is not available, set up the mock version temporarily
-    temp_dir = None
-    old_path = None
+    # Check help output behavior
+    help_result = subprocess.run(["sbctl", "--help"], capture_output=True, text=True, timeout=5)
 
-    if result.returncode != 0:
-        # Create a temporary directory for bin
-        temp_dir = tempfile.mkdtemp()
-        bin_dir = Path(temp_dir) / "bin"
-        bin_dir.mkdir(exist_ok=True)
+    # Verify the command ran successfully
+    assert help_result.returncode == 0, "sbctl help command should succeed"
 
-        # Set up mock sbctl script
-        mock_sbctl_path = fixtures_dir / "mock_sbctl.py"
-        sbctl_script = bin_dir / "sbctl"
+    # Verify the help output contains expected commands (behavior test)
+    help_output = help_result.stdout
+    assert "shell" in help_output, "sbctl help should mention the shell command"
+    assert "serve" in help_output, "sbctl help should mention the serve command"
 
-        with open(sbctl_script, "w") as f:
-            f.write(
-                f"""#!/bin/bash
-python "{mock_sbctl_path}" "$@"
-"""
-            )
-        os.chmod(sbctl_script, 0o755)
+    # Check a basic command behavior that should be present in all versions
+    # (version command might not exist in all sbctl implementations)
+    basic_cmd_result = subprocess.run(
+        ["sbctl", "--version"], capture_output=True, text=True, timeout=5
+    )
 
-        # Add to PATH temporarily
-        old_path = os.environ.get("PATH", "")
-        os.environ["PATH"] = f"{bin_dir}:{old_path}"
+    # If --version doesn't work, we'll fall back to verifying help works
+    # This is a more behavior-focused test that's resilient to implementation details
+    if basic_cmd_result.returncode != 0:
+        print("Note: sbctl --version command not available, falling back to help check")
+        # We already verified help works above, so continue
 
-        # Verify our mock sbctl is now available
-        result = subprocess.run(["which", "sbctl"], capture_output=True, text=True)
-        assert result.returncode == 0, "Mock sbctl command should be available"
+    # Create a temporary working directory for any file tests
+    with tempfile.TemporaryDirectory() as temp_dir:
+        work_dir = Path(temp_dir)
 
-    try:
-        # Check help output behavior
-        help_result = subprocess.run(["sbctl", "--help"], capture_output=True, text=True, timeout=5)
-
-        # Verify the command ran successfully
-        assert help_result.returncode == 0, "sbctl help command should succeed"
-
-        # Verify the help output contains expected commands (behavior test)
-        help_output = help_result.stdout
-        assert "shell" in help_output, "sbctl help should mention the shell command"
-        assert "serve" in help_output, "sbctl help should mention the serve command"
-
-        # Check a basic command behavior that should be present in all versions
-        # (version command might not exist in all sbctl implementations)
-        basic_cmd_result = subprocess.run(
-            ["sbctl", "--version"], capture_output=True, text=True, timeout=5
+        # Verify sbctl command behavior with specific options
+        # This is testing the CLI interface rather than execution outcome
+        serve_help_result = subprocess.run(
+            ["sbctl", "serve", "--help"],
+            cwd=str(work_dir),
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
 
-        # If --version doesn't work, we'll fall back to verifying help works
-        # This is a more behavior-focused test that's resilient to implementation details
-        if basic_cmd_result.returncode != 0:
-            print("Note: sbctl --version command not available, falling back to help check")
-            # We already verified help works above, so continue
+        # Verify help for serve is available
+        assert serve_help_result.returncode == 0, "sbctl serve help command should succeed"
 
-        # Create a temporary working directory for any file tests
-        with tempfile.TemporaryDirectory() as temp_dir2:
-            work_dir = Path(temp_dir2)
-
-            # Verify sbctl command behavior with specific options
-            # This is testing the CLI interface rather than execution outcome
-            serve_help_result = subprocess.run(
-                ["sbctl", "serve", "--help"],
-                cwd=str(work_dir),
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-
-            # Verify help for serve is available
-            assert serve_help_result.returncode == 0, "sbctl serve help command should succeed"
-
-            # Verify serve help contains expected options
-            serve_help_output = serve_help_result.stdout
-            assert (
-                "--support-bundle-location" in serve_help_output
-            ), "Serve command should document bundle location option"
-    finally:
-        # Clean up if we created a temporary mock sbctl
-        if temp_dir and Path(temp_dir).exists():
-            import shutil
-
-            try:
-                shutil.rmtree(temp_dir)
-            except Exception:
-                pass  # Ignore cleanup errors
-
-            # Restore original PATH
-            if old_path is not None:
-                os.environ["PATH"] = old_path
+        # Verify serve help contains expected options
+        serve_help_output = serve_help_result.stdout
+        assert (
+            "--support-bundle-location" in serve_help_output
+        ), "Serve command should document bundle location option"
 
 
 @pytest.mark.asyncio
