@@ -82,6 +82,11 @@ def parse_args() -> argparse.Namespace:
         default=3600,
         help="Interval in seconds for periodic cleanup (default: 3600)",
     )
+    parser.add_argument(
+        "--version",
+        action="store_true",
+        help="Show version information",
+    )
 
     return parser.parse_args()
 
@@ -90,6 +95,13 @@ def handle_show_config() -> None:
     """Output recommended client configuration."""
     config = get_recommended_client_config()
     json.dump(config, sys.stdout, indent=2)
+    sys.exit(0)
+
+
+def handle_version() -> None:
+    """Output version information."""
+    from mcp_server_troubleshoot import __version__
+    print(f"mcp-server-troubleshoot version {__version__}")
     sys.exit(0)
 
 
@@ -105,6 +117,10 @@ def main() -> None:
     if args.show_config:
         handle_show_config()
         return  # This should never be reached as handle_show_config exits
+    
+    if args.version:
+        handle_version()
+        return  # This should never be reached as handle_version exits
 
     # Determine if we're in stdio mode
     # Use explicit flag or detect from terminal
