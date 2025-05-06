@@ -74,6 +74,11 @@ timeout = 30
 [tool.ruff]
 line-length = 100
 target-version = "py313"
+# Exclude specific modules or use per-file rules as needed
+exclude = [
+    "tests/fixtures/mock_sbctl.py",
+    "tests/fixtures/mock_kubectl.py"
+]
 
 [tool.black]
 line-length = 100

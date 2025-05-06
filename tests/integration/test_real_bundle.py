@@ -1,14 +1,13 @@
 """
 Tests for real support bundle integration.
 
-These tests verify the behavior of the MCP server components 
+These tests verify the behavior of the MCP server components
 with actual support bundles, focusing on user-visible behavior
 rather than implementation details.
 """
 
 import time
 import asyncio
-import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -17,16 +16,13 @@ import pytest_asyncio
 
 # Import components for testing
 from mcp_server_troubleshoot.bundle import BundleManager
-from mcp_server_troubleshoot.files import FileExplorer, PathNotFoundError
-from mcp_server_troubleshoot.kubectl import KubectlExecutor
+from mcp_server_troubleshoot.files import FileExplorer
 
 # Mark all tests in this file as integration tests
 pytestmark = pytest.mark.integration
 
-from mcp_server_troubleshoot.bundle import BundleManager
 
 # Import pytest_asyncio for proper fixture setup
-import pytest_asyncio
 
 
 @pytest_asyncio.fixture
@@ -183,7 +179,6 @@ async def test_bundle_initialization_workflow(bundle_manager_fixture, test_asser
     Args:
         bundle_manager_fixture: Fixture that provides a BundleManager and bundle path
     """
-    from mcp_server_troubleshoot.files import FileExplorer
 
     # Unpack the fixture
     manager, bundle_path = bundle_manager_fixture

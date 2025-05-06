@@ -32,7 +32,7 @@ import pytest
 async def test_stdio_lifecycle_docstring():
     """
     This test exists to document why the stdio lifecycle tests were removed.
-    
+
     The stdio lifecycle functionality is now properly tested in the e2e container
     tests which provide a more appropriate environment.
     """

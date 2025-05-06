@@ -59,15 +59,17 @@ pytestmark = pytest.mark.unit
         "invalid-delete-operation",
         "invalid-exec-operation",
         "invalid-apply-operation",
-    ]
+    ],
 )
-def test_kubectl_command_args_validation_parametrized(command, timeout, json_output, expected_valid):
+def test_kubectl_command_args_validation_parametrized(
+    command, timeout, json_output, expected_valid
+):
     """
     Test KubectlCommandArgs validation with parameterized test cases.
-    
+
     This test covers both valid and invalid inputs in a single test,
     making it easier to see all validation rules and add new cases.
-    
+
     Args:
         command: The kubectl command to validate
         timeout: Command timeout in seconds
@@ -98,8 +100,11 @@ def test_kubectl_command_args_validation_parametrized(command, timeout, json_out
         ("get pods -o wide", ["kubectl", "get", "pods", "-o", "wide"], False),
         # Commands with additional flags
         ("get pods -n default", ["kubectl", "get", "pods", "-n", "default"], True),
-        ("get pods --field-selector=status.phase=Running", 
-         ["kubectl", "get", "pods", "--field-selector=status.phase=Running"], True),
+        (
+            "get pods --field-selector=status.phase=Running",
+            ["kubectl", "get", "pods", "--field-selector=status.phase=Running"],
+            True,
+        ),
         # Query-type commands
         ("api-resources", ["kubectl", "api-resources"], True),
         ("version", ["kubectl", "version"], True),
@@ -113,15 +118,15 @@ def test_kubectl_command_args_validation_parametrized(command, timeout, json_out
         "field-selector",
         "api-resources",
         "version",
-    ]
+    ],
 )
 async def test_kubectl_command_execution_parameters(command, expected_args, add_json, test_factory):
     """
     Test that the kubectl executor handles different command formats correctly.
-    
+
     This test ensures the command is properly parsed and executed for
     various command patterns with different options.
-    
+
     Args:
         command: The kubectl command to execute
         expected_args: Expected command arguments list
@@ -130,44 +135,44 @@ async def test_kubectl_command_execution_parameters(command, expected_args, add_
     """
     # Create a bundle for testing
     bundle = test_factory.create_bundle_metadata()
-    
+
     # Create mock objects for testing
     mock_process = AsyncMock()
     mock_process.returncode = 0
     mock_process.communicate = AsyncMock(return_value=(b'{"items": []}', b""))
-    
+
     # Create the executor with a mock bundle manager
     bundle_manager = Mock(spec=BundleManager)
     bundle_manager.get_active_bundle.return_value = bundle
     executor = KubectlExecutor(bundle_manager)
-    
+
     # If we should add JSON format, add it to the expected args
     if add_json:
         expected_args.extend(["-o", "json"])
-    
+
     # Mock the create_subprocess_exec function
     with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
         # Execute the command
         result = await executor._run_kubectl_command(command, bundle, 30, True)
-        
+
         # Verify the command was constructed correctly
         mock_exec.assert_awaited_once()
         args = mock_exec.call_args[0]
-        
+
         # Verify each argument matches the expected value
         for i, arg in enumerate(expected_args):
             assert args[i] == arg, f"Argument {i} should be '{arg}', got '{args[i]}'"
-        
+
         # Verify the result structure
         assert result.exit_code == 0
         assert isinstance(result.stdout, str)
         assert isinstance(result.stderr, str)
-        
+
         # Verify JSON handling
         if add_json:
             assert result.is_json is True
             assert isinstance(result.output, dict)
-        
+
         # Verify timing information
         assert isinstance(result.duration_ms, int)
         assert result.duration_ms >= 0
@@ -191,17 +196,17 @@ async def test_kubectl_command_execution_parameters(command, expected_args, add_
         "error-resource-not-found",
         "error-unknown-flag",
         "error-command-not-found",
-    ]
+    ],
 )
 async def test_kubectl_error_handling(
     return_code, stdout_content, stderr_content, expected_exit_code, should_raise, test_factory
 ):
     """
     Test that the kubectl executor handles errors correctly.
-    
+
     This test verifies that command failures are handled properly,
     with appropriate errors raised and error information preserved.
-    
+
     Args:
         return_code: The command return code
         stdout_content: Command standard output
@@ -212,33 +217,33 @@ async def test_kubectl_error_handling(
     """
     # Create a bundle for testing
     bundle = test_factory.create_bundle_metadata()
-    
+
     # Create mock objects for testing
     mock_process = AsyncMock()
     mock_process.returncode = return_code
     mock_process.communicate = AsyncMock(
         return_value=(stdout_content.encode(), stderr_content.encode())
     )
-    
+
     # Create the executor with a mock bundle manager
     bundle_manager = Mock(spec=BundleManager)
     bundle_manager.get_active_bundle.return_value = bundle
     executor = KubectlExecutor(bundle_manager)
-    
+
     # Test command execution
     with patch("asyncio.create_subprocess_exec", return_value=mock_process):
         if should_raise:
             # Should raise KubectlError
             with pytest.raises(KubectlError) as excinfo:
                 await executor._run_kubectl_command("get pods", bundle, 30, True)
-            
+
             # Verify error details
             assert excinfo.value.exit_code == expected_exit_code
             assert stderr_content in excinfo.value.stderr
         else:
             # Should succeed
             result = await executor._run_kubectl_command("get pods", bundle, 30, True)
-            
+
             # Verify result details
             assert result.exit_code == expected_exit_code
             assert result.stdout == stdout_content
@@ -249,45 +254,45 @@ async def test_kubectl_error_handling(
 async def test_kubectl_timeout_behavior(test_assertions, test_factory):
     """
     Test that the kubectl executor properly handles command timeouts.
-    
+
     This test verifies that:
     1. Commands that exceed their timeout are properly terminated
     2. KubectlError is raised with the correct error information
     3. The process is killed to prevent resource leaks
-    
+
     Args:
         test_assertions: Assertions helper fixture
         test_factory: Factory fixture for test objects
     """
     # Create a bundle for testing
     bundle = test_factory.create_bundle_metadata()
-    
+
     # Create a mock process
     mock_process = AsyncMock()
     mock_process.returncode = 0
-    
+
     # Create a function that hangs to simulate a timeout
     async def hang_forever():
         await asyncio.sleep(30)  # Much longer than our timeout
         return (b"", b"")
-    
+
     mock_process.communicate = AsyncMock(side_effect=hang_forever)
     mock_process.kill = Mock()
-    
+
     # Create the executor
     bundle_manager = Mock(spec=BundleManager)
     bundle_manager.get_active_bundle.return_value = bundle
     executor = KubectlExecutor(bundle_manager)
-    
+
     # Test with a very short timeout
     with patch("asyncio.create_subprocess_exec", return_value=mock_process):
         with pytest.raises(KubectlError) as excinfo:
             await executor._run_kubectl_command("get pods", bundle, 0.1, True)
-        
+
         # Verify error details
         assert "timed out" in str(excinfo.value).lower()
         assert excinfo.value.exit_code == 124  # Standard timeout exit code
-        
+
         # Verify the process was killed
         mock_process.kill.assert_called_once()
 
@@ -296,19 +301,19 @@ async def test_kubectl_timeout_behavior(test_assertions, test_factory):
 async def test_kubectl_response_parsing(test_assertions, test_factory):
     """
     Test that kubectl output is properly parsed based on format.
-    
+
     This test verifies:
     1. JSON output is properly parsed into Python objects
     2. Non-JSON output is handled correctly
     3. JSON parsing errors are handled gracefully
-    
+
     Args:
         test_assertions: Assertions helper fixture
         test_factory: Factory fixture for test objects
     """
     # Create a kubectl executor for testing
     executor = KubectlExecutor(Mock(spec=BundleManager))
-    
+
     # Test cases for output processing
     test_cases = [
         # Valid JSON
@@ -347,17 +352,17 @@ async def test_kubectl_response_parsing(test_assertions, test_factory):
             "expected_type": str,
         },
     ]
-    
+
     # Test each case
     for i, case in enumerate(test_cases):
         processed, is_json = executor._process_output(case["output"], case["try_json"])
-        
+
         # Assert the output format was detected correctly
         assert is_json == case["expected_is_json"], f"Case {i}: JSON detection failed"
-        
+
         # Assert the output was processed to the right type
         assert isinstance(processed, case["expected_type"]), f"Case {i}: Wrong output type"
-        
+
         # For JSON outputs, verify structure
         if case["expected_is_json"]:
             if isinstance(processed, dict) and "items" in processed:

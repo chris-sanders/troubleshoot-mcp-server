@@ -48,15 +48,16 @@ ALLOW_ALTERNATIVE_KUBECONFIG = os.environ.get(
     "SBCTL_ALLOW_ALTERNATIVE_KUBECONFIG", "true"
 ).lower() in ("true", "1", "yes")
 
+
 # Helper function for safe file copying
 def safe_copy_file(src: Union[Path, None], dst: Union[Path, None]) -> None:
     """
     Safely copy a file, handling Path | None types.
-    
+
     Args:
         src: Source path (may be None)
         dst: Destination path (may be None)
-        
+
     Raises:
         ValueError: If src or dst is None
     """
@@ -64,9 +65,10 @@ def safe_copy_file(src: Union[Path, None], dst: Union[Path, None]) -> None:
         raise ValueError("Source path cannot be None")
     if dst is None:
         raise ValueError("Destination path cannot be None")
-        
+
     # Both paths are valid, perform the copy
     shutil.copy2(src, dst)
+
 
 logger.debug(f"Using MAX_DOWNLOAD_SIZE: {MAX_DOWNLOAD_SIZE / 1024 / 1024:.1f} MB")
 logger.debug(f"Using MAX_DOWNLOAD_TIMEOUT: {MAX_DOWNLOAD_TIMEOUT} seconds")
@@ -759,23 +761,31 @@ class BundleManager:
                 if self.sbctl_process.stdout is not None:
                     try:
                         # We expect bytes returned from the process stdout
-                        stdout_data = await asyncio.wait_for(self.sbctl_process.stdout.read(1024), timeout=1.0)
+                        stdout_data = await asyncio.wait_for(
+                            self.sbctl_process.stdout.read(1024), timeout=1.0
+                        )
                     except (asyncio.TimeoutError, Exception):
                         stdout_data = b""
                 else:
                     stdout_data = b""
-                    
+
                 if self.sbctl_process.stderr is not None:
                     try:
                         # We expect bytes returned from the process stderr
-                        stderr_data = await asyncio.wait_for(self.sbctl_process.stderr.read(1024), timeout=1.0)
+                        stderr_data = await asyncio.wait_for(
+                            self.sbctl_process.stderr.read(1024), timeout=1.0
+                        )
                     except (asyncio.TimeoutError, Exception):
                         stderr_data = b""
                 else:
                     stderr_data = b""
 
                 if stdout_data:
-                    stdout_text = stdout_data.decode("utf-8", errors="replace") if isinstance(stdout_data, bytes) else str(stdout_data)
+                    stdout_text = (
+                        stdout_data.decode("utf-8", errors="replace")
+                        if isinstance(stdout_data, bytes)
+                        else str(stdout_data)
+                    )
                     logger.debug(f"sbctl stdout: {stdout_text}")
 
                     # Look for exported KUBECONFIG path in the output
@@ -792,7 +802,11 @@ class BundleManager:
                             alternative_kubeconfig_paths.append(alt_kubeconfig)
 
                 if stderr_data:
-                    stderr_text = stderr_data.decode("utf-8", errors="replace") if isinstance(stderr_data, bytes) else str(stderr_data)
+                    stderr_text = (
+                        stderr_data.decode("utf-8", errors="replace")
+                        if isinstance(stderr_data, bytes)
+                        else str(stderr_data)
+                    )
                     logger.debug(f"sbctl stderr: {stderr_text}")
                     error_message = stderr_text
             except (asyncio.TimeoutError, Exception) as e:
@@ -861,7 +875,6 @@ class BundleManager:
 
                             # Try to copy to expected location
                             try:
-                                import shutil
 
                                 safe_copy_file(alt_path, kubeconfig_path)
                                 logger.info(
@@ -923,7 +936,9 @@ class BundleManager:
                     # If we've found the kubeconfig and waited long enough, continue anyway
                     # Make sure kubeconfig_found_time is not None before subtraction
                     if kubeconfig_found_time is not None:
-                        time_since_kubeconfig = asyncio.get_event_loop().time() - kubeconfig_found_time
+                        time_since_kubeconfig = (
+                            asyncio.get_event_loop().time() - kubeconfig_found_time
+                        )
                         if time_since_kubeconfig > (timeout * api_server_wait_percentage):
                             logger.warning(
                                 f"API server not responding after {time_since_kubeconfig:.1f}s "

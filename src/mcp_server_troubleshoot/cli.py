@@ -52,7 +52,7 @@ def setup_logging(verbose: bool = False, mcp_mode: bool = False) -> None:
         # Configure root logger to use stderr
         root_logger = logging.getLogger()
         for handler in root_logger.handlers:
-            if hasattr(handler, 'stream'):
+            if hasattr(handler, "stream"):
                 handler.stream = sys.stderr
 
 

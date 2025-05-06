@@ -63,15 +63,15 @@ pytestmark = pytest.mark.unit
         "invalid-empty-path",
         "invalid-simple-traversal",
         "invalid-complex-traversal",
-    ]
+    ],
 )
 def test_list_files_args_validation_parametrized(path, recursive, expected_valid):
     """
     Test ListFilesArgs validation with parameterized test cases.
-    
+
     This test covers both valid and invalid inputs in a single test,
     making it easier to see all validation rules and add new cases.
-    
+
     Args:
         path: Directory path to validate
         recursive: Whether to recursively list files
@@ -95,7 +95,12 @@ def test_list_files_args_validation_parametrized(path, recursive, expected_valid
         # Valid cases
         ("file.txt", 0, 10, True),
         ("dir/file.txt", 5, 15, True),
-        ("absolute/path/file.txt", 0, 100, True),  # Note: without leading slash - the validator removes it
+        (
+            "absolute/path/file.txt",
+            0,
+            100,
+            True,
+        ),  # Note: without leading slash - the validator removes it
         # Invalid cases
         ("", 0, 10, False),  # Empty path
         ("../outside.txt", 0, 10, False),  # Path traversal
@@ -110,14 +115,14 @@ def test_list_files_args_validation_parametrized(path, recursive, expected_valid
         "invalid-path-traversal",
         "invalid-negative-start",
         "invalid-negative-end",
-    ]
+    ],
 )
 def test_read_file_args_validation_parametrized(path, start_line, end_line, expected_valid):
     """
     Test ReadFileArgs validation with parameterized test cases.
-    
+
     This test ensures both valid and invalid inputs are properly validated.
-    
+
     Args:
         path: File path to validate
         start_line: Starting line number
@@ -156,16 +161,16 @@ def test_read_file_args_validation_parametrized(path, start_line, end_line, expe
         "invalid-empty-pattern",
         "invalid-max-results",
         "invalid-path-traversal",
-    ]
+    ],
 )
 def test_grep_files_args_validation_parametrized(
     pattern, path, recursive, glob_pattern, case_sensitive, max_results, expected_valid
 ):
     """
     Test GrepFilesArgs validation with parameterized test cases.
-    
+
     This test ensures all validation rules are properly enforced.
-    
+
     Args:
         pattern: Search pattern
         path: Directory path to search
@@ -213,22 +218,27 @@ def test_grep_files_args_validation_parametrized(
         # Error case - path doesn't exist
         ("nonexistent", True, False, PathNotFoundError),
         # Error case - path is a file, not a directory
-        ("file.txt", False, True, FileSystemError),  # Note: Changed from ReadFileError to FileSystemError
+        (
+            "file.txt",
+            False,
+            True,
+            FileSystemError,
+        ),  # Note: Changed from ReadFileError to FileSystemError
     ],
     ids=[
         "valid-directory",
         "invalid-nonexistent",
         "invalid-not-directory",
-    ]
+    ],
 )
 async def test_file_explorer_list_files_error_handling(
     path, is_directory, exists, expected_error, test_file_setup, test_factory
 ):
     """
     Test that the file explorer handles listing errors correctly with parameterization.
-    
+
     This test verifies error conditions for directory listings are handled properly.
-    
+
     Args:
         path: Path to list
         is_directory: Whether the path is a directory
@@ -244,15 +254,15 @@ async def test_file_explorer_list_files_error_handling(
         actual_path = "dir1/file1.txt"  # This exists in the test_file_setup
     else:
         actual_path = path  # Use as is for non-existent paths
-        
+
     # Set up the bundle manager
     bundle_manager = Mock(spec=BundleManager)
     bundle = test_factory.create_bundle_metadata(path=test_file_setup)
     bundle_manager.get_active_bundle.return_value = bundle
-    
+
     # Create file explorer
     explorer = FileExplorer(bundle_manager)
-    
+
     if expected_error:
         # Should raise an error
         with pytest.raises(expected_error):
@@ -282,16 +292,16 @@ async def test_file_explorer_list_files_error_handling(
         "valid-file",
         "invalid-nonexistent",
         "invalid-directory",
-    ]
+    ],
 )
 async def test_file_explorer_read_file_error_handling(
     path, exists, is_file, is_directory, expected_error, test_file_setup, test_factory
 ):
     """
     Test that the file explorer handles read errors correctly with parameterization.
-    
+
     This test verifies error conditions for file reading are handled properly.
-    
+
     Args:
         path: Path to read
         exists: Whether the path exists
@@ -305,10 +315,10 @@ async def test_file_explorer_read_file_error_handling(
     bundle_manager = Mock(spec=BundleManager)
     bundle = test_factory.create_bundle_metadata(path=test_file_setup)
     bundle_manager.get_active_bundle.return_value = bundle
-    
+
     # Create file explorer
     explorer = FileExplorer(bundle_manager)
-    
+
     if expected_error:
         # Should raise an error
         with pytest.raises(expected_error):
@@ -340,16 +350,16 @@ async def test_file_explorer_read_file_error_handling(
         "match-case-insensitive",
         "no-match",
         "multiple-matches",
-    ]
+    ],
 )
 async def test_file_explorer_grep_files_behavior(
     path, pattern, case_sensitive, contains_match, test_file_setup, test_factory
 ):
     """
     Test grep functionality with different patterns and case sensitivity.
-    
+
     This test verifies the grep behavior with different search configurations.
-    
+
     Args:
         path: Directory path to search
         pattern: Search pattern
@@ -362,24 +372,24 @@ async def test_file_explorer_grep_files_behavior(
     bundle_manager = Mock(spec=BundleManager)
     bundle = test_factory.create_bundle_metadata(path=test_file_setup)
     bundle_manager.get_active_bundle.return_value = bundle
-    
+
     # Create file explorer
     explorer = FileExplorer(bundle_manager)
-    
+
     # Run the grep operation
     result = await explorer.grep_files(pattern, path, True, None, case_sensitive)
-    
+
     # Verify the result structure
     assert isinstance(result, GrepResult)
     assert result.pattern == pattern
     assert result.path == path
     assert result.case_sensitive == case_sensitive
-    
+
     # Verify match behavior
     if contains_match:
         assert result.total_matches > 0
         assert len(result.matches) > 0
-        
+
         # Verify match structure
         for match in result.matches:
             assert pattern.lower() in match.line.lower()
@@ -414,14 +424,14 @@ async def test_file_explorer_grep_files_behavior(
         "invalid-parent-traversal",
         "invalid-double-traversal",
         "invalid-triple-traversal",
-    ]
+    ],
 )
 def test_file_explorer_path_normalization(path, expected_traversal, test_file_setup):
     """
     Test path normalization for security vulnerabilities.
-    
+
     This test ensures that directory traversal attempts are blocked properly.
-    
+
     Args:
         path: Path to normalize
         expected_traversal: Whether path contains directory traversal
@@ -437,10 +447,10 @@ def test_file_explorer_path_normalization(path, expected_traversal, test_file_se
         initialized=True,
     )
     bundle_manager.get_active_bundle.return_value = bundle
-    
+
     # Create the explorer
     explorer = FileExplorer(bundle_manager)
-    
+
     if expected_traversal:
         # Should detect traversal and raise error
         with pytest.raises(InvalidPathError):

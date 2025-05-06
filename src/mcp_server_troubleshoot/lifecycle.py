@@ -205,7 +205,7 @@ def handle_signal(signum: int, frame: Any) -> None:
                         import shutil
 
                         shutil.rmtree(bundle_path)
-                        logger.info(f"Successfully removed bundle directory")
+                        logger.info("Successfully removed bundle directory")
                     except Exception as e:
                         logger.error(f"Error removing bundle directory: {e}")
         except Exception as e:

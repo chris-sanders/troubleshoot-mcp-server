@@ -95,7 +95,7 @@ class KubectlResult(BaseModel):
     output: Any = Field(description="The parsed output, if applicable")
     is_json: bool = Field(description="Whether the output is JSON")
     duration_ms: int = Field(description="The duration of the command execution in milliseconds")
-    
+
     @field_validator("exit_code")
     @classmethod
     def validate_exit_code(cls, v: int | None) -> int:

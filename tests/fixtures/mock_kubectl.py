@@ -207,7 +207,7 @@ def handle_get(args):
             print(json.dumps(data))
         else:
             # Simple plain text output
-            resource_type = args.resource.upper()
+            # Resource type not used in plain text format
             if "items" in data:
                 print("NAME\tSTATUS")
                 for item in data["items"]:
@@ -238,10 +238,8 @@ def main():
         args = parse_args()
         logger.debug(f"Parsed args: {args}")
 
-        # Set json_output flag based on args
-        json_output = False
-        if args.output == "json":
-            json_output = True
+        # Check if json output is requested
+        # Output format is handled in the specific command handlers
 
         if args.command == "version":
             return handle_version(args)

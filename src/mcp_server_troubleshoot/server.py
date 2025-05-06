@@ -9,7 +9,7 @@ import logging
 import signal
 import sys
 from pathlib import Path
-from typing import Callable, List, Optional, Any
+from typing import Callable, List, Optional
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import TextContent
@@ -21,7 +21,14 @@ from .bundle import (
     ListAvailableBundlesArgs,
 )
 from .kubectl import KubectlError, KubectlExecutor, KubectlCommandArgs
-from .files import FileExplorer, FileSystemError, GrepFilesArgs, ListFilesArgs, ReadFileArgs, GrepMatch
+from .files import (
+    FileExplorer,
+    FileSystemError,
+    GrepFilesArgs,
+    ListFilesArgs,
+    ReadFileArgs,
+    GrepMatch,
+)
 from .lifecycle import app_lifespan, AppContext
 
 logger = logging.getLogger(__name__)
