@@ -55,12 +55,12 @@ As an AI agent, you should:
    - Update the task progress with details of changes
    - Keep the task in the `/tasks/active/` folder until PR is merged
 
-6. **Complete a task** (after PR is merged):
-   - Update the task's metadata:
+6. **Complete a task** (when ready for review):
+   - When your implementation is complete and ready for review, update the task's metadata:
      - Change `**Status**: active` to `**Status**: completed`
      - Add `**Completed**: YYYY-MM-DD` with today's date
-     - Update `**PR Status**: Merged`
-   - Document evidence of completion
+     - If a PR was created, update `**PR Status**: [current status]`
+   - Document evidence of completion and validation results
    - Move the task file from `/tasks/active/` to `/tasks/completed/` using `git mv`:
      ```bash
      git mv tasks/active/[task-file].md tasks/completed/[task-file].md

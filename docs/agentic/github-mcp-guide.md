@@ -2,6 +2,36 @@
 
 This document provides guidance on how to use GitHub MCP (Model Capability Provider) tools for Git and GitHub operations as part of the AI workflow.
 
+## IMPORTANT: Use GitHub MCP Tools, NOT gh Binary
+
+**CRITICAL**: All GitHub operations must be performed using the `mcp__github__*` tools provided by the GitHub MCP server. **DO NOT use the `gh` command-line binary** for any GitHub operations.
+
+**Correct approach:**
+- Use `mcp__github__create_pull_request` for creating PRs
+- Use `mcp__github__create_pull_request_review` for PR comments and reviews
+- Use `mcp__github__merge_pull_request` for merging PRs
+- Use other `mcp__github__*` tools as needed
+
+**Incorrect approach:**
+- `gh pr create` ❌
+- `gh pr review` ❌ 
+- `gh pr merge` ❌
+
+## Git vs GitHub Operations
+
+**Git operations** (local repository management) - Use standard Git commands:
+- `git checkout -b branch-name` - Create branches
+- `git add`, `git commit` - Stage and commit changes  
+- `git push` - Push changes to remote
+- `git status`, `git diff` - Check repository status
+
+**GitHub operations** (remote platform interactions) - Use MCP tools:
+- `mcp__github__create_pull_request` - Create pull requests
+- `mcp__github__create_pull_request_review` - Add PR reviews/comments
+- `mcp__github__merge_pull_request` - Merge pull requests
+- `mcp__github__get_pull_request` - Get PR information
+- All other GitHub API interactions
+
 ## Prerequisites
 
 - Claude Code must be configured with GitHub MCP access at the user level

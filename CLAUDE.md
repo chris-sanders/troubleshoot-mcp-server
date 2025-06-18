@@ -41,6 +41,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - ALWAYS use `git mv` when moving task files between directories to prevent orphaned documents
 - Create branches with pattern: `task/[task-filename-without-extension]`
 - Commit messages: Start with present-tense verb, be descriptive, do NOT include AI attribution
+- **Task completion**: Move tasks to completed when implementation is ready for review, not after PR merge
+- **GitHub operations**: Use `mcp__github__*` tools for all GitHub interactions, NOT the `gh` binary
 - When completing tasks, update all metadata and move to correct folder using `git mv`
 
 ## UV Best Practices
