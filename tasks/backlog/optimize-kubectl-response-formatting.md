@@ -39,10 +39,12 @@ The system is returning `kubectl get pods -o json` (full API objects) instead of
 - **Current**: Automatically adds `-o json` when `json_output=True`
 - **Keep**: Logic but ensure it's only used when explicitly requested
 
-### 3. Implement Compact JSON Mode
-- **File**: `src/mcp_server_troubleshoot/formatters.py`
-- **Add**: Compact JSON formatting option that outputs raw JSON without indentation
-- **Logic**: Use compact format unless explicitly requesting verbose formatting
+### 3. Implement Compact JSON for Programmatic Use
+- **File**: `src/mcp_server_troubleshoot/formatters.py:339`
+- **Change**: Remove `indent=2` from `json.dumps(result.output, indent=2)`
+- **Use**: `json.dumps(result.output)` for compact JSON (no whitespace)
+- **Rationale**: JSON output is for programmatic use, not human reading
+- **Token Savings**: Additional 20-30% reduction when JSON is explicitly requested
 
 ### 4. Review Verbosity Defaults
 - **File**: `tests/conftest.py:12`
@@ -70,7 +72,8 @@ The system is returning `kubectl get pods -o json` (full API objects) instead of
 - **Explicit JSON request (`json_output=True`)**:
   - Verify `-o json` is added to commands when explicitly requested
   - Confirm JSON structure remains valid and parseable  
-  - Test that JSON output works for programmatic use cases
+  - Test that JSON output is compact (no indentation/pretty printing)
+  - Ensure JSON is suitable for programmatic parsing
 - **User-specified output formats**:
   - Verify commands like `kubectl get pods -o yaml` are not modified
   - Ensure existing `-o` flags in user commands are preserved
@@ -91,11 +94,15 @@ def test_kubectl_default_format():
     assert "READY" in result.stdout
     assert result.command == "get pods"  # No -o json added
 
-# Test 2: Explicit JSON request works  
+# Test 2: Explicit JSON request works with compact format
 def test_kubectl_explicit_json():
     result = kubectl_executor.execute("get pods", json_output=True)
     assert result.is_json
     assert result.command == "get pods -o json"  # -o json was added
+    # Verify JSON is compact (no pretty printing)
+    json_str = json.dumps(result.output)
+    assert "\n  " not in json_str  # No indented lines
+    assert json_str == json.dumps(result.output, separators=(',', ':'))  # Compact
     
 # Test 3: User-specified format preserved
 def test_kubectl_user_format_preserved():
@@ -110,9 +117,12 @@ def test_kubectl_user_format_preserved():
 
 ## Target Token Reductions
 Based on investigation findings:
-- **Current**: 160k+ tokens for rook-ceph pod listing (full API JSON objects)
-- **Expected CLI Output**: ~1-2k tokens (compact table format)
-- **Goal**: 90%+ reduction by returning normal CLI output instead of API objects
+- **Current**: 160k+ tokens for rook-ceph pod listing (full API JSON objects with pretty printing)
+- **Expected CLI Output**: ~1-2k tokens (compact table format) 
+- **Compact JSON (when requested)**: ~40-50k tokens (no indentation)
+- **Goals**: 
+  - 90%+ reduction with CLI output by default
+  - Additional 20-30% reduction for JSON when explicitly requested (compact vs pretty)
 
 ## Evidence of Completion
 (To be filled by AI)
