@@ -62,10 +62,18 @@ The system is returning `kubectl get pods -o json` (full API objects) instead of
 - Test `kubectl get nodes -o wide` (medium response)
 - Measure token counts before/after optimization
 
-### Response Quality Testing  
-- Verify JSON structure remains valid and parseable
-- Ensure human readability is maintained when verbose mode explicitly requested
-- Confirm all kubectl functionality works with optimized formatting
+### Output Format Testing
+- **Default behavior (`json_output=False`)**: 
+  - Verify `kubectl get pods` returns CLI table format (not JSON)
+  - Confirm no `-o json` is added to commands automatically
+  - Test that output looks like normal kubectl CLI (headers, columns, etc.)
+- **Explicit JSON request (`json_output=True`)**:
+  - Verify `-o json` is added to commands when explicitly requested
+  - Confirm JSON structure remains valid and parseable  
+  - Test that JSON output works for programmatic use cases
+- **User-specified output formats**:
+  - Verify commands like `kubectl get pods -o yaml` are not modified
+  - Ensure existing `-o` flags in user commands are preserved
 
 ### Verbosity Level Testing
 - **Minimal**: Raw output with minimal formatting
@@ -73,9 +81,31 @@ The system is returning `kubectl get pods -o json` (full API objects) instead of
 - **Verbose**: Current formatting (when explicitly requested)
 - **Debug**: Full metadata (when explicitly requested)
 
+### Specific Test Cases to Implement
+```python
+# Test 1: Default behavior returns CLI format
+def test_kubectl_default_format():
+    result = kubectl_executor.execute("get pods", json_output=False)
+    assert not result.is_json
+    assert "NAME" in result.stdout  # CLI table header
+    assert "READY" in result.stdout
+    assert result.command == "get pods"  # No -o json added
+
+# Test 2: Explicit JSON request works  
+def test_kubectl_explicit_json():
+    result = kubectl_executor.execute("get pods", json_output=True)
+    assert result.is_json
+    assert result.command == "get pods -o json"  # -o json was added
+    
+# Test 3: User-specified format preserved
+def test_kubectl_user_format_preserved():
+    result = kubectl_executor.execute("get pods -o yaml", json_output=False)
+    assert result.command == "get pods -o yaml"  # No modification
+```
+
 ### Performance Benchmarks
 - Measure token reduction percentages across different kubectl commands
-- Target: 50-75% reduction in token usage for typical commands
+- Target: 90%+ reduction in token usage for typical commands (CLI vs JSON)
 - Ensure response times are not negatively impacted
 
 ## Target Token Reductions
