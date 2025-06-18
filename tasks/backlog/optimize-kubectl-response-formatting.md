@@ -10,7 +10,7 @@ Investigation revealed a fundamental issue: kubectl responses are returning full
 3. **CLI table output bypassed**: Users expect compact CLI tables, not verbose API responses
 4. **Massive token bloat**: Full API objects contain extensive metadata vs simple table rows
 
-The system is returning `kubectl get pods -o json` (full API objects) instead of `kubectl get pods` (compact tables). This is why a simple pod listing generates 160k tokens instead of ~100 lines of table output.
+The system is returning `kubectl get pods -o json` (full API objects) instead of `kubectl get pods` (compact tables). This causes excessive token usage compared to normal CLI table output.
 
 ## Success Criteria
 - [ ] Return normal kubectl CLI table output by default (not JSON API objects)
@@ -59,10 +59,10 @@ The system is returning `kubectl get pods -o json` (full API objects) instead of
 ## Validation Plan
 
 ### Token Usage Testing
-- Test `kubectl get pods` in default namespace (small response)
-- Test `kubectl get pods -n rook-ceph` (large response that caused 160k tokens)
-- Test `kubectl get nodes -o wide` (medium response)
-- Measure token counts before/after optimization
+- Test with available test bundle before and after changes
+- Use common kubectl commands like `kubectl get pods`, `kubectl get nodes`, `kubectl get services`
+- Measure token counts before/after optimization with same test bundle and commands
+- Document actual token reduction achieved (will vary by bundle content)
 
 ### Output Format Testing
 - **Default behavior (`json_output=False`)**: 
@@ -111,24 +111,28 @@ def test_kubectl_user_format_preserved():
 ```
 
 ### Performance Benchmarks
-- Measure token reduction percentages across different kubectl commands
-- Target: 90%+ reduction in token usage for typical commands (CLI vs JSON)
+- Measure token reduction percentages across different kubectl commands with test bundle
+- Compare before/after token counts for same commands on same bundle
 - Ensure response times are not negatively impacted
+- Document actual performance improvements achieved
 
 ## Target Token Reductions
 Based on investigation findings:
-- **Current**: 160k+ tokens for rook-ceph pod listing (full API JSON objects with pretty printing)
-- **Expected CLI Output**: ~1-2k tokens (compact table format) 
-- **Compact JSON (when requested)**: ~40-50k tokens (no indentation)
+- **Current Issue**: Full API JSON objects with pretty printing consume excessive tokens
+- **Expected CLI Output**: Compact table format should dramatically reduce token usage
+- **Compact JSON (when requested)**: Remove indentation to save additional tokens
 - **Goals**: 
-  - 90%+ reduction with CLI output by default
+  - Significant reduction with CLI output by default (magnitude depends on bundle content)
   - Additional 20-30% reduction for JSON when explicitly requested (compact vs pretty)
+  - Actual reductions to be measured and documented during implementation
 
 ## Evidence of Completion
 (To be filled by AI)
-- [ ] Before/after token count measurements for test commands
-- [ ] Path to modified files with specific changes made
+- [ ] Before/after token count measurements using available test bundle
+- [ ] Path to modified files with specific changes made  
 - [ ] Test results showing maintained functionality with reduced token usage
+- [ ] New test suite results confirming no regressions in kubectl functionality
+- [ ] Documentation of actual token reduction percentages achieved
 
 ## Notes
 - This is a critical performance issue affecting LLM context efficiency
