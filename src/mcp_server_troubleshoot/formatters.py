@@ -336,7 +336,7 @@ class ResponseFormatter:
         else:  # VERBOSE or DEBUG
             # Current full format
             if result.is_json:
-                output_str = json.dumps(result.output, indent=2)
+                output_str = json.dumps(result.output)
                 response = f"kubectl command executed successfully:\n```json\n{output_str}\n```"
             else:
                 output_str = result.stdout
