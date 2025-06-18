@@ -13,7 +13,7 @@ You are planning a development task for the MCP Server for Kubernetes Support Bu
 2. Check existing codebase for similar implementations (use search tools)
 3. Plan implementation approach with dependencies
 4. Define testing strategy (unit, integration, e2e as needed)
-5. Create step-by-step implementation plan
+5. Create step-by-step implementation plan, with small vertical slices and progress tracking in the task.
 
 **Deliverables:**
 1. **Implementation Plan**: Detailed steps with order of operations
@@ -30,3 +30,4 @@ You are planning a development task for the MCP Server for Kubernetes Support Bu
 - Work in git worktree under `trees/` directory
 
 Provide a comprehensive plan that can be executed by following the implementation steps.
+DO NOT START ON THE WORK
