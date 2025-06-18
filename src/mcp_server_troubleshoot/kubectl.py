@@ -11,7 +11,7 @@ import json
 import logging
 import os
 import re
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -45,6 +45,9 @@ class KubectlCommandArgs(BaseModel):
     command: str = Field(description="The kubectl command to execute")
     timeout: int = Field(30, description="Timeout in seconds for the command")
     json_output: bool = Field(True, description="Whether to format the output as JSON")
+    verbosity: Optional[str] = Field(
+        None, description="Verbosity level for response formatting (minimal|standard|verbose|debug)"
+    )
 
     @field_validator("command")
     def validate_command(cls, v: str) -> str:

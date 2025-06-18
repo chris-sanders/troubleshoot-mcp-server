@@ -56,6 +56,9 @@ class ListFilesArgs(BaseModel):
 
     path: str = Field(description="The path within the bundle to list")
     recursive: bool = Field(False, description="Whether to list recursively")
+    verbosity: Optional[str] = Field(
+        None, description="Verbosity level for response formatting (minimal|standard|verbose|debug)"
+    )
 
     @field_validator("path")
     def validate_path(cls, v: str) -> str:
@@ -100,6 +103,9 @@ class ReadFileArgs(BaseModel):
     start_line: int = Field(0, description="The line number to start reading from (0-indexed)")
     end_line: Optional[int] = Field(
         None, description="The line number to end reading at (0-indexed, inclusive)"
+    )
+    verbosity: Optional[str] = Field(
+        None, description="Verbosity level for response formatting (minimal|standard|verbose|debug)"
     )
 
     @field_validator("path")
@@ -150,6 +156,9 @@ class GrepFilesArgs(BaseModel):
     glob_pattern: Optional[str] = Field(None, description="The glob pattern to match files against")
     case_sensitive: bool = Field(False, description="Whether the search is case-sensitive")
     max_results: int = Field(1000, description="Maximum number of results to return")
+    verbosity: Optional[str] = Field(
+        None, description="Verbosity level for response formatting (minimal|standard|verbose|debug)"
+    )
 
     @field_validator("path")
     def validate_path(cls, v: str) -> str:

@@ -1,11 +1,13 @@
 # Task: Optimize MCP Server Token Usage with Verbosity Levels
 
 ## Metadata
-**Status**: ready
+**Status**: active
 **Created**: 2025-06-18
 **Priority**: high
 **Complexity**: medium
 **Estimated effort**: 2-3 days
+**Started**: 2025-06-18
+**Branch**: task/optimize-mcp-token-usage
 
 ## Objective
 Implement configurable verbosity levels in the MCP server to reduce token consumption in production use while maintaining full debugging capabilities for development.
