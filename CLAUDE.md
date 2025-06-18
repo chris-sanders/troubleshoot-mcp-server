@@ -4,16 +4,20 @@ This file provides mandatory guidance for Claude Code agents working in this rep
 
 ## CRITICAL: Workflow Requirements
 - Follow the mandatory step-by-step workflow below - no exceptions
-- Use UV for ALL Python operations (`uv run [command]`)
+- Use UV for ALL Python operations (`uv run [command]`) 
+- All dependencies are managed in pyproject.toml - use `uv pip install -e ".[dev]"` to install them
 - Work in git worktrees under `trees/` directory for all development
+- **CONTINUE WORKING** after completing setup - do not stop to ask permission
 
 ## MANDATORY PRE-WORK CHECKLIST
 
 Before starting ANY development work, you MUST complete this checklist:
 
 ### ✅ 1. Environment Setup (One-time)
-- [ ] Run: `./scripts/setup_env.sh` to set up development environment
+- [ ] Run: `./scripts/setup_env.sh` to set up development environment with UV
+- [ ] This installs ALL dependencies from pyproject.toml (including pytest, black, ruff, mypy)
 - [ ] Verify setup: `uv run pytest tests/unit/test_components.py -v`
+- [ ] **DO NOT install additional packages** - everything needed is already configured
 
 ### ✅ 2. Task Preparation
 - [ ] Create git worktree: `git worktree add trees/[branch-name] -b task/[task-name]`
@@ -138,7 +142,7 @@ gh repo view --web              # Open repo in browser
 ## ENFORCEMENT RULES
 
 ### ❌ NEVER DO:
-- Install packages without `uv pip install`
+- Install additional packages (all dependencies are in pyproject.toml)
 - Run Python commands without `uv run`
 - Skip code quality checks (black, ruff, mypy)
 - Work directly on main branch
@@ -147,13 +151,14 @@ gh repo view --web              # Open repo in browser
 - Move task files with `mv` (use `git mv`)
 
 ### ✅ ALWAYS DO:
-- Use `uv run` for all Python commands
+- Use `uv run` for all Python commands (dependencies are pre-managed)
 - Run quality checks after every code change
-- Work in worktrees under `trees/` directory
+- Work in worktrees under `trees/` directory  
 - Use `git mv` for task file movements
 - Update task progress regularly
 - Test changes before committing
 - Use descriptive commit messages
+- Continue working after setup - don't stop to ask permission
 - Prefer `gh` CLI for GitHub operations (MCP tools allowed as alternative)
 
 ## PROJECT STRUCTURE
