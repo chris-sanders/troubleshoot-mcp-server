@@ -44,7 +44,7 @@ class KubectlCommandArgs(BaseModel):
 
     command: str = Field(description="The kubectl command to execute")
     timeout: int = Field(30, description="Timeout in seconds for the command")
-    json_output: bool = Field(True, description="Whether to format the output as JSON")
+    json_output: bool = Field(False, description="Whether to format the output as JSON")
     verbosity: Optional[str] = Field(
         None, description="Verbosity level for response formatting (minimal|standard|verbose|debug)"
     )

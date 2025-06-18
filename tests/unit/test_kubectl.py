@@ -27,7 +27,7 @@ def test_kubectl_command_args_validation():
     args = KubectlCommandArgs(command="get pods")
     assert args.command == "get pods"
     assert args.timeout == 30  # Default value
-    assert args.json_output is True  # Default value
+    assert args.json_output is False  # Default value
 
     # Valid command with custom timeout and json_output
     args = KubectlCommandArgs(command="get pods", timeout=60, json_output=False)
@@ -370,3 +370,162 @@ def test_process_output_text():
     processed, is_json = executor._process_output(output, False)
     assert processed == output
     assert is_json is False
+
+
+@pytest.mark.asyncio
+async def test_kubectl_default_cli_format():
+    """Test that kubectl returns CLI format by default (not JSON)."""
+    # Mock bundle manager
+    bundle_manager = Mock(spec=BundleManager)
+    bundle = BundleMetadata(
+        id="test",
+        source="test",
+        path=Path("/test"),
+        kubeconfig_path=Path("/test/kubeconfig"),
+        initialized=True,
+    )
+    bundle_manager.get_active_bundle.return_value = bundle
+
+    # Mock subprocess to return CLI table format
+    mock_process = AsyncMock()
+    mock_process.returncode = 0
+    mock_process.communicate = AsyncMock(
+        return_value=(
+            b"NAME    READY   STATUS    RESTARTS   AGE\npod1    1/1     Running   0          1m",
+            b"",
+        )
+    )
+
+    # Create the executor
+    executor = KubectlExecutor(bundle_manager)
+
+    # Mock create_subprocess_exec
+    with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+        # Execute with default json_output=False
+        result = await executor._run_kubectl_command("get pods", bundle, 30, False)
+
+        # Verify CLI format is returned
+        assert result.is_json is False
+        assert "NAME" in result.stdout
+        assert "READY" in result.stdout
+        assert result.command == "get pods"  # No -o json added
+
+        # Verify subprocess call doesn't include -o json
+        cmd_args = mock_exec.call_args[0]
+        assert "-o" not in cmd_args
+        assert "json" not in cmd_args
+
+
+@pytest.mark.asyncio
+async def test_kubectl_explicit_json_request():
+    """Test that explicit JSON request works with compact format."""
+    # Mock bundle manager
+    bundle_manager = Mock(spec=BundleManager)
+    bundle = BundleMetadata(
+        id="test",
+        source="test",
+        path=Path("/test"),
+        kubeconfig_path=Path("/test/kubeconfig"),
+        initialized=True,
+    )
+    bundle_manager.get_active_bundle.return_value = bundle
+
+    # Mock subprocess to return JSON format
+    mock_process = AsyncMock()
+    mock_process.returncode = 0
+    mock_process.communicate = AsyncMock(
+        return_value=(b'{"items": [{"metadata": {"name": "pod1"}}]}', b"")
+    )
+
+    # Create the executor
+    executor = KubectlExecutor(bundle_manager)
+
+    # Mock create_subprocess_exec
+    with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+        # Execute with explicit json_output=True
+        result = await executor._run_kubectl_command("get pods", bundle, 30, True)
+
+        # Verify JSON format is returned
+        assert result.is_json is True
+        assert result.command == "get pods -o json"  # -o json was added
+        assert isinstance(result.output, dict)
+        assert "items" in result.output
+
+        # Verify subprocess call includes -o json
+        cmd_args = mock_exec.call_args[0]
+        assert "-o" in cmd_args
+        assert "json" in cmd_args
+
+
+@pytest.mark.asyncio
+async def test_kubectl_user_format_preserved():
+    """Test that user-specified format is preserved."""
+    # Mock bundle manager
+    bundle_manager = Mock(spec=BundleManager)
+    bundle = BundleMetadata(
+        id="test",
+        source="test",
+        path=Path("/test"),
+        kubeconfig_path=Path("/test/kubeconfig"),
+        initialized=True,
+    )
+    bundle_manager.get_active_bundle.return_value = bundle
+
+    # Mock subprocess to return YAML format
+    mock_process = AsyncMock()
+    mock_process.returncode = 0
+    mock_process.communicate = AsyncMock(
+        return_value=(b"apiVersion: v1\nkind: Pod\nmetadata:\n  name: pod1", b"")
+    )
+
+    # Create the executor
+    executor = KubectlExecutor(bundle_manager)
+
+    # Mock create_subprocess_exec
+    with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+        # Execute with user-specified YAML format
+        result = await executor._run_kubectl_command("get pods -o yaml", bundle, 30, False)
+
+        # Verify user format is preserved
+        assert result.command == "get pods -o yaml"  # No modification
+        assert result.is_json is False
+        assert "apiVersion" in result.stdout
+
+        # Verify subprocess call preserves user format
+        cmd_args = mock_exec.call_args[0]
+        assert "yaml" in cmd_args
+
+
+def test_compact_json_formatting():
+    """Test that JSON formatting is compact (no indentation)."""
+    import json
+    from mcp_server_troubleshoot.formatters import ResponseFormatter
+    from mcp_server_troubleshoot.kubectl import KubectlResult
+
+    # Create a sample JSON result
+    result = KubectlResult(
+        command="get pods -o json",
+        exit_code=0,
+        stdout='{"items": [{"metadata": {"name": "pod1"}}]}',
+        stderr="",
+        duration_ms=100,
+        output={"items": [{"metadata": {"name": "pod1"}}]},
+        is_json=True,
+    )
+
+    # Create formatter with verbose verbosity to trigger JSON formatting
+    formatter = ResponseFormatter(verbosity="verbose")
+    formatted = formatter.format_kubectl_result(result)
+
+    # Extract the JSON from the formatted response
+    json_start = formatted.find("```json\n") + 8
+    json_end = formatted.find("\n```", json_start)
+    json_str = formatted[json_start:json_end]
+
+    # Verify JSON is compact (no indentation)
+    assert "\n  " not in json_str  # No indented lines
+
+    # Verify it's valid JSON and compact
+    parsed = json.loads(json_str)
+    compact_json = json.dumps(parsed, separators=(",", ":"))
+    assert json_str == compact_json or json_str == json.dumps(parsed)

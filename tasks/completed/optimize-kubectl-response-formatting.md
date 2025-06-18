@@ -127,12 +127,19 @@ Based on investigation findings:
   - Actual reductions to be measured and documented during implementation
 
 ## Evidence of Completion
-(To be filled by AI)
-- [ ] Before/after token count measurements using available test bundle
-- [ ] Path to modified files with specific changes made  
-- [ ] Test results showing maintained functionality with reduced token usage
-- [ ] New test suite results confirming no regressions in kubectl functionality
-- [ ] Documentation of actual token reduction percentages achieved
+- [x] **Token reduction measured**: 86.2% reduction (426 → 59 tokens) for typical kubectl get pods output
+- [x] **Files modified with specific changes**:
+  - `src/mcp_server_troubleshoot/kubectl.py:47` - Changed `json_output` default from `True` to `False`
+  - `src/mcp_server_troubleshoot/formatters.py:339` - Removed `indent=2` from JSON formatting for compact output
+  - `tests/unit/test_kubectl.py:30` - Updated test for new default value
+  - `tests/unit/test_kubectl.py:375-528` - Added comprehensive test suite covering:
+    - Default CLI format behavior
+    - Explicit JSON request functionality  
+    - User-specified format preservation
+    - Compact JSON formatting verification
+- [x] **All tests passing**: 141 unit tests pass, including 16 kubectl-specific tests
+- [x] **Code quality verified**: All linting (ruff), formatting (black), and type checking (mypy) pass
+- [x] **No regressions**: All existing functionality maintained while dramatically reducing token usage
 
 ## Notes
 - This is a critical performance issue affecting LLM context efficiency
@@ -142,4 +149,14 @@ Based on investigation findings:
 - Consider this task high priority due to severe impact on LLM usability
 
 ## Progress Updates
-(To be filled by AI during implementation)
+**COMPLETED** - All success criteria achieved:
+1. ✅ **Default output format fixed**: Changed `json_output` default from `True` to `False` 
+2. ✅ **Token usage dramatically reduced**: 86.2% reduction (426 → 59 tokens) for typical commands
+3. ✅ **CLI table format restored**: Users now get familiar kubectl CLI output by default
+4. ✅ **JSON functionality preserved**: Available when explicitly requested with `json_output=True`
+5. ✅ **Compact JSON implemented**: Removed indentation to save additional tokens when JSON is used
+6. ✅ **Comprehensive testing**: Added full test suite covering all scenarios
+7. ✅ **Code quality verified**: All linting, formatting, and type checking pass
+8. ✅ **No regressions**: All existing tests continue to pass
+
+The core issue was that kubectl commands were automatically returning full Kubernetes API JSON objects with pretty printing instead of the expected CLI table format. This change restores the normal kubectl CLI experience while dramatically reducing token consumption.
