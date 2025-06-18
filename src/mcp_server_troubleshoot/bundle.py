@@ -105,6 +105,9 @@ class InitializeBundleArgs(BaseModel):
     force: bool = Field(
         False, description="Whether to force re-initialization if a bundle is already active"
     )
+    verbosity: Optional[str] = Field(
+        None, description="Verbosity level for response formatting (minimal|standard|verbose|debug)"
+    )
 
     @field_validator("source")
     @classmethod
@@ -173,6 +176,9 @@ class ListAvailableBundlesArgs(BaseModel):
 
     include_invalid: bool = Field(
         False, description="Whether to include invalid or inaccessible bundles in the results"
+    )
+    verbosity: Optional[str] = Field(
+        None, description="Verbosity level for response formatting (minimal|standard|verbose|debug)"
     )
 
 

@@ -3,8 +3,6 @@ MCP server implementation for Kubernetes support bundles.
 """
 
 import asyncio
-import datetime
-import json
 import logging
 import signal
 import sys
@@ -27,9 +25,9 @@ from .files import (
     GrepFilesArgs,
     ListFilesArgs,
     ReadFileArgs,
-    GrepMatch,
 )
 from .lifecycle import app_lifespan, AppContext
+from .formatters import get_formatter
 
 logger = logging.getLogger(__name__)
 
@@ -125,12 +123,15 @@ async def initialize_bundle(args: InitializeBundleArgs) -> List[TextContent]:
             source: (string, required) The source of the bundle (URL or local file path)
             force: (boolean, optional) Whether to force re-initialization if a bundle
                 is already active. Defaults to False.
+            verbosity: (string, optional) Verbosity level for response formatting
+                (minimal|standard|verbose|debug). Defaults to minimal.
 
     Returns:
         Metadata about the initialized bundle including path and kubeconfig location.
         If the API server is not available, also returns diagnostic information.
     """
     bundle_manager = get_bundle_manager()
+    formatter = get_formatter(args.verbosity)
 
     try:
         # Check if sbctl is available before attempting to initialize
@@ -138,17 +139,11 @@ async def initialize_bundle(args: InitializeBundleArgs) -> List[TextContent]:
         if not sbctl_available:
             error_message = "sbctl is not available in the environment. This is required for bundle initialization."
             logger.error(error_message)
-            return [TextContent(type="text", text=error_message)]
+            formatted_error = formatter.format_error(error_message)
+            return [TextContent(type="text", text=formatted_error)]
 
         # Initialize the bundle
         result = await bundle_manager.initialize_bundle(args.source, args.force)
-
-        # Convert the metadata to a dictionary
-        metadata_dict = json.loads(result.model_dump_json())
-
-        # Format paths as strings
-        metadata_dict["path"] = str(metadata_dict["path"])
-        metadata_dict["kubeconfig_path"] = str(metadata_dict["kubeconfig_path"])
 
         # Check if the API server is available
         api_server_available = await bundle_manager.check_api_server_available()
@@ -156,16 +151,8 @@ async def initialize_bundle(args: InitializeBundleArgs) -> List[TextContent]:
         # Get diagnostic information
         diagnostics = await bundle_manager.get_diagnostic_info()
 
-        # Format response based on API server status
-        if api_server_available:
-            response = f"Bundle initialized successfully:\n```json\n{json.dumps(metadata_dict, indent=2)}\n```"
-        else:
-            response = (
-                f"Bundle initialized but API server is NOT available. kubectl commands may fail:\n"
-                f"```json\n{json.dumps(metadata_dict, indent=2)}\n```\n\n"
-                f"Diagnostic information:\n```json\n{json.dumps(diagnostics, indent=2)}\n```"
-            )
-
+        # Format response using the formatter
+        response = formatter.format_bundle_initialization(result, api_server_available, diagnostics)
         return [TextContent(type="text", text=response)]
 
     except BundleManagerError as e:
@@ -173,31 +160,27 @@ async def initialize_bundle(args: InitializeBundleArgs) -> List[TextContent]:
         logger.error(error_message)
 
         # Try to get diagnostic information even on failure
+        diagnostics = None
         try:
             diagnostics = await bundle_manager.get_diagnostic_info()
-            diagnostic_info = (
-                f"\n\nDiagnostic information:\n```json\n{json.dumps(diagnostics, indent=2)}\n```"
-            )
-            error_message += diagnostic_info
         except Exception as diag_error:
             logger.error(f"Failed to get diagnostics: {diag_error}")
 
-        return [TextContent(type="text", text=error_message)]
+        formatted_error = formatter.format_error(error_message, diagnostics)
+        return [TextContent(type="text", text=formatted_error)]
     except Exception as e:
         error_message = f"Unexpected error initializing bundle: {str(e)}"
         logger.exception(error_message)
 
         # Try to get diagnostic information even on failure
+        diagnostics = None
         try:
             diagnostics = await bundle_manager.get_diagnostic_info()
-            diagnostic_info = (
-                f"\n\nDiagnostic information:\n```json\n{json.dumps(diagnostics, indent=2)}\n```"
-            )
-            error_message += diagnostic_info
         except Exception as diag_error:
             logger.error(f"Failed to get diagnostics: {diag_error}")
 
-        return [TextContent(type="text", text=error_message)]
+        formatted_error = formatter.format_error(error_message, diagnostics)
+        return [TextContent(type="text", text=formatted_error)]
 
 
 @mcp.tool()
@@ -210,87 +193,33 @@ async def list_available_bundles(args: ListAvailableBundlesArgs) -> List[TextCon
         args: Arguments containing:
             include_invalid: (boolean, optional) Whether to include invalid or inaccessible
                 bundles in the results. Defaults to False.
+            verbosity: (string, optional) Verbosity level for response formatting
+                (minimal|standard|verbose|debug). Defaults to minimal.
 
     Returns:
         A list of available bundle files with details including path, size, and modification time.
         Bundles are validated to ensure they have the expected support bundle structure.
     """
     bundle_manager = get_bundle_manager()
+    formatter = get_formatter(args.verbosity)
 
     try:
         # List available bundles
         bundles = await bundle_manager.list_available_bundles(args.include_invalid)
 
-        if not bundles:
-            return [
-                TextContent(
-                    type="text",
-                    text="No support bundles found. You may need to download or transfer a bundle to the bundle storage directory.",
-                )
-            ]
-
-        # Create structured JSON response for MCP clients
-        bundle_list = []
-
-        for bundle in bundles:
-            # Format human-readable size
-            size_str = ""
-            if bundle.size_bytes < 1024:
-                size_str = f"{bundle.size_bytes} B"
-            elif bundle.size_bytes < 1024 * 1024:
-                size_str = f"{bundle.size_bytes / 1024:.1f} KB"
-            elif bundle.size_bytes < 1024 * 1024 * 1024:
-                size_str = f"{bundle.size_bytes / (1024 * 1024):.1f} MB"
-            else:
-                size_str = f"{bundle.size_bytes / (1024 * 1024 * 1024):.1f} GB"
-
-            # Format modification time for human readability
-            modified_time_str = datetime.datetime.fromtimestamp(bundle.modified_time).strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
-
-            # Add bundle entry
-            bundle_entry = {
-                "name": bundle.name,
-                "source": bundle.relative_path,  # Use relative path for initializing
-                "full_path": bundle.path,
-                "size_bytes": bundle.size_bytes,
-                "size": size_str,
-                "modified_time": bundle.modified_time,
-                "modified": modified_time_str,
-                "valid": bundle.valid,
-            }
-
-            if not bundle.valid and bundle.validation_message:
-                bundle_entry["validation_message"] = bundle.validation_message
-
-            bundle_list.append(bundle_entry)
-
-        # Create response object
-        response_obj = {"bundles": bundle_list, "total": len(bundle_list)}
-
-        # Get example bundle for usage instructions
-        example_bundle = next((b for b in bundles if b.valid), bundles[0] if bundles else None)
-
-        # Create response text with JSON result and usage instructions
-        response = f"```json\n{json.dumps(response_obj, indent=2)}\n```\n\n"
-
-        if example_bundle:
-            response += "## Usage Instructions\n\n"
-            response += "To use one of these bundles, initialize it with the `initialize_bundle` tool using the `source` value:\n\n"
-            response += '```json\n{\n  "source": "' + example_bundle.relative_path + '"\n}\n```\n\n'
-            response += "After initializing a bundle, you can explore its contents using the file exploration tools (`list_files`, `read_file`, `grep_files`) and run kubectl commands with the `kubectl` tool."
-
+        response = formatter.format_bundle_list(bundles)
         return [TextContent(type="text", text=response)]
 
     except BundleManagerError as e:
         error_message = f"Failed to list bundles: {str(e)}"
         logger.error(error_message)
-        return [TextContent(type="text", text=error_message)]
+        formatted_error = formatter.format_error(error_message)
+        return [TextContent(type="text", text=formatted_error)]
     except Exception as e:
         error_message = f"Unexpected error listing bundles: {str(e)}"
         logger.exception(error_message)
-        return [TextContent(type="text", text=error_message)]
+        formatted_error = formatter.format_error(error_message)
+        return [TextContent(type="text", text=formatted_error)]
 
 
 @mcp.tool()
@@ -306,6 +235,8 @@ async def kubectl(args: KubectlCommandArgs) -> List[TextContent]:
             timeout: (integer, optional) Timeout in seconds for the command. Defaults to 30.
             json_output: (boolean, optional) Whether to format the output as JSON.
                 Defaults to True. Set to False for plain text output.
+            verbosity: (string, optional) Verbosity level for response formatting
+                (minimal|standard|verbose|debug). Defaults to minimal.
 
     Returns:
         The formatted output from the kubectl command, along with execution metadata
@@ -313,6 +244,7 @@ async def kubectl(args: KubectlCommandArgs) -> List[TextContent]:
         information if the command fails or API server is not available.
     """
     bundle_manager = get_bundle_manager()
+    formatter = get_formatter(args.verbosity)
 
     try:
         # Check if the API server is available before attempting kubectl
@@ -321,36 +253,18 @@ async def kubectl(args: KubectlCommandArgs) -> List[TextContent]:
             # Get diagnostic information
             diagnostics = await bundle_manager.get_diagnostic_info()
             error_message = (
-                "Kubernetes API server is not available. kubectl commands cannot be executed.\n\n"
-                f"Diagnostic information:\n```json\n{json.dumps(diagnostics, indent=2)}\n```\n\n"
+                "Kubernetes API server is not available. kubectl commands cannot be executed. "
                 "Try reinitializing the bundle with the initialize_bundle tool."
             )
             logger.error("API server not available for kubectl command")
-            return [TextContent(type="text", text=error_message)]
+            formatted_error = formatter.format_error(error_message, diagnostics)
+            return [TextContent(type="text", text=formatted_error)]
 
         # Execute the kubectl command
         result = await get_kubectl_executor().execute(args.command, args.timeout, args.json_output)
 
-        # Format the response based on the result
-        if result.is_json:
-            # Convert objects to JSON with nice formatting
-            output_str = json.dumps(result.output, indent=2)
-            response = f"kubectl command executed successfully:\n```json\n{output_str}\n```"
-        else:
-            # Use plain text for non-JSON output
-            output_str = result.stdout
-            response = f"kubectl command executed successfully:\n```\n{output_str}\n```"
-
-        # Add metadata about the command execution
-        metadata = {
-            "command": result.command,
-            "exit_code": result.exit_code,
-            "duration_ms": result.duration_ms,
-        }
-
-        metadata_str = json.dumps(metadata, indent=2)
-        response += f"\nCommand metadata:\n```json\n{metadata_str}\n```"
-
+        # Format response using the formatter
+        response = formatter.format_kubectl_result(result)
         return [TextContent(type="text", text=response)]
 
     except KubectlError as e:
@@ -358,51 +272,48 @@ async def kubectl(args: KubectlCommandArgs) -> List[TextContent]:
         logger.error(error_message)
 
         # Try to get diagnostic information for the API server
+        diagnostics = None
         try:
             diagnostics = await bundle_manager.get_diagnostic_info()
 
             # Check if this is a connection issue
             if "connection refused" in str(e).lower() or "could not connect" in str(e).lower():
                 error_message += (
-                    "\n\nThis appears to be a connection issue with the Kubernetes API server. "
-                    "The API server may not be running properly.\n\n"
-                    f"Diagnostic information:\n```json\n{json.dumps(diagnostics, indent=2)}\n```\n\n"
+                    " This appears to be a connection issue with the Kubernetes API server. "
+                    "The API server may not be running properly. "
                     "Try reinitializing the bundle with the initialize_bundle tool."
                 )
-            else:
-                error_message += f"\n\nDiagnostic information:\n```json\n{json.dumps(diagnostics, indent=2)}\n```"
         except Exception as diag_error:
             logger.error(f"Failed to get diagnostics: {diag_error}")
 
-        return [TextContent(type="text", text=error_message)]
+        formatted_error = formatter.format_error(error_message, diagnostics)
+        return [TextContent(type="text", text=formatted_error)]
     except BundleManagerError as e:
         error_message = f"Bundle error: {str(e)}"
         logger.error(error_message)
 
         # Try to get diagnostic information
+        diagnostics = None
         try:
             diagnostics = await bundle_manager.get_diagnostic_info()
-            error_message += (
-                f"\n\nDiagnostic information:\n```json\n{json.dumps(diagnostics, indent=2)}\n```"
-            )
         except Exception as diag_error:
             logger.error(f"Failed to get diagnostics: {diag_error}")
 
-        return [TextContent(type="text", text=error_message)]
+        formatted_error = formatter.format_error(error_message, diagnostics)
+        return [TextContent(type="text", text=formatted_error)]
     except Exception as e:
         error_message = f"Unexpected error executing kubectl command: {str(e)}"
         logger.exception(error_message)
 
         # Try to get diagnostic information
+        diagnostics = None
         try:
             diagnostics = await bundle_manager.get_diagnostic_info()
-            error_message += (
-                f"\n\nDiagnostic information:\n```json\n{json.dumps(diagnostics, indent=2)}\n```"
-            )
         except Exception as diag_error:
             logger.error(f"Failed to get diagnostics: {diag_error}")
 
-        return [TextContent(type="text", text=error_message)]
+        formatted_error = formatter.format_error(error_message, diagnostics)
+        return [TextContent(type="text", text=formatted_error)]
 
 
 @mcp.tool()
@@ -420,51 +331,36 @@ async def list_files(args: ListFilesArgs) -> List[TextContent]:
                 for root directory. Path cannot contain directory traversal (e.g., "../").
             recursive: (boolean, optional) Whether to list files and directories recursively.
                 Defaults to False. Set to True to show nested files.
+            verbosity: (string, optional) Verbosity level for response formatting
+                (minimal|standard|verbose|debug). Defaults to minimal.
 
     Returns:
         A JSON list of entries with file/directory information including name, path, type
         (file or dir), size, access time, modification time, and whether binary.
         Also returns metadata about the directory listing like total file and directory counts.
     """
+    formatter = get_formatter(args.verbosity)
+
     try:
         result = await get_file_explorer().list_files(args.path, args.recursive)
-
-        # Format the response
-        response = (
-            f"Listed files in {result.path} "
-            + ("recursively" if result.recursive else "non-recursively")
-            + ":\n"
-        )
-
-        # Format the entries
-        entries_data = [entry.model_dump() for entry in result.entries]
-        entries_json = json.dumps(entries_data, indent=2)
-        response += f"```json\n{entries_json}\n```\n"
-
-        # Add metadata
-        metadata = {
-            "path": result.path,
-            "recursive": result.recursive,
-            "total_files": result.total_files,
-            "total_dirs": result.total_dirs,
-        }
-        metadata_str = json.dumps(metadata, indent=2)
-        response += f"Directory metadata:\n```json\n{metadata_str}\n```"
-
+        response = formatter.format_file_list(result)
         return [TextContent(type="text", text=response)]
 
     except FileSystemError as e:
         error_message = f"File system error: {str(e)}"
         logger.error(error_message)
-        return [TextContent(type="text", text=error_message)]
+        formatted_error = formatter.format_error(error_message)
+        return [TextContent(type="text", text=formatted_error)]
     except BundleManagerError as e:
         error_message = f"Bundle error: {str(e)}"
         logger.error(error_message)
-        return [TextContent(type="text", text=error_message)]
+        formatted_error = formatter.format_error(error_message)
+        return [TextContent(type="text", text=formatted_error)]
     except Exception as e:
         error_message = f"Unexpected error listing files: {str(e)}"
         logger.exception(error_message)
-        return [TextContent(type="text", text=error_message)]
+        formatted_error = formatter.format_error(error_message)
+        return [TextContent(type="text", text=formatted_error)]
 
 
 @mcp.tool()
@@ -484,49 +380,35 @@ async def read_file(args: ReadFileArgs) -> List[TextContent]:
                 Defaults to 0 (the first line).
             end_line: (integer or null, optional) The line number to end reading at
                 (0-indexed, inclusive). Defaults to null, which means read to the end of the file.
+            verbosity: (string, optional) Verbosity level for response formatting
+                (minimal|standard|verbose|debug). Defaults to minimal.
 
     Returns:
         The content of the file with line numbers. For text files, displays the
         specified line range with line numbers. For binary files, displays a hex dump.
     """
+    formatter = get_formatter(args.verbosity)
+
     try:
         result = await get_file_explorer().read_file(args.path, args.start_line, args.end_line)
-
-        # Format the response
-        file_type = "binary" if result.binary else "text"
-
-        # For text files, add line numbers
-        if not result.binary:
-            # Split the content into lines
-            lines = result.content.splitlines()
-
-            # Generate line numbers
-            content_with_numbers = ""
-            for i, line in enumerate(lines):
-                line_number = result.start_line + i
-                content_with_numbers += f"{line_number + 1:4d} | {line}\n"  # 1-indexed for display
-
-            response = f"Read {file_type} file {result.path} (lines {result.start_line + 1}-{result.end_line + 1} of {result.total_lines}):\n"
-            response += f"```\n{content_with_numbers}```"
-        else:
-            # For binary files, just show the hex dump
-            response = f"Read {file_type} file {result.path} (binary data shown as hex):\n"
-            response += f"```\n{result.content}\n```"
-
+        response = formatter.format_file_content(result)
         return [TextContent(type="text", text=response)]
 
     except FileSystemError as e:
         error_message = f"File system error: {str(e)}"
         logger.error(error_message)
-        return [TextContent(type="text", text=error_message)]
+        formatted_error = formatter.format_error(error_message)
+        return [TextContent(type="text", text=formatted_error)]
     except BundleManagerError as e:
         error_message = f"Bundle error: {str(e)}"
         logger.error(error_message)
-        return [TextContent(type="text", text=error_message)]
+        formatted_error = formatter.format_error(error_message)
+        return [TextContent(type="text", text=formatted_error)]
     except Exception as e:
         error_message = f"Unexpected error reading file: {str(e)}"
         logger.exception(error_message)
-        return [TextContent(type="text", text=error_message)]
+        formatted_error = formatter.format_error(error_message)
+        return [TextContent(type="text", text=formatted_error)]
 
 
 @mcp.tool()
@@ -551,12 +433,16 @@ async def grep_files(args: GrepFilesArgs) -> List[TextContent]:
                 Defaults to False (case-insensitive search).
             max_results: (integer, optional) Maximum number of results to return.
                 Defaults to 1000.
+            verbosity: (string, optional) Verbosity level for response formatting
+                (minimal|standard|verbose|debug). Defaults to minimal.
 
     Returns:
         Matches found in file contents and filenames, grouped by file.
         Also includes search metadata such as the number of files searched
         and the total number of matches found.
     """
+    formatter = get_formatter(args.verbosity)
+
     try:
         result = await get_file_explorer().grep_files(
             args.pattern,
@@ -567,67 +453,24 @@ async def grep_files(args: GrepFilesArgs) -> List[TextContent]:
             args.max_results,
         )
 
-        # Format the response
-        pattern_type = "case-sensitive" if result.case_sensitive else "case-insensitive"
-        path_desc = result.path + (
-            f" (matching {result.glob_pattern})" if result.glob_pattern else ""
-        )
-
-        response = f"Found {result.total_matches} matches for {pattern_type} pattern '{result.pattern}' in {path_desc}:\n\n"
-
-        # If we have matches, show them
-        if result.matches:
-            # Group matches by file
-            matches_by_file: dict[str, list[GrepMatch]] = {}
-            for match in result.matches:
-                if match.path not in matches_by_file:
-                    matches_by_file[match.path] = []
-                matches_by_file[match.path].append(match)
-
-            # Format the matches
-            for file_path, matches in matches_by_file.items():
-                response += f"**File: {file_path}**\n```\n"
-                for match in matches:
-                    response += (
-                        f"{match.line_number + 1:4d} | {match.line}\n"  # 1-indexed for display
-                    )
-                response += "```\n\n"
-
-            # Add truncation notice if necessary
-            if result.truncated:
-                response += f"_Note: Results truncated to {args.max_results} matches._\n\n"
-
-        else:
-            response += "No matches found.\n\n"
-
-        # Add metadata
-        metadata = {
-            "pattern": result.pattern,
-            "path": result.path,
-            "glob_pattern": result.glob_pattern,
-            "total_matches": result.total_matches,
-            "files_searched": result.files_searched,
-            "recursive": args.recursive,
-            "case_sensitive": result.case_sensitive,
-            "truncated": result.truncated,
-        }
-        metadata_str = json.dumps(metadata, indent=2)
-        response += f"Search metadata:\n```json\n{metadata_str}\n```"
-
+        response = formatter.format_grep_results(result)
         return [TextContent(type="text", text=response)]
 
     except FileSystemError as e:
         error_message = f"File system error: {str(e)}"
         logger.error(error_message)
-        return [TextContent(type="text", text=error_message)]
+        formatted_error = formatter.format_error(error_message)
+        return [TextContent(type="text", text=formatted_error)]
     except BundleManagerError as e:
         error_message = f"Bundle error: {str(e)}"
         logger.error(error_message)
-        return [TextContent(type="text", text=error_message)]
+        formatted_error = formatter.format_error(error_message)
+        return [TextContent(type="text", text=formatted_error)]
     except Exception as e:
         error_message = f"Unexpected error searching files: {str(e)}"
         logger.exception(error_message)
-        return [TextContent(type="text", text=error_message)]
+        formatted_error = formatter.format_error(error_message)
+        return [TextContent(type="text", text=formatted_error)]
 
 
 # Helper function to initialize the bundle manager with a specified directory
