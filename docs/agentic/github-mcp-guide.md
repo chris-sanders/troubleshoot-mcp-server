@@ -1,21 +1,21 @@
-# GitHub MCP Operations Guide
+# GitHub CLI Operations Guide
 
-This document provides guidance on how to use GitHub MCP (Model Capability Provider) tools for Git and GitHub operations as part of the AI workflow.
+This document provides guidance on how to use the GitHub CLI (`gh`) for Git and GitHub operations as part of the AI workflow.
 
-## IMPORTANT: Use GitHub MCP Tools, NOT gh Binary
+## PREFERRED: Use GitHub CLI (gh)
 
-**CRITICAL**: All GitHub operations must be performed using the `mcp__github__*` tools provided by the GitHub MCP server. **DO NOT use the `gh` command-line binary** for any GitHub operations.
+**RECOMMENDATION**: Prefer using the `gh` command-line interface for GitHub operations to save tokens and context. MCP GitHub tools are available as an alternative if needed.
 
-**Correct approach:**
-- Use `mcp__github__create_pull_request` for creating PRs
-- Use `mcp__github__create_pull_request_review` for PR comments and reviews
-- Use `mcp__github__merge_pull_request` for merging PRs
-- Use other `mcp__github__*` tools as needed
+**Preferred approach (recommended):**
+- Use `gh pr create` for creating PRs
+- Use `gh pr review` for PR comments and reviews
+- Use `gh pr merge` for merging PRs
+- Use other `gh` commands as needed
 
-**Incorrect approach:**
-- `gh pr create` ❌
-- `gh pr review` ❌ 
-- `gh pr merge` ❌
+**Alternative approach (if MCP tools available):**
+- `mcp__github__create_pull_request` ✓ (allowed but less preferred)
+- `mcp__github__create_pull_request_review` ✓ (allowed but less preferred)
+- `mcp__github__merge_pull_request` ✓ (allowed but less preferred)
 
 ## Git vs GitHub Operations
 
@@ -25,17 +25,18 @@ This document provides guidance on how to use GitHub MCP (Model Capability Provi
 - `git push` - Push changes to remote
 - `git status`, `git diff` - Check repository status
 
-**GitHub operations** (remote platform interactions) - Use MCP tools:
-- `mcp__github__create_pull_request` - Create pull requests
-- `mcp__github__create_pull_request_review` - Add PR reviews/comments
-- `mcp__github__merge_pull_request` - Merge pull requests
-- `mcp__github__get_pull_request` - Get PR information
-- All other GitHub API interactions
+**GitHub operations** (remote platform interactions) - Use GitHub CLI:
+- `gh pr create` - Create pull requests
+- `gh pr review` - Add PR reviews/comments
+- `gh pr merge` - Merge pull requests
+- `gh pr view` - Get PR information
+- All other GitHub operations
 
 ## Prerequisites
 
-- Claude Code must be configured with GitHub MCP access at the user level
-- The repository must be a valid git repository
+- GitHub CLI (`gh`) must be installed and authenticated
+- The repository must be a valid git repository with GitHub remote
+- Agent must have access to run shell commands (`gh` CLI)
 
 ## Branch Management
 
@@ -104,17 +105,17 @@ git commit -am "Descriptive message about changes"
 
 ### Creating a Pull Request
 
-After pushing your branch, create a pull request using the MCP tools:
+After pushing your branch, create a pull request using the GitHub CLI:
 
-```
-# Format
-mcp__github__create_pull_request:
-  owner: [repository-owner]
-  repo: [repository-name]
-  title: "Implement [task-name]"
-  head: [branch-name]
-  base: master
-  body: "PR description with summary and test plan"
+```bash
+# Basic PR creation
+gh pr create --title "Implement [task-name]" --body "PR description with summary and test plan"
+
+# PR creation with specific base branch
+gh pr create --title "Implement [task-name]" --base main --body "PR description"
+
+# Create draft PR
+gh pr create --title "Implement [task-name]" --draft --body "PR description"
 ```
 
 ### PR Description Template
@@ -131,13 +132,19 @@ mcp__github__create_pull_request:
 
 ### Updating Task with PR Information
 
-After creating a PR, update the task file metadata and move it to the review folder:
+After creating a PR, update the task file metadata:
 
 ```
-**Status**: review
+**Status**: completed
 **PR**: #[PR-number]
 **PR URL**: [PR-URL]
 **PR Status**: Open
+```
+
+Get PR information with:
+```bash
+gh pr view  # View current PR
+gh pr view 123  # View specific PR number
 ```
 
 ### Handling PR Feedback
@@ -155,13 +162,17 @@ When receiving PR feedback:
 
 When a PR is approved and ready to merge:
 
-```
-# Format
-mcp__github__merge_pull_request:
-  owner: [repository-owner]
-  repo: [repository-name]
-  pullNumber: [PR-number]
-  merge_method: "squash"  # or "merge" or "rebase"
+```bash
+# Merge PR with default method
+gh pr merge
+
+# Merge with specific method
+gh pr merge --squash  # Squash and merge
+gh pr merge --merge   # Create merge commit
+gh pr merge --rebase  # Rebase and merge
+
+# Merge specific PR by number
+gh pr merge 123 --squash
 ```
 
 After merging:
@@ -175,20 +186,25 @@ After merging:
 
 Always include AI attribution in comments to distinguish between human and AI responses:
 
-```
-# Format - IMPORTANT: Use create_pull_request_review for PR comments, NOT add_issue_comment
-mcp__github__create_pull_request_review:
-  owner: [repository-owner]
-  repo: [repository-name]
-  pullNumber: [PR-number]  # Use pullNumber (not issue_number) for PRs
-  event: "COMMENT"  # or "APPROVE" or "REQUEST_CHANGES"
-  body: "🤖 Comment text\n\n---\n[Comment by AI Assistant]"
-```
+```bash
+# Add general comment to PR
+gh pr review --comment "🤖 Comment text
 
-> ⚠️ **IMPORTANT**: PRs and Issues are different in the GitHub API:
-> - For Issues: Use `mcp__github__add_issue_comment` with `issue_number`
-> - For PRs: Use `mcp__github__create_pull_request_review` with `pullNumber`
-> - Never use `add_issue_comment` for PR comments, even though PRs and Issues share numbering
+---
+[Comment by AI Assistant]"
+
+# Add comment to specific PR by number
+gh pr review 123 --comment "🤖 Comment text
+
+---
+[Comment by AI Assistant]"
+
+# Add comment to specific file/line (during review)
+gh pr review --comment "🤖 Comment about specific code
+
+---
+[Comment by AI Assistant]"
+```
 
 ### Comment Attribution Format
 

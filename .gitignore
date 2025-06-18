@@ -39,3 +39,6 @@ ENV/
 .aider*
 
 **/.claude/settings.local.json
+
+# Git worktrees (development branches)
+trees/

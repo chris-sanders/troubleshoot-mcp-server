@@ -1,52 +1,190 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides mandatory guidance for Claude Code agents working in this repository. Follow these instructions exactly to ensure consistent development workflow.
 
-## Important
-- ALWAYS read both READMEs in the root directory and in the mcp-server-troubleshoot folder to understand the project
-- ALWAYS read `docs/agentic/ai-readme.md` first to understand the task workflow
-- Follow the structured workflow in `/docs/` for tasks, PRs, and code reviews
-- Understand system architecture from `docs/architecture.md` before coding
+## CRITICAL: Workflow Requirements
+- Follow the mandatory step-by-step workflow below - no exceptions
+- Use UV for ALL Python operations (`uv run [command]`)
+- Work in git worktrees under `trees/` directory for all development
 
-## Development Environment Setup
-- Setup dev environment: `./scripts/setup_env.sh`
-- Create virtual environment manually (if needed): `uv venv -p python3.13 .venv`
-- Install dependencies: `uv pip install -e ".[dev]"`
+## MANDATORY PRE-WORK CHECKLIST
 
-## Testing Commands
-- Run all tests: `uv run pytest`
-- Run test categories: `uv run pytest -m unit`, `uv run pytest -m integration`, `uv run pytest -m e2e`
-- Run single test: `uv run pytest tests/unit/test_bundle.py -v`
-- Run with coverage: `uv run pytest --cov=src`
-- Run tests with helper script: `./scripts/run_tests.sh [test_type]`
+Before starting ANY development work, you MUST complete this checklist:
 
-## Code Quality Commands
-- Lint code: `uv run ruff check .`
-- Format code: `uv run black .`
-- Type check: `uv run mypy src`
+### ✅ 1. Environment Setup (One-time)
+- [ ] Run: `./scripts/setup_env.sh` to set up development environment
+- [ ] Verify setup: `uv run pytest tests/unit/test_components.py -v`
 
-## Code Style Guidelines
-- Python: Follow PEP 8 and use type annotations
-- Imports: Group standard lib, third-party, then local imports
-- Naming: snake_case for functions/variables, CamelCase for classes
-- Error handling: Use specific exceptions, provide context messages
-- Use f-strings for string formatting
-- 100 character line length maximum
-- Document public interfaces with docstrings
-- Write atomic, focused unit tests with pytest
-- Use the MCP protocol standard for handler implementations
+### ✅ 2. Task Preparation
+- [ ] Create git worktree: `git worktree add trees/[branch-name] -b task/[task-name]`
+- [ ] Switch to worktree: `cd trees/[branch-name]`
+- [ ] Move task file IN WORKTREE: `git mv tasks/backlog/[task-file].md tasks/active/[task-file].md`
+- [ ] Update task metadata: Status to "active", add Started date, add progress entry
+- [ ] Commit task move: `git commit -m "Start task: [task-name]"`
 
-## Task Workflow
-- Tasks flow through: backlog → active → completed
-- ALWAYS use `git mv` when moving task files between directories to prevent orphaned documents
-- Create branches with pattern: `task/[task-filename-without-extension]`
-- Commit messages: Start with present-tense verb, be descriptive, do NOT include AI attribution
-- **Task completion**: Move tasks to completed when implementation is ready for review, not after PR merge
-- **GitHub operations**: Use `mcp__github__*` tools for all GitHub interactions, NOT the `gh` binary
-- When completing tasks, update all metadata and move to correct folder using `git mv`
+### ✅ 3. UV Environment Verification
+- [ ] Verify UV detects environment: `uv run python --version`
+- [ ] Test dependency access: `uv run pytest --version`
 
-## UV Best Practices
-- Always use `uv run` to execute commands in the virtual environment
-- No need to manually activate the virtual environment
-- Use `uv pip` for dependency management
-- UV automatically detects the virtual environment in .venv
+## DEVELOPMENT WORKFLOW (MANDATORY STEPS)
+
+### Step 1: Start Development Work
+- [ ] Work in your worktree directory: `trees/[branch-name]/`
+- [ ] Make code changes following project conventions
+- [ ] Use ONLY `uv run [command]` for all Python operations
+- [ ] Update task file with progress notes
+
+### Step 2: Code Quality Enforcement (MANDATORY)
+After making ANY code changes, you MUST run these commands in order:
+
+```bash
+# In your worktree directory
+uv run black .                    # Format code - MANDATORY
+uv run ruff check .               # Lint code - MANDATORY  
+uv run mypy src                   # Type check - MANDATORY
+```
+
+**These commands MUST pass before proceeding. Fix all issues before continuing.**
+
+### Step 3: Testing Requirements (MANDATORY)
+- [ ] Run relevant tests: `uv run pytest tests/unit/test_[component].py -v`
+- [ ] If integration tests exist: `uv run pytest -m integration`
+- [ ] All tests MUST pass before proceeding
+
+### Step 4: Commit Changes
+- [ ] Add changes: `git add .`
+- [ ] Commit with descriptive message: `git commit -m "Implement [feature]: [description]"`
+- [ ] Messages MUST start with present-tense verb, NO AI attribution
+
+## TASK COMPLETION WORKFLOW (MANDATORY)
+
+### Step 1: Final Quality Check
+- [ ] Run complete test suite: `uv run pytest`
+- [ ] Run final quality check: `uv run black . && uv run ruff check . && uv run mypy src`
+- [ ] All commands MUST pass
+
+### Step 2: Push and Create PR
+- [ ] Push branch: `git push -u origin task/[task-name]`
+- [ ] Create PR using gh CLI: `gh pr create --title "[Task Name]" --body "[Description]"`
+- [ ] Update task file with PR URL and metadata
+
+### Step 3: Task File Management
+- [ ] Update task status to "completed"
+- [ ] Add completion date and PR information
+- [ ] Move task IN WORKTREE: `git mv tasks/active/[task-file].md tasks/completed/[task-file].md`
+- [ ] Commit task completion: `git commit -m "Complete task: [task-name]"`
+
+### Step 4: Cleanup (After PR Merge)
+- [ ] Delete worktree: `git worktree remove trees/[branch-name]`
+- [ ] Delete branch: `git branch -d task/[task-name]`
+
+## GIT WORKTREE WORKFLOW
+
+This project uses git worktrees in the `trees/` directory for parallel development:
+
+### Creating a Worktree
+```bash
+# Create worktree with new branch
+git worktree add trees/[branch-name] -b task/[task-name]
+
+# Switch to worktree
+cd trees/[branch-name]
+```
+
+### Working in Worktrees
+- Each worktree is a complete working directory
+- UV environment works the same in worktrees
+- Main branch remains accessible in project root
+- Multiple worktrees can exist simultaneously
+
+### Worktree Cleanup
+```bash
+# Remove worktree when done
+git worktree remove trees/[branch-name]
+
+# Remove branch after PR merge
+git branch -d task/[task-name]
+```
+
+## TOOLS & COMMANDS REFERENCE
+
+### UV Commands (Use ONLY these)
+```bash
+uv run pytest                     # Run tests
+uv run pytest -m unit           # Run unit tests
+uv run pytest -m integration    # Run integration tests
+uv run black .                  # Format code
+uv run ruff check .             # Lint code
+uv run mypy src                 # Type check
+```
+
+### GitHub Operations (Prefer gh CLI)
+```bash
+gh pr create --title "Title" --body "Description"  # Preferred
+gh pr view                      # View current PR
+gh pr merge                     # Merge PR  
+gh repo view --web              # Open repo in browser
+
+# MCP tools available as alternative if needed:
+# mcp__github__create_pull_request, mcp__github__merge_pull_request, etc.
+```
+
+### Testing Categories
+- Unit tests: `uv run pytest -m unit`
+- Integration tests: `uv run pytest -m integration`  
+- E2E tests: `uv run pytest -m e2e`
+- Specific file: `uv run pytest tests/unit/test_bundle.py -v`
+
+## ENFORCEMENT RULES
+
+### ❌ NEVER DO:
+- Install packages without `uv pip install`
+- Run Python commands without `uv run`
+- Skip code quality checks (black, ruff, mypy)
+- Work directly on main branch
+- Create branches without worktrees
+- Include AI attribution in commit messages
+- Move task files with `mv` (use `git mv`)
+
+### ✅ ALWAYS DO:
+- Use `uv run` for all Python commands
+- Run quality checks after every code change
+- Work in worktrees under `trees/` directory
+- Use `git mv` for task file movements
+- Update task progress regularly
+- Test changes before committing
+- Use descriptive commit messages
+- Prefer `gh` CLI for GitHub operations (MCP tools allowed as alternative)
+
+## PROJECT STRUCTURE
+```
+├── trees/                     # Git worktrees (DO NOT commit)
+│   ├── feature-branch-1/      # Worktree for task/feature-1
+│   └── feature-branch-2/      # Worktree for task/feature-2  
+├── tasks/
+│   ├── backlog/              # Tasks ready to start
+│   ├── active/               # Tasks currently being worked on
+│   └── completed/            # Finished tasks
+├── src/                      # Source code
+└── tests/                    # Test files
+```
+
+## TROUBLESHOOTING
+
+### UV Environment Issues
+```bash
+# Reset environment
+./scripts/setup_env.sh --force-recreate
+
+# Verify installation  
+uv run python -c "import mcp_server_troubleshoot"
+```
+
+### Worktree Issues
+```bash
+# List worktrees
+git worktree list
+
+# Remove broken worktree
+git worktree remove trees/[branch-name] --force
+```
