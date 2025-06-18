@@ -4,21 +4,21 @@
 Dramatically reduce token usage in kubectl responses which currently can generate 160k+ tokens for simple commands like `kubectl get pod -n rook-ceph` due to excessive JSON formatting and verbosity.
 
 ## Context
-Investigation revealed that kubectl responses are generating excessive tokens due to:
-1. Default JSON output with `indent=2` formatting in verbose mode
-2. JSON output enabled by default (`json_output: bool = Field(True, ...)`)
-3. Additional metadata and markdown wrapping that compounds the bloat
-4. Verbose mode being set as default in test environment potentially affecting production
+Investigation revealed a fundamental issue: kubectl responses are returning full Kubernetes API JSON objects instead of normal CLI output due to:
+1. **Automatic `-o json` injection**: Line 177-178 in kubectl.py automatically adds `-o json` to commands
+2. **JSON output enabled by default**: `json_output: bool = Field(True, ...)` on line 47
+3. **CLI table output bypassed**: Users expect compact CLI tables, not verbose API responses
+4. **Massive token bloat**: Full API objects contain extensive metadata vs simple table rows
 
-A simple pod listing generating 160k tokens is completely unacceptable for LLM context usage.
+The system is returning `kubectl get pods -o json` (full API objects) instead of `kubectl get pods` (compact tables). This is why a simple pod listing generates 160k tokens instead of ~100 lines of table output.
 
 ## Success Criteria
-- [ ] kubectl responses use minimal formatting by default
-- [ ] JSON indentation removed or made optional
-- [ ] Token usage for typical kubectl commands reduced by 50-75%
-- [ ] Maintain readability for human users when explicitly requested
-- [ ] Preserve all functionality while optimizing token efficiency
-- [ ] Update default verbosity settings to minimize token usage
+- [ ] Return normal kubectl CLI table output by default (not JSON API objects)
+- [ ] Change default `json_output` to `False` to get compact CLI format
+- [ ] JSON output available only when explicitly requested (`json_output=True`)
+- [ ] Token usage for typical kubectl commands reduced by 90%+ (from API objects to CLI tables)
+- [ ] Maintain familiar kubectl CLI experience users expect
+- [ ] Preserve JSON functionality for programmatic use when needed
 
 ## Dependencies
 - `src/mcp_server_troubleshoot/formatters.py` - Response formatting logic
@@ -28,15 +28,16 @@ A simple pod listing generating 160k tokens is completely unacceptable for LLM c
 
 ## Implementation Plan
 
-### 1. Fix JSON Formatting Issues
-- **File**: `src/mcp_server_troubleshoot/formatters.py:339`
-- **Change**: Remove `indent=2` from `json.dumps(result.output, indent=2)`
-- **Impact**: Eliminate JSON indentation bloat
-
-### 2. Optimize Default Settings
+### 1. Fix Default Output Format (CRITICAL)
 - **File**: `src/mcp_server_troubleshoot/kubectl.py:47`
-- **Change**: Consider changing `json_output: bool = Field(False, ...)` for minimal output by default
-- **Alternative**: Keep JSON but ensure minimal formatting
+- **Change**: `json_output: bool = Field(False, ...)` - Disable JSON by default
+- **Impact**: Return normal CLI tables instead of full API objects
+- **Token Reduction**: 90%+ reduction (160k → ~1-2k tokens)
+
+### 2. Remove Automatic JSON Injection
+- **File**: `src/mcp_server_troubleshoot/kubectl.py:177-178`
+- **Current**: Automatically adds `-o json` when `json_output=True`
+- **Keep**: Logic but ensure it's only used when explicitly requested
 
 ### 3. Implement Compact JSON Mode
 - **File**: `src/mcp_server_troubleshoot/formatters.py`
@@ -79,9 +80,9 @@ A simple pod listing generating 160k tokens is completely unacceptable for LLM c
 
 ## Target Token Reductions
 Based on investigation findings:
-- **Current**: ~93,644 tokens for rook-ceph pod listing (verbose with indent)
-- **Target**: ~53,348 tokens (raw JSON without indentation)
-- **Goal**: 43% reduction minimum, 60%+ preferred
+- **Current**: 160k+ tokens for rook-ceph pod listing (full API JSON objects)
+- **Expected CLI Output**: ~1-2k tokens (compact table format)
+- **Goal**: 90%+ reduction by returning normal CLI output instead of API objects
 
 ## Evidence of Completion
 (To be filled by AI)
