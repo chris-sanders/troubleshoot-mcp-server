@@ -115,6 +115,24 @@ def test_grep_files_args_validation():
     with pytest.raises(ValidationError):
         GrepFilesArgs(pattern="test", path="dir1", max_results=0)
 
+    # Test new parameters with defaults
+    args_defaults = GrepFilesArgs(pattern="test", path="dir1")
+    assert args_defaults.max_results_per_file == 5  # Default value
+    assert args_defaults.max_files == 10  # Default value
+
+    # Test new parameters with custom values
+    args_custom = GrepFilesArgs(pattern="test", path="dir1", max_results_per_file=3, max_files=5)
+    assert args_custom.max_results_per_file == 3
+    assert args_custom.max_files == 5
+
+    # Non-positive max_results_per_file
+    with pytest.raises(ValidationError):
+        GrepFilesArgs(pattern="test", path="dir1", max_results_per_file=0)
+
+    # Non-positive max_files
+    with pytest.raises(ValidationError):
+        GrepFilesArgs(pattern="test", path="dir1", max_files=0)
+
 
 @pytest.mark.asyncio
 async def test_file_explorer_list_files(test_file_setup):
@@ -555,3 +573,132 @@ def test_file_explorer_normalize_path(test_file_setup):
 
     with pytest.raises(InvalidPathError):
         explorer._normalize_path("dir1/../../../outside")
+
+
+@pytest.mark.asyncio
+async def test_file_explorer_grep_files_per_file_limiting(test_file_setup):
+    """
+    Test that grep_files respects per-file result limiting.
+
+    This test verifies that when a file has many matches,
+    only max_results_per_file matches are returned for that file.
+    """
+    # Create a file with many lines containing the pattern
+    test_file = test_file_setup / "many_matches.txt"
+    test_content = "\n".join([f"line {i} with pattern match" for i in range(20)])
+    test_file.write_text(test_content)
+
+    # Mock the bundle manager
+    bundle_manager = Mock(spec=BundleManager)
+    bundle = BundleMetadata(
+        id="test",
+        source="test",
+        path=test_file_setup,
+        kubeconfig_path=Path("/test/kubeconfig"),
+        initialized=True,
+    )
+    bundle_manager.get_active_bundle.return_value = bundle
+
+    # Create the explorer
+    explorer = FileExplorer(bundle_manager)
+
+    # Search with max_results_per_file=3
+    result = await explorer.grep_files(
+        pattern="pattern", path="many_matches.txt", max_results_per_file=3, max_files=10
+    )
+
+    # Should only get 3 matches from the file (per-file limit)
+    assert result.total_matches == 3
+    assert len(result.matches) == 3
+
+    # All matches should be from the same file
+    for match in result.matches:
+        assert match.path == "many_matches.txt"
+
+
+@pytest.mark.asyncio
+async def test_file_explorer_grep_files_max_files_limiting(test_file_setup):
+    """
+    Test that grep_files respects max_files limiting.
+
+    This test verifies that when there are many files to search,
+    only max_files are actually searched.
+    """
+    # Create multiple files with matches
+    for i in range(15):
+        test_file = test_file_setup / f"file{i}.txt"
+        test_file.write_text(f"This is file {i} with a test pattern")
+
+    # Mock the bundle manager
+    bundle_manager = Mock(spec=BundleManager)
+    bundle = BundleMetadata(
+        id="test",
+        source="test",
+        path=test_file_setup,
+        kubeconfig_path=Path("/test/kubeconfig"),
+        initialized=True,
+    )
+    bundle_manager.get_active_bundle.return_value = bundle
+
+    # Create the explorer
+    explorer = FileExplorer(bundle_manager)
+
+    # Search with max_files=5
+    result = await explorer.grep_files(
+        pattern="test",
+        path="",  # Search all files
+        recursive=False,
+        max_files=5,
+        max_results_per_file=10,
+    )
+
+    # Should have searched only 5 files maximum
+    assert result.files_searched <= 5
+    # Should have files_truncated flag set
+    assert hasattr(result, "files_truncated")
+    assert result.files_truncated is True
+
+
+@pytest.mark.asyncio
+async def test_file_explorer_grep_files_combined_limiting(test_file_setup):
+    """
+    Test grep_files with both per-file and max_files limiting.
+
+    This test verifies the interaction between both limiting mechanisms.
+    """
+    # Create multiple files, each with multiple matches
+    for i in range(8):
+        test_file = test_file_setup / f"multi{i}.txt"
+        content = "\n".join([f"line {j} test match" for j in range(10)])
+        test_file.write_text(content)
+
+    # Mock the bundle manager
+    bundle_manager = Mock(spec=BundleManager)
+    bundle = BundleMetadata(
+        id="test",
+        source="test",
+        path=test_file_setup,
+        kubeconfig_path=Path("/test/kubeconfig"),
+        initialized=True,
+    )
+    bundle_manager.get_active_bundle.return_value = bundle
+
+    # Create the explorer
+    explorer = FileExplorer(bundle_manager)
+
+    # Search with both limits: max_files=3, max_results_per_file=2
+    result = await explorer.grep_files(
+        pattern="test",
+        path="",  # Search all files
+        recursive=False,
+        max_files=3,
+        max_results_per_file=2,
+    )
+
+    # Should have searched only 3 files maximum
+    assert result.files_searched <= 3
+    # Should have at most 6 total matches (3 files × 2 matches per file)
+    assert result.total_matches <= 6
+    # Should have files_truncated flag set since we have 8 files but limit is 3
+    assert hasattr(result, "files_truncated")
+    assert result.files_truncated is True

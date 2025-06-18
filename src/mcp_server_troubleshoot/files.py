@@ -156,6 +156,8 @@ class GrepFilesArgs(BaseModel):
     glob_pattern: Optional[str] = Field(None, description="The glob pattern to match files against")
     case_sensitive: bool = Field(False, description="Whether the search is case-sensitive")
     max_results: int = Field(1000, description="Maximum number of results to return")
+    max_results_per_file: int = Field(5, description="Maximum number of results to return per file")
+    max_files: int = Field(10, description="Maximum number of files to search/return")
     verbosity: Optional[str] = Field(
         None, description="Verbosity level for response formatting (minimal|standard|verbose|debug)"
     )
@@ -194,6 +196,20 @@ class GrepFilesArgs(BaseModel):
         """Validate max_results."""
         if v <= 0:
             raise ValueError("max_results must be positive")
+        return v
+
+    @field_validator("max_results_per_file")
+    def validate_max_results_per_file(cls, v: int) -> int:
+        """Validate max_results_per_file."""
+        if v <= 0:
+            raise ValueError("max_results_per_file must be positive")
+        return v
+
+    @field_validator("max_files")
+    def validate_max_files(cls, v: int) -> int:
+        """Validate max_files."""
+        if v <= 0:
+            raise ValueError("max_files must be positive")
         return v
 
 
@@ -263,6 +279,9 @@ class GrepResult(BaseModel):
     files_searched: int = Field(description="The number of files that were searched")
     case_sensitive: bool = Field(description="Whether the search was case-sensitive")
     truncated: bool = Field(description="Whether the results were truncated due to max_results")
+    files_truncated: bool = Field(
+        default=False, description="Whether the file list was truncated due to max_files"
+    )
 
 
 class FileExplorer:
@@ -590,6 +609,8 @@ class FileExplorer:
         glob_pattern: Optional[str] = None,
         case_sensitive: bool = False,
         max_results: int = 1000,
+        max_results_per_file: int = 5,
+        max_files: int = 10,
     ) -> GrepResult:
         """
         Search for a pattern in files within the bundle.
@@ -601,6 +622,8 @@ class FileExplorer:
             glob_pattern: The glob pattern to match files against
             case_sensitive: Whether the search is case-sensitive
             max_results: Maximum number of results to return
+            max_results_per_file: Maximum number of results to return per file
+            max_files: Maximum number of files to search/return
 
         Returns:
             The result of the search operation
@@ -631,6 +654,8 @@ class FileExplorer:
             matches = []
             total_matches = 0
             truncated = False
+            files_searched = 0
+            files_truncated = False
             files_to_search = []
             file_paths_with_matching_names = []
 
@@ -666,6 +691,21 @@ class FileExplorer:
 
                         files_to_search.append(file_path)
 
+            # Limit total files to search (filename matches + content search files)
+            all_files = list(set(file_paths_with_matching_names + files_to_search))
+            if len(all_files) > max_files:
+                all_files = all_files[:max_files]
+                files_truncated = True
+
+            # Separate back into filename matches and content search files
+            file_paths_with_matching_names = [
+                f for f in file_paths_with_matching_names if f in all_files
+            ]
+            files_to_search = [f for f in files_to_search if f in all_files]
+
+            # Track files processed per file for per-file limiting
+            files_processed = set()
+
             # First add matches from filenames
             for file_path in file_paths_with_matching_names:
                 # Skip if we've hit the max results
@@ -675,9 +715,14 @@ class FileExplorer:
 
                 rel_path = str(file_path.relative_to(bundle_path))
                 filename = file_path.name
+                file_matches = 0
+                files_processed.add(file_path)
 
                 # Find all matches of the pattern in the filename
                 for match in regex.finditer(filename):
+                    if file_matches >= max_results_per_file:
+                        break
+
                     matches.append(
                         GrepMatch(
                             path=rel_path,
@@ -688,6 +733,7 @@ class FileExplorer:
                         )
                     )
                     total_matches += 1
+                    file_matches += 1
 
                     # Stop if we've hit the max results
                     if total_matches >= max_results:
@@ -702,6 +748,19 @@ class FileExplorer:
                     break
 
                 try:
+                    rel_path = str(file_path.relative_to(bundle_path))
+                    file_matches = 0
+
+                    # If this file was already processed for filename matches,
+                    # we need to account for those in per-file limiting
+                    if file_path in files_processed:
+                        # Count existing matches for this file
+                        for existing_match in matches:
+                            if existing_match.path == rel_path:
+                                file_matches += 1
+                    else:
+                        files_processed.add(file_path)
+
                     with open(file_path, "r") as f:
                         for i, line in enumerate(f):
                             # Skip if we've hit the max results
@@ -709,9 +768,14 @@ class FileExplorer:
                                 truncated = True
                                 break
 
+                            # Skip if we've hit the per-file limit
+                            if file_matches >= max_results_per_file:
+                                break
+
                             for match in regex.finditer(line):
-                                # Get the match information
-                                rel_path = str(file_path.relative_to(bundle_path))
+                                # Skip if we've hit the per-file limit
+                                if file_matches >= max_results_per_file:
+                                    break
 
                                 matches.append(
                                     GrepMatch(
@@ -724,6 +788,7 @@ class FileExplorer:
                                 )
 
                                 total_matches += 1
+                                file_matches += 1
 
                                 # Stop if we've hit the max results
                                 if total_matches >= max_results:
@@ -733,6 +798,8 @@ class FileExplorer:
                     # Skip files that can't be read
                     continue
 
+            files_searched = len(files_processed)
+
             # Create the result
             result = GrepResult(
                 pattern=pattern,
@@ -740,10 +807,13 @@ class FileExplorer:
                 glob_pattern=glob_pattern,
                 matches=matches,
                 total_matches=total_matches,
-                files_searched=len(files_to_search),
+                files_searched=files_searched,
                 case_sensitive=case_sensitive,
                 truncated=truncated,
             )
+
+            # Add files_truncated info to result for ultra-compact format
+            result.files_truncated = files_truncated
 
             return result
 

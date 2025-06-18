@@ -262,15 +262,31 @@ class TestVerbositySystem(unittest.TestCase):
 
     def test_grep_results_formatting(self):
         """Test grep results response formatting."""
-        # Test minimal format
+        # Test minimal format (ultra-compact)
         formatter = ResponseFormatter("minimal")
         response = formatter.format_grep_results(self.grep_result)
         parsed = json.loads(response)
-        self.assertIsInstance(parsed, list)
-        self.assertEqual(len(parsed), 1)
-        self.assertIn("file", parsed[0])
-        self.assertIn("line", parsed[0])
-        self.assertIn("match", parsed[0])
+
+        # Should be a compact result object with matches array
+        self.assertIsInstance(parsed, dict)
+        self.assertIn("matches", parsed)
+        matches = parsed["matches"]
+        self.assertEqual(len(matches), 1)
+
+        # Each match should have file, line, and content (not just match)
+        match = matches[0]
+        self.assertIn("file", match)
+        self.assertIn("line", match)
+        self.assertIn("content", match)  # Full line content instead of just match
+        self.assertEqual(match["file"], "/kubernetes/config.yaml")
+        self.assertEqual(match["line"], 1)  # 1-indexed
+        self.assertEqual(match["content"], "apiVersion: v1")  # Full line
+
+        # Should use compact JSON format (no pretty-printing)
+        # Verify it's using compact separators by checking structure
+        self.assertTrue(response.startswith('{"matches":['))
+        self.assertNotIn("}\n", response)  # No newlines
+        self.assertNotIn("  ", response)  # No double spaces for indentation
 
         # Test standard format
         formatter = ResponseFormatter("standard")
@@ -302,7 +318,10 @@ class TestVerbositySystem(unittest.TestCase):
         formatter = ResponseFormatter("minimal")
         response = formatter.format_grep_results(no_matches_result)
         parsed = json.loads(response)
-        self.assertEqual(parsed, [])
+        # Should be a compact result object with empty matches array
+        self.assertIsInstance(parsed, dict)
+        self.assertIn("matches", parsed)
+        self.assertEqual(parsed["matches"], [])
 
     def test_kubectl_result_formatting(self):
         """Test kubectl result response formatting."""

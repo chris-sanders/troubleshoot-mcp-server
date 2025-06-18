@@ -245,16 +245,38 @@ class ResponseFormatter:
         """Format grep search results."""
 
         if self.verbosity == VerbosityLevel.MINIMAL:
+            # Ultra-compact format with no whitespace
             matches = []
+            files_with_matches: Dict[str, List[GrepMatch]] = {}
+
+            # Group matches by file and track per-file counts
             for match in result.matches:
-                matches.append(
-                    {
+                if match.path not in files_with_matches:
+                    files_with_matches[match.path] = []
+                files_with_matches[match.path].append(match)
+
+            # Build compact match objects with full line content
+            for file_path, file_matches in files_with_matches.items():
+                for i, match in enumerate(file_matches):
+                    match_obj = {
                         "file": match.path,
                         "line": match.line_number + 1,  # 1-indexed for display
-                        "match": match.match,
+                        "content": match.line,  # Full line content instead of just match
                     }
-                )
-            return json.dumps(matches)
+                    # Add truncated indicator if this is the last match for this file
+                    # and we might have hit the per-file limit
+                    if (
+                        i == len(file_matches) - 1 and len(file_matches) >= 5
+                    ):  # Default max_results_per_file
+                        match_obj["truncated"] = True
+                    matches.append(match_obj)
+
+            # Create final result with truncation indicators
+            compact_result: Dict[str, Any] = {"matches": matches}
+            if hasattr(result, "files_truncated") and result.files_truncated:
+                compact_result["files_truncated"] = True
+
+            return json.dumps(compact_result, separators=(",", ":"))
 
         elif self.verbosity == VerbosityLevel.STANDARD:
             matches = []
