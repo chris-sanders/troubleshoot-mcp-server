@@ -151,3 +151,35 @@ File A: 5 matches, File B: 5 matches, etc.
 ## Progress
 
 - [x] 2025-06-18: Task moved to active and development environment prepared
+- [x] 2025-06-18: Analyzed current grep_files implementation in files.py and formatters.py
+- [x] 2025-06-18: Added max_results_per_file (default: 5) and max_files (default: 10) parameters to GrepFilesArgs
+- [x] 2025-06-18: Implemented per-file and file count limiting logic in grep_files method
+- [x] 2025-06-18: Updated formatters.py with ultra-compact minimal format using full line content and separators=(',', ':')
+- [x] 2025-06-18: Added files_truncated field to GrepResult for truncation indicators
+- [x] 2025-06-18: Created comprehensive tests for new functionality (3 new test functions)
+- [x] 2025-06-18: Updated existing formatter tests to verify ultra-compact format
+- [x] 2025-06-18: All quality checks pass (black, ruff, mypy) and full test suite passes (240 tests)
+
+## Implementation Summary
+
+### New Parameters Added
+- `max_results_per_file: int = Field(5)` - Limits matches per individual file
+- `max_files: int = Field(10)` - Limits total number of files searched/returned
+
+### Core Logic Changes
+- Modified grep_files() to implement early termination when file limits are reached
+- Added per-file match counting to prevent single files from dominating results
+- Added file-level truncation tracking with files_truncated flag
+
+### Ultra-Compact Format Changes
+- Changed minimal format from array of simple objects to structured result object
+- Uses full line content instead of just match snippet
+- Applies compact JSON separators `(',', ':')` for minimal whitespace
+- Includes truncation indicators when limits are hit
+
+### Token Usage Optimization
+**Expected Results:**
+- Per-file limits prevent runaway single-file matches
+- File limits cap total search scope
+- Ultra-compact format provides ~60-70% token reduction vs current verbose format
+- Better result distribution across multiple files instead of single file domination
