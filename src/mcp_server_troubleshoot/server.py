@@ -3,8 +3,6 @@ MCP server implementation for Kubernetes support bundles.
 """
 
 import asyncio
-import datetime
-import json
 import logging
 import signal
 import sys
@@ -27,7 +25,6 @@ from .files import (
     GrepFilesArgs,
     ListFilesArgs,
     ReadFileArgs,
-    GrepMatch,
 )
 from .lifecycle import app_lifespan, AppContext
 from .formatters import get_formatter
@@ -278,7 +275,7 @@ async def kubectl(args: KubectlCommandArgs) -> List[TextContent]:
         diagnostics = None
         try:
             diagnostics = await bundle_manager.get_diagnostic_info()
-            
+
             # Check if this is a connection issue
             if "connection refused" in str(e).lower() or "could not connect" in str(e).lower():
                 error_message += (
@@ -343,7 +340,7 @@ async def list_files(args: ListFilesArgs) -> List[TextContent]:
         Also returns metadata about the directory listing like total file and directory counts.
     """
     formatter = get_formatter(args.verbosity)
-    
+
     try:
         result = await get_file_explorer().list_files(args.path, args.recursive)
         response = formatter.format_file_list(result)
@@ -391,7 +388,7 @@ async def read_file(args: ReadFileArgs) -> List[TextContent]:
         specified line range with line numbers. For binary files, displays a hex dump.
     """
     formatter = get_formatter(args.verbosity)
-    
+
     try:
         result = await get_file_explorer().read_file(args.path, args.start_line, args.end_line)
         response = formatter.format_file_content(result)
@@ -445,7 +442,7 @@ async def grep_files(args: GrepFilesArgs) -> List[TextContent]:
         and the total number of matches found.
     """
     formatter = get_formatter(args.verbosity)
-    
+
     try:
         result = await get_file_explorer().grep_files(
             args.pattern,

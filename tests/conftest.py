@@ -8,6 +8,9 @@ import contextlib
 import pytest
 from pathlib import Path
 
+# Set default verbosity to verbose for tests to maintain backward compatibility
+os.environ["MCP_VERBOSITY"] = "verbose"
+
 # Configure pytest_asyncio globally
 pytest_plugins = ["pytest_asyncio"]
 
