@@ -37,11 +37,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Use the MCP protocol standard for handler implementations
 
 ## Task Workflow
-- Tasks flow through: ready → started → review → completed
-- Move task files between corresponding directories as they progress
+- Tasks flow through: backlog → active → completed
+- ALWAYS use `git mv` when moving task files between directories to prevent orphaned documents
 - Create branches with pattern: `task/[task-filename-without-extension]`
-- Commit messages: Start with present-tense verb, be descriptive
-- When completing tasks, update all metadata and move to correct folder
+- Commit messages: Start with present-tense verb, be descriptive, do NOT include AI attribution
+- When completing tasks, update all metadata and move to correct folder using `git mv`
 
 ## UV Best Practices
 - Always use `uv run` to execute commands in the virtual environment

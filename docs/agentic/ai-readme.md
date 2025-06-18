@@ -7,14 +7,17 @@ This document provides guidance on how to work within this project's development
 As an AI agent, you should:
 
 1. **Find tasks to work on**:
-   - Look in `/tasks/ready/` for new tasks to implement
-   - Check in `/tasks/review/` for tasks needing PR feedback responses
+   - Look in `/tasks/backlog/` for new tasks to implement
+   - Check in `/tasks/active/` for tasks needing continued work or PR feedback responses
    - Check dependencies to ensure they are completed
 
 2. **Start working on a task**:
-   - Move the task file from `/tasks/ready/` to `/tasks/started/`
+   - Move the task file from `/tasks/backlog/` to `/tasks/active/` using `git mv`:
+     ```bash
+     git mv tasks/backlog/[task-file].md tasks/active/[task-file].md
+     ```
    - Update the task's metadata:
-     - Change `**Status**: ready` to `**Status**: started` 
+     - Change `**Status**: backlog` to `**Status**: active` 
      - Add `**Started**: YYYY-MM-DD` with today's date
    - Create a branch for the task:
      - Use naming convention: `task/[task-filename-without-extension]`
@@ -35,12 +38,12 @@ As an AI agent, you should:
      - Use the task name as the PR title
      - Include summary of changes and test plan in the PR body
    - Update the task's metadata:
-     - Change `**Status**: started` to `**Status**: review`
+     - Keep `**Status**: active` (no status change needed)
      - Add `**PR**: #[PR-number]` 
      - Add `**PR URL**: [PR-URL]`
      - Add `**PR Status**: Open`
    - Add a progress note with PR creation details
-   - Move the task file from `/tasks/started/` to `/tasks/review/` folder
+   - Keep the task file in `/tasks/active/` folder throughout PR review process
 
 5. **Handle PR Feedback**:
    - Make requested changes to address PR feedback
@@ -50,21 +53,50 @@ As an AI agent, you should:
      - Example: `🤖 Feedback addressed in latest commit\n\n---\n[Comment by AI Assistant]`
    - Commit changes with descriptive messages
    - Update the task progress with details of changes
-   - Keep the task in the `/tasks/review/` folder until PR is merged
+   - Keep the task in the `/tasks/active/` folder until PR is merged
 
 6. **Complete a task** (after PR is merged):
    - Update the task's metadata:
-     - Change `**Status**: review` to `**Status**: completed`
+     - Change `**Status**: active` to `**Status**: completed`
      - Add `**Completed**: YYYY-MM-DD` with today's date
      - Update `**PR Status**: Merged`
    - Document evidence of completion
-   - Move the task file from `/tasks/review/` to `/tasks/completed/`
+   - Move the task file from `/tasks/active/` to `/tasks/completed/` using `git mv`:
+     ```bash
+     git mv tasks/active/[task-file].md tasks/completed/[task-file].md
+     ```
    - Update relevant documentation in `/docs/` if necessary
 
 7. **Report completion**:
    - Summarize what was accomplished
    - List evidence of completion
    - Suggest next steps or related tasks
+
+## CRITICAL: Task File Movement Guidelines
+
+**ALWAYS use `git mv` when moving task files between folders**. This ensures proper version control tracking and prevents orphaned documents.
+
+**Correct approach:**
+```bash
+# Moving from backlog to active
+git mv tasks/backlog/task-name.md tasks/active/task-name.md
+
+# Moving from active to completed  
+git mv tasks/active/task-name.md tasks/completed/task-name.md
+```
+
+**NEVER do this (incorrect):**
+```bash
+# This creates orphaned files and breaks version control tracking
+mv tasks/backlog/task-name.md tasks/active/task-name.md
+cp tasks/backlog/task-name.md tasks/active/task-name.md && rm tasks/backlog/task-name.md
+```
+
+**Why this matters:**
+- Preserves file history and version control tracking
+- Prevents duplicate or orphaned task files
+- Maintains clean repository state
+- Allows proper tracking of task progression through folders
 
 ## Context Understanding
 
