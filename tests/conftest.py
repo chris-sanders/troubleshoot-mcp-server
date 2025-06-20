@@ -163,7 +163,7 @@ def build_container_image(project_root, use_mock_sbctl=False):
     # Check for melange/apko config files
     melange_config = project_root / ".melange.yaml"
     apko_config = project_root / "apko.yaml"
-    
+
     if not melange_config.exists():
         return False, ".melange.yaml not found"
     if not apko_config.exists():
@@ -183,7 +183,7 @@ def build_container_image(project_root, use_mock_sbctl=False):
         if use_mock_sbctl:
             # Create a temporary melange config with mock sbctl
             melange_test_config = project_root / ".melange.test.yaml"
-            
+
             # Read the original melange config
             melange_content = ""
             with safe_open(melange_config, "r") as f:
@@ -201,11 +201,9 @@ def build_container_image(project_root, use_mock_sbctl=False):
 
             # Replace the pipeline section
             import re
+
             melange_content = re.sub(
-                r'pipeline:.*', 
-                mock_pipeline, 
-                melange_content, 
-                flags=re.DOTALL
+                r"pipeline:.*", mock_pipeline, melange_content, flags=re.DOTALL
             )
 
             # Write the modified melange config
@@ -216,8 +214,15 @@ def build_container_image(project_root, use_mock_sbctl=False):
             # First build the package
             result = subprocess.run(
                 [
-                    "podman", "run", "--rm", "-v", f"{project_root}:/work",
-                    "cgr.dev/chainguard/melange", "build", ".melange.test.yaml", "--arch=amd64"
+                    "podman",
+                    "run",
+                    "--rm",
+                    "-v",
+                    f"{project_root}:/work",
+                    "cgr.dev/chainguard/melange",
+                    "build",
+                    ".melange.test.yaml",
+                    "--arch=amd64",
                 ],
                 cwd=str(project_root),
                 stdout=subprocess.PIPE,
@@ -230,9 +235,17 @@ def build_container_image(project_root, use_mock_sbctl=False):
             # Then build the image
             result = subprocess.run(
                 [
-                    "podman", "run", "--rm", "-v", f"{project_root}:/work",
-                    "cgr.dev/chainguard/apko", "build", "apko.yaml", 
-                    "troubleshoot-mcp-server:latest", "troubleshoot-mcp-server.tar", "--arch=amd64"
+                    "podman",
+                    "run",
+                    "--rm",
+                    "-v",
+                    f"{project_root}:/work",
+                    "cgr.dev/chainguard/apko",
+                    "build",
+                    "apko.yaml",
+                    "troubleshoot-mcp-server:latest",
+                    "troubleshoot-mcp-server.tar",
+                    "--arch=amd64",
                 ],
                 cwd=str(project_root),
                 stdout=subprocess.PIPE,

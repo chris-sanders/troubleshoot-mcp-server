@@ -113,6 +113,17 @@ jobs:
       - name: Check Podman version
         run: podman --version
       
+      - name: Install melange and apko
+        run: |
+          # Install melange and apko for CI environment
+          curl -L -o melange "https://github.com/chainguard-dev/melange/releases/latest/download/melange-linux-amd64"
+          curl -L -o apko "https://github.com/chainguard-dev/apko/releases/latest/download/apko-linux-amd64"
+          chmod +x melange apko
+          sudo mv melange /usr/local/bin/
+          sudo mv apko /usr/local/bin/
+          melange version
+          apko version
+      
       - name: Set file permissions
         run: |
           chmod +x scripts/build.sh
@@ -120,15 +131,18 @@ jobs:
           chmod +x scripts/run_tests.sh
           chmod +x scripts/setup_env.sh
       
-      - name: Create .containerignore if needed
+      - name: Verify melange and apko configs exist
         run: |
-          if [ ! -f .containerignore ]; then
-            echo "# Created during test run" > .containerignore
-            echo "venv/" >> .containerignore
-            echo "__pycache__/" >> .containerignore
-            echo "*.pyc" >> .containerignore
-            cat .containerignore
+          if [ ! -f .melange.yaml ]; then
+            echo "ERROR: .melange.yaml not found"
+            exit 1
           fi
+          if [ ! -f apko.yaml ]; then
+            echo "ERROR: apko.yaml not found"
+            exit 1
+          fi
+          echo "Configuration files found:"
+          ls -la .melange.yaml apko.yaml
       
       - name: Run Podman container tests
         run: uv run pytest tests/e2e/test_podman_container.py -v

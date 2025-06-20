@@ -207,3 +207,4 @@ uv run pytest tests/e2e/test_podman.py -v
 - **2025-06-20**: Completed Phase 2 - Created apko.yaml image configuration
 - **2025-06-20**: Completed Phase 3 - Updated scripts/build.sh for melange/apko workflow
 - **2025-06-20**: Completed Phase 4 - Updated container test infrastructure for melange/apko
+- **2025-06-20**: Completed Phase 5 - Updated CI/CD pipeline for melange/apko and standardized naming to troubleshoot-mcp-server
