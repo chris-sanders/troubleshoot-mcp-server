@@ -12,34 +12,7 @@ from pathlib import Path
 from typing import Tuple, Dict, Any
 
 
-def is_ci_environment() -> bool:
-    """
-    Detect if tests are running in a continuous integration environment.
-
-    Returns:
-        bool: True if running in a CI environment, False otherwise
-    """
-    # Check common CI environment variables
-    ci_env_vars = [
-        "GITHUB_ACTIONS",
-        "GITLAB_CI",
-        "CIRCLECI",
-        "TRAVIS",
-        "JENKINS_URL",
-        "CI",
-    ]
-
-    return any(os.environ.get(var) for var in ci_env_vars)
-
-
-def is_github_actions() -> bool:
-    """
-    Detect if tests are running in GitHub Actions.
-
-    Returns:
-        bool: True if running in GitHub Actions, False otherwise
-    """
-    return os.environ.get("GITHUB_ACTIONS") == "true"
+# CI detection functions removed - tests should behave consistently regardless of environment
 
 
 def get_container_runtime() -> Tuple[str, bool]:
@@ -109,8 +82,6 @@ def get_system_info() -> Dict[str, Any]:
         "platform_version": platform.version(),
         "architecture": platform.machine(),
         "python_version": platform.python_version(),
-        "in_ci": is_ci_environment(),
-        "in_github_actions": is_github_actions(),
     }
 
     # Add container runtime info
@@ -121,32 +92,7 @@ def get_system_info() -> Dict[str, Any]:
     return info
 
 
-def should_skip_in_ci(test_name: str) -> Tuple[bool, str]:
-    """
-    Determine if a test should be skipped in CI environments.
-
-    Args:
-        test_name: The name of the test function
-
-    Returns:
-        Tuple[bool, str]: A tuple of (should_skip, reason) where:
-          - should_skip is a boolean indicating if the test should be skipped
-          - reason is a string explaining why the test is skipped
-    """
-    # List of tests known to be problematic in CI
-    problematic_tests = {
-        # Tests that require volume mounting capabilities that may not be
-        # available in all CI environments
-        "test_volume_mounting": "Volume mounting tests are unreliable in CI environments",
-        # Tests that are flaky in CI environments
-        "test_mcp_server_startup": "Server startup tests can be flaky in CI due to resource constraints",
-    }
-
-    # Skip if in CI and test is in the problematic list
-    if is_ci_environment() and test_name in problematic_tests:
-        return True, problematic_tests[test_name]
-
-    return False, ""
+# should_skip_in_ci function removed - tests should pass consistently everywhere
 
 
 def sanitize_container_name(name: str) -> str:

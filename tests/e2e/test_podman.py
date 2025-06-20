@@ -232,99 +232,41 @@ def test_process_dummy_bundle(
 ) -> None:
     """
     Test that the container can process a bundle.
-
-    Since volume mounting can be problematic in CI environments, this test uses
-    different approaches based on the environment to reliably verify the
-    application functionality.
     """
-    from .utils import is_ci_environment
-
     # Create a dummy bundle to test with
     dummy_bundle = temp_bundle_dir / "test-bundle.tar.gz"
     with open(dummy_bundle, "w") as f:
         f.write("Dummy bundle content")
 
-    # Separate approach based on environment to ensure reliability
-    if is_ci_environment():
-        # In CI, we don't need to use volume mounting or copy files
-        # We'll just verify that the CLI works properly with basic commands
+    # Test basic CLI functionality with volume mounting
+    result = subprocess.run(
+        [
+            "podman",
+            "run",
+            "--name",
+            container_name,
+            "--rm",
+            "-v",
+            f"{temp_bundle_dir}:/data/bundles:Z",  # Add :Z for SELinux contexts
+            "--security-opt",
+            "label=disable",  # Disable SELinux container separation
+            "-e",
+            "MCP_BUNDLE_STORAGE=/data/bundles",
+            "-e",
+            "SBCTL_TOKEN=test-token",
+            docker_image,
+            "--help",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+        timeout=10,
+    )
 
-        # Just run a simple command to verify the CLI functionality
-        cli_check_result = subprocess.run(
-            [
-                "podman",
-                "run",
-                "--rm",
-                "--name",
-                f"{container_name}-cli-check",
-                docker_image,
-                "--version",  # Simple command to test the CLI
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=False,
-            timeout=10,
-        )
-
-        # Verify the application CLI works
-        assert (
-            cli_check_result.returncode == 0
-        ), f"Application CLI check failed: {cli_check_result.stderr}"
-
-        # Now test the help command
-        help_check_result = subprocess.run(
-            [
-                "podman",
-                "run",
-                "--rm",
-                "--name",
-                f"{container_name}-help-check",
-                docker_image,
-                "--help",
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=False,
-            timeout=10,
-        )
-
-        # Verify the help command works
-        assert help_check_result.returncode == 0, f"Help command failed: {help_check_result.stderr}"
-        assert (
-            "usage:" in (help_check_result.stdout + help_check_result.stderr).lower()
-        ), "Help command output is incorrect"
-    else:
-        # For non-CI environments, use direct volume mount but with extra options for reliability
-        result = subprocess.run(
-            [
-                "podman",
-                "run",
-                "--name",
-                container_name,
-                "--rm",
-                "-v",
-                f"{temp_bundle_dir}:/data/bundles:Z",  # Add :Z for SELinux contexts
-                "--security-opt",
-                "label=disable",  # Disable SELinux container separation
-                "-e",
-                "MCP_BUNDLE_STORAGE=/data/bundles",
-                "-e",
-                "SBCTL_TOKEN=test-token",
-                docker_image,
-                "--help",  # Just check basic CLI functionality
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=False,
-            timeout=10,
-        )
-
-        # Verify the application CLI works
-        assert result.returncode == 0, f"Failed to run container: {result.stderr}"
-        assert "usage:" in (result.stdout + result.stderr).lower(), "Application CLI is not working"
+    # Verify the application CLI works
+    assert result.returncode == 0, f"Failed to run container: {result.stderr}"
+    assert "usage:" in (result.stdout + result.stderr).lower(), "Application CLI is not working"
 
 
 if __name__ == "__main__":
