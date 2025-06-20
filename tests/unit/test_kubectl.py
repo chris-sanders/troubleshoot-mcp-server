@@ -82,6 +82,30 @@ async def test_kubectl_executor_execute_no_bundle():
 
 
 @pytest.mark.asyncio
+async def test_kubectl_executor_execute_host_only_bundle():
+    """Test that the kubectl executor raises an error for host-only bundles."""
+    bundle_manager = Mock(spec=BundleManager)
+    bundle = BundleMetadata(
+        id="test",
+        source="test",
+        path=Path("/test"),
+        kubeconfig_path=Path("/test/kubeconfig"),
+        initialized=True,
+        host_only_bundle=True,  # This is the key difference
+    )
+    bundle_manager.get_active_bundle.return_value = bundle
+    executor = KubectlExecutor(bundle_manager)
+
+    with pytest.raises(KubectlError) as excinfo:
+        await executor.execute("get pods")
+
+    assert "Host-only bundle detected" in str(excinfo.value)
+    assert "no cluster resources" in str(excinfo.value)
+    assert "file exploration tools" in str(excinfo.value)
+    assert excinfo.value.exit_code == 1
+
+
+@pytest.mark.asyncio
 async def test_kubectl_executor_execute_success():
     """Test that the kubectl executor can execute a command successfully."""
     # Mock bundle manager
@@ -529,3 +553,103 @@ def test_compact_json_formatting():
     parsed = json.loads(json_str)
     compact_json = json.dumps(parsed, separators=(",", ":"))
     assert json_str == compact_json or json_str == json.dumps(parsed)
+
+
+@pytest.mark.asyncio
+async def test_kubectl_executor_host_only_bundle():
+    """Test that KubectlExecutor properly handles host-only bundles."""
+    # Create a mock bundle manager
+    bundle_manager = Mock(spec=BundleManager)
+
+    # Create a host-only bundle metadata
+    host_only_bundle = BundleMetadata(
+        id="host-only-bundle",
+        source="/path/to/host-only-bundle.tar.gz",
+        path=Path("/tmp/host-only-bundle"),
+        kubeconfig_path=Path("/tmp/host-only-bundle/kubeconfig"),
+        initialized=True,
+        host_only_bundle=True,  # This is the key field
+    )
+
+    # Mock the bundle manager to return the host-only bundle
+    bundle_manager.get_active_bundle.return_value = host_only_bundle
+
+    # Create executor
+    executor = KubectlExecutor(bundle_manager)
+
+    # Test that executing any kubectl command raises appropriate error
+    with pytest.raises(KubectlError) as exc_info:
+        await executor.execute("get pods")
+
+    # Verify the error message is appropriate for host-only bundles
+    error = exc_info.value
+    assert error.exit_code == 1
+    error_message = str(error).lower()
+    assert "host resources" in error_message
+    assert "no cluster resources" in error_message
+    assert "file exploration tools" in error_message
+
+
+@pytest.mark.asyncio
+async def test_kubectl_executor_regular_bundle_not_affected():
+    """Test that regular bundles (non-host-only) work normally."""
+    # Create a mock bundle manager
+    bundle_manager = Mock(spec=BundleManager)
+
+    # Create a regular bundle metadata (host_only_bundle=False)
+    regular_bundle = BundleMetadata(
+        id="regular-bundle",
+        source="/path/to/regular-bundle.tar.gz",
+        path=Path("/tmp/regular-bundle"),
+        kubeconfig_path=Path("/tmp/regular-bundle/kubeconfig"),
+        initialized=True,
+        host_only_bundle=False,  # Regular bundle
+    )
+
+    # Mock the bundle manager to return the regular bundle
+    bundle_manager.get_active_bundle.return_value = regular_bundle
+
+    # Create executor
+    executor = KubectlExecutor(bundle_manager)
+
+    # Mock a successful kubectl process
+    mock_process = AsyncMock()
+    mock_process.communicate.return_value = (b'{"items": []}', b"")
+    mock_process.returncode = 0
+
+    # Mock file existence check for kubeconfig
+    with patch("pathlib.Path.exists", return_value=True):
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process):
+            # This should work normally (no host-only bundle error)
+            result = await executor.execute("get pods", json_output=False)
+
+            # Verify it returns a normal result
+            assert result.exit_code == 0
+            assert result.command == "get pods"
+
+
+@pytest.mark.asyncio
+async def test_kubectl_executor_no_bundle_still_works():
+    """Test that the no-bundle error takes precedence over host-only checks."""
+    # Create a mock bundle manager with no active bundle
+    bundle_manager = Mock(spec=BundleManager)
+    bundle_manager.get_active_bundle.return_value = None
+
+    # Create executor
+    executor = KubectlExecutor(bundle_manager)
+
+    # Test that it raises the normal "no bundle" error, not host-only error
+    with pytest.raises(KubectlError) as exc_info:
+        await executor.execute("get pods")
+
+    # Verify this is the standard "no bundle" error
+    error = exc_info.value
+    assert error.exit_code == 1
+    error_message = str(error).lower()
+    assert (
+        "no active bundle" in error_message
+        or "bundle not initialized" in error_message
+        or "no bundle is initialized" in error_message
+    )
+    # Should NOT mention host-only bundle
+    assert "host resources" not in error_message

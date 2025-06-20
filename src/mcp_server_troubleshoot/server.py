@@ -247,6 +247,28 @@ async def kubectl(args: KubectlCommandArgs) -> List[TextContent]:
     formatter = get_formatter(args.verbosity)
 
     try:
+        # Check if a bundle is initialized first
+        active_bundle = bundle_manager.get_active_bundle()
+        if active_bundle is None or not active_bundle.initialized:
+            error_message = (
+                "No bundle is initialized. kubectl commands cannot be executed. "
+                "Please initialize a bundle with the initialize_bundle tool first."
+            )
+            logger.error("No bundle initialized for kubectl command")
+            formatted_error = formatter.format_error(error_message)
+            return [TextContent(type="text", text=formatted_error)]
+
+        # Check if this is a host-only bundle
+        if active_bundle.host_only_bundle:
+            error_message = (
+                "This support bundle contains only host resources and no cluster resources. "
+                "kubectl commands are not available for host-only bundles. "
+                "Use the file exploration tools (list_files, read_file, grep_files) to analyze host data instead."
+            )
+            logger.info("kubectl command attempted on host-only bundle")
+            formatted_error = formatter.format_error(error_message)
+            return [TextContent(type="text", text=formatted_error)]
+
         # Check if the API server is available before attempting kubectl
         api_server_available = await bundle_manager.check_api_server_available()
         if not api_server_available:

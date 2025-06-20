@@ -190,6 +190,19 @@ async def test_kubectl_tool_parametrized(
     # Set up the mocks
     with patch("mcp_server_troubleshoot.server.get_bundle_manager") as mock_get_manager:
         mock_manager = Mock()
+        # Mock an active bundle that's NOT host-only
+        from mcp_server_troubleshoot.bundle import BundleMetadata
+        from pathlib import Path
+
+        mock_bundle = BundleMetadata(
+            id="test",
+            source="test",
+            path=Path("/test"),
+            kubeconfig_path=Path("/test/kubeconfig"),
+            initialized=True,
+            host_only_bundle=False,  # Not a host-only bundle
+        )
+        mock_manager.get_active_bundle = Mock(return_value=mock_bundle)
         mock_manager.check_api_server_available = AsyncMock(return_value=True)
         # Add diagnostic info mock to avoid diagnostics error
         mock_manager.get_diagnostic_info = AsyncMock(return_value={"api_server_available": True})
