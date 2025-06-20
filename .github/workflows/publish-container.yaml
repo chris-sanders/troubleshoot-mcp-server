@@ -55,16 +55,33 @@ jobs:
           echo "image=${IMAGE_NAME}" >> $GITHUB_OUTPUT
           echo "Image name: ${IMAGE_NAME}"
       
-      - name: Install melange and apko
+      - name: Set file permissions
         run: |
-          # Install melange and apko for CI environment
-          curl -L -o melange "https://github.com/chainguard-dev/melange/releases/latest/download/melange-linux-amd64"
-          curl -L -o apko "https://github.com/chainguard-dev/apko/releases/latest/download/apko-linux-amd64"
-          chmod +x melange apko
-          sudo mv melange /usr/local/bin/
-          sudo mv apko /usr/local/bin/
-          melange version
-          apko version
+          chmod +x scripts/build.sh
+          chmod +x scripts/run.sh
+          chmod +x scripts/run_tests.sh
+          chmod +x scripts/setup_env.sh
+          chmod +x scripts/generate_test_keys.sh
+      
+      - name: Verify melange/apko availability via containers
+        run: |
+          # Test that melange and apko work via containers (as used in our build system)
+          # We run them in containers rather than installing binaries directly
+          podman run --rm cgr.dev/chainguard/melange:latest version
+          podman run --rm cgr.dev/chainguard/apko:latest version
+      
+      - name: Verify melange and apko configs exist
+        run: |
+          if [ ! -f .melange.yaml ]; then
+            echo "ERROR: .melange.yaml not found"
+            exit 1
+          fi
+          if [ ! -f apko.yaml ]; then
+            echo "ERROR: apko.yaml not found"
+            exit 1
+          fi
+          echo "Configuration files found:"
+          ls -la .melange.yaml apko.yaml
       
       - name: Setup melange signing key
         run: |
@@ -77,11 +94,11 @@ jobs:
           IMAGE_NAME: ${{ steps.prep.outputs.image }}
           VERSION: ${{ steps.get-version.outputs.version }}
         run: |
-          # Build melange package with signing key
-          melange build .melange.yaml --arch=amd64 --signing-key=melange.rsa
+          # Build melange package with signing key using containerized melange
+          podman run --rm --privileged --cap-add=SYS_ADMIN -v "$PWD":/work cgr.dev/chainguard/melange build .melange.yaml --arch=amd64 --signing-key=melange.rsa
           
-          # Build apko image
-          apko build apko.yaml ${IMAGE_NAME}:${VERSION} ${IMAGE_NAME}.tar --arch=amd64
+          # Build apko image using containerized apko
+          podman run --rm --privileged --cap-add=SYS_ADMIN -v "$PWD":/work cgr.dev/chainguard/apko build apko.yaml ${IMAGE_NAME}:${VERSION} ${IMAGE_NAME}.tar --arch=amd64
           
           # Load into podman
           podman load < ${IMAGE_NAME##*/}.tar
