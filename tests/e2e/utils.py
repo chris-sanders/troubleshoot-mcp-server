@@ -5,7 +5,6 @@ These functions help with environment detection, resource cleanup,
 and other common operations needed by e2e tests.
 """
 
-import os
 import platform
 import subprocess
 from pathlib import Path
