@@ -42,3 +42,6 @@ ENV/
 
 # Git worktrees (development branches)
 trees/
+
+# Melange private key (keep public key but not private key)
+melange.rsa

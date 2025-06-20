@@ -66,13 +66,19 @@ jobs:
           melange version
           apko version
       
+      - name: Setup melange signing key
+        run: |
+          # Create temporary signing key from secret
+          echo "${{ secrets.MELANGE_RSA }}" > melange.rsa
+          chmod 600 melange.rsa
+      
       - name: Build with melange and apko
         env:
           IMAGE_NAME: ${{ steps.prep.outputs.image }}
           VERSION: ${{ steps.get-version.outputs.version }}
         run: |
-          # Build melange package
-          melange build .melange.yaml --arch=amd64
+          # Build melange package with signing key
+          melange build .melange.yaml --arch=amd64 --signing-key=melange.rsa
           
           # Build apko image
           apko build apko.yaml ${IMAGE_NAME}:${VERSION} ${IMAGE_NAME}.tar --arch=amd64
@@ -84,6 +90,12 @@ jobs:
           if [[ "${{ github.event_name }}" == "push" ]]; then
             podman tag ${IMAGE_NAME}:${VERSION} ${IMAGE_NAME}:latest
           fi
+      
+      - name: Cleanup signing key
+        if: always()
+        run: |
+          # Remove temporary signing key
+          rm -f melange.rsa
       
       - name: Push container to GitHub Container Registry
         env:
