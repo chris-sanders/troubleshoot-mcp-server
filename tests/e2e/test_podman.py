@@ -7,7 +7,7 @@ These tests verify:
 3. Application inside the container functions correctly
 
 All tests that involve building or running containers use the shared
-docker_image fixture to avoid rebuilding for each test.
+container_image fixture to avoid rebuilding for each test.
 """
 
 import os
@@ -106,7 +106,7 @@ def test_podman_availability() -> None:
     print(f"Using Podman version: {result.stdout.strip()}")
 
 
-def test_basic_podman_run(docker_image: str, container_name: str, temp_bundle_dir: Path) -> None:
+def test_basic_podman_run(container_image: str, container_name: str, temp_bundle_dir: Path) -> None:
     """Test that the Podman container runs and exits successfully."""
     result = subprocess.run(
         [
@@ -121,7 +121,7 @@ def test_basic_podman_run(docker_image: str, container_name: str, temp_bundle_di
             "SBCTL_TOKEN=test-token",
             "--entrypoint",
             "/bin/bash",
-            docker_image,
+            container_image,
             "-c",
             "echo 'Container is working!'",
         ],
@@ -136,7 +136,7 @@ def test_basic_podman_run(docker_image: str, container_name: str, temp_bundle_di
     assert "Container is working!" in result.stdout
 
 
-def test_installed_tools(docker_image: str, container_name: str) -> None:
+def test_installed_tools(container_image: str, container_name: str) -> None:
     """Test that required tools are installed in the container."""
     # Check for required tools
     tools_to_check = [
@@ -155,7 +155,7 @@ def test_installed_tools(docker_image: str, container_name: str) -> None:
                 "--rm",
                 "--entrypoint",
                 "which",
-                docker_image,
+                container_image,
                 tool,
             ],
             stdout=subprocess.PIPE,
@@ -168,7 +168,7 @@ def test_installed_tools(docker_image: str, container_name: str) -> None:
         assert result.stdout.strip(), f"{tool} path is empty"
 
 
-def test_help_command(docker_image: str, container_name: str, temp_bundle_dir: Path) -> None:
+def test_help_command(container_image: str, container_name: str, temp_bundle_dir: Path) -> None:
     """Test that the application's help command works."""
     result = subprocess.run(
         [
@@ -183,7 +183,7 @@ def test_help_command(docker_image: str, container_name: str, temp_bundle_dir: P
             "MCP_BUNDLE_STORAGE=/data/bundles",
             "-e",
             "SBCTL_TOKEN=test-token",
-            docker_image,
+            container_image,
             "--help",
         ],
         stdout=subprocess.PIPE,
@@ -197,7 +197,7 @@ def test_help_command(docker_image: str, container_name: str, temp_bundle_dir: P
     assert "usage:" in combined_output.lower(), "Application help command failed"
 
 
-def test_version_command(docker_image: str, container_name: str, temp_bundle_dir: Path) -> None:
+def test_version_command(container_image: str, container_name: str, temp_bundle_dir: Path) -> None:
     """Test that the application's version command works."""
     result = subprocess.run(
         [
@@ -212,7 +212,7 @@ def test_version_command(docker_image: str, container_name: str, temp_bundle_dir
             "MCP_BUNDLE_STORAGE=/data/bundles",
             "-e",
             "SBCTL_TOKEN=test-token",
-            docker_image,
+            container_image,
             "--version",
         ],
         stdout=subprocess.PIPE,
@@ -228,7 +228,7 @@ def test_version_command(docker_image: str, container_name: str, temp_bundle_dir
 
 
 def test_process_dummy_bundle(
-    docker_image: str, container_name: str, temp_bundle_dir: Path
+    container_image: str, container_name: str, temp_bundle_dir: Path
 ) -> None:
     """
     Test that the container can process a bundle.
@@ -254,7 +254,7 @@ def test_process_dummy_bundle(
             "MCP_BUNDLE_STORAGE=/data/bundles",
             "-e",
             "SBCTL_TOKEN=test-token",
-            docker_image,
+            container_image,
             "--help",
         ],
         stdout=subprocess.PIPE,

@@ -11,6 +11,9 @@ from pathlib import Path
 # Set default verbosity to verbose for tests to maintain backward compatibility
 os.environ["MCP_VERBOSITY"] = "verbose"
 
+# Ensure test builds use test keys for melange/apko tests
+os.environ["MELANGE_TEST_BUILD"] = "true"
+
 # Configure pytest_asyncio globally
 pytest_plugins = ["pytest_asyncio"]
 
@@ -116,7 +119,7 @@ def test_support_bundle(fixtures_dir) -> Path:
     return bundle_path
 
 
-def is_docker_available():
+def is_container_runtime_available():
     """Check if Podman is available on the system."""
     try:
         result = subprocess.run(
@@ -295,9 +298,9 @@ def build_container_image(project_root, use_mock_sbctl=False):
 
 
 @pytest.fixture(scope="session")
-def docker_image(request):
+def container_image(request):
     """
-    Session-scoped fixture that ensures the Podman image is built once for all tests.
+    Session-scoped fixture that ensures the OCI container image is built once for all tests.
 
     If the test is marked with 'mock_sbctl', a test image with mock sbctl will be built.
     Otherwise, the standard image will be built.
@@ -308,10 +311,10 @@ def docker_image(request):
         request: The pytest request object
 
     Returns:
-        The name of the Podman image
+        The name of the OCI container image
     """
     # Skip if Podman is not available
-    if not is_docker_available():
+    if not is_container_runtime_available():
         pytest.skip("Podman is not available")
 
     # Get project root directory
@@ -327,7 +330,7 @@ def docker_image(request):
 
     # Image exists already, just use it
     if image_check.returncode == 0:
-        print("\nUsing existing Podman image for tests...")
+        print("\nUsing existing container image for tests...")
         yield "troubleshoot-mcp-server:latest"
         return
 
@@ -340,18 +343,18 @@ def docker_image(request):
 
     # Print what we're doing
     if use_mock_sbctl:
-        print("\nBuilding Podman image with mock sbctl for tests...")
+        print("\nBuilding OCI container image with mock sbctl for tests...")
     else:
-        print("\nBuilding standard Podman image for tests...")
+        print("\nBuilding standard OCI container image for tests...")
 
-    # Build the Podman image
+    # Build the container image
     success, result = build_container_image(project_root, use_mock_sbctl)
 
     if not success:
         if isinstance(result, str):
-            pytest.skip(f"Failed to build Podman image: {result}")
+            pytest.skip(f"Failed to build container image: {result}")
         else:
-            pytest.skip(f"Failed to build Podman image: {result.stderr}")
+            pytest.skip(f"Failed to build container image: {result.stderr}")
 
     # Yield to allow tests to run
     yield "troubleshoot-mcp-server:latest"
