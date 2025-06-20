@@ -18,6 +18,16 @@ if [[ "${CI:-false}" == "true" ]]; then
 fi
 
 echo "Building melange package..."
+# Check if signing key exists, create instructions if not
+if [ ! -f melange.rsa ]; then
+    echo "ERROR: melange.rsa signing key not found!"
+    echo "For local development:"
+    echo "  1. Copy your melange.rsa private key to the project root"
+    echo "  2. The key should be ignored by git (already in .gitignore)"
+    echo "For CI/CD, this key is provided via MELANGE_RSA secret"
+    exit 1
+fi
+
 if ! podman run --rm --privileged --cap-add=SYS_ADMIN -v "$PWD":/work cgr.dev/chainguard/melange build .melange.yaml ${ARCH_FLAGS} --signing-key=melange.rsa; then
     echo "Melange build failed!"
     exit 1
