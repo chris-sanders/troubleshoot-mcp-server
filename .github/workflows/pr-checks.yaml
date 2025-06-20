@@ -249,16 +249,12 @@ jobs:
       - name: Check Podman version
         run: podman --version
       
-      - name: Install melange and apko
+      - name: Verify melange/apko availability via containers
         run: |
-          # Install melange and apko for CI environment
-          curl -L -o melange "https://github.com/chainguard-dev/melange/releases/latest/download/melange-linux-amd64"
-          curl -L -o apko "https://github.com/chainguard-dev/apko/releases/latest/download/apko-linux-amd64"
-          chmod +x melange apko
-          sudo mv melange /usr/local/bin/
-          sudo mv apko /usr/local/bin/
-          melange version
-          apko version
+          # Test that melange and apko work via containers (as used in our build system)
+          # We run them in containers rather than installing binaries directly
+          podman run --rm cgr.dev/chainguard/melange:latest version
+          podman run --rm cgr.dev/chainguard/apko:latest version
       
       - name: Set file permissions
         run: |
@@ -266,6 +262,7 @@ jobs:
           chmod +x scripts/run.sh
           chmod +x scripts/run_tests.sh
           chmod +x scripts/setup_env.sh
+          chmod +x scripts/generate_test_keys.sh
       
       - name: Verify melange and apko configs exist
         run: |
