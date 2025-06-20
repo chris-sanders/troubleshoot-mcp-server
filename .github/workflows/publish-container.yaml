@@ -95,13 +95,16 @@ jobs:
           VERSION: ${{ steps.get-version.outputs.version }}
         run: |
           # Build melange package with signing key using containerized melange
-          podman run --rm --privileged --cap-add=SYS_ADMIN -v "$PWD":/work cgr.dev/chainguard/melange build .melange.yaml --signing-key=melange.rsa
+          podman run --rm --privileged --cap-add=SYS_ADMIN -v "$PWD":/work cgr.dev/chainguard/melange build .melange.yaml --arch=amd64 --signing-key=melange.rsa
           
           # Build apko image using containerized apko
-          podman run --rm --privileged --cap-add=SYS_ADMIN -v "$PWD":/work cgr.dev/chainguard/apko build apko.yaml ${IMAGE_NAME}:${VERSION} troubleshoot-mcp-server.tar
+          podman run --rm --privileged --cap-add=SYS_ADMIN -v "$PWD":/work cgr.dev/chainguard/apko build apko.yaml ${IMAGE_NAME}:${VERSION} troubleshoot-mcp-server.tar --arch=amd64
           
           # Load into podman
           podman load < troubleshoot-mcp-server.tar
+          
+          # Remove architecture suffix from loaded image
+          podman tag ${IMAGE_NAME}:${VERSION}-amd64 ${IMAGE_NAME}:${VERSION}
           
           # Tag with "latest" if this is not a test run
           if [[ "${{ github.event_name }}" == "push" ]]; then
