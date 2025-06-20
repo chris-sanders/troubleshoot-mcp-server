@@ -94,6 +94,9 @@ class BundleMetadata(BaseModel):
     path: Path = Field(description="The path to the extracted bundle")
     kubeconfig_path: Path = Field(description="The path to the kubeconfig file")
     initialized: bool = Field(description="Whether the bundle has been initialized with sbctl")
+    host_only_bundle: bool = Field(
+        False, description="Whether this bundle contains only host resources (no cluster resources)"
+    )
 
 
 class InitializeBundleArgs(BaseModel):
@@ -221,6 +224,7 @@ class BundleManager:
         self.bundle_dir.mkdir(parents=True, exist_ok=True)
         self.active_bundle: Optional[BundleMetadata] = None
         self.sbctl_process: Optional[asyncio.subprocess.Process] = None
+        self._host_only_bundle: bool = False
 
     async def initialize_bundle(self, source: str, force: bool = False) -> BundleMetadata:
         """
@@ -289,6 +293,11 @@ class BundleManager:
 
             # Initialize the bundle with sbctl
             kubeconfig_path = await self._initialize_with_sbctl(bundle_path, bundle_output_dir)
+
+            # Handle case where no kubeconfig was created (host-only bundle)
+            if self._host_only_bundle:
+                # Create a dummy kubeconfig path for host-only bundles (but don't create the file)
+                kubeconfig_path = bundle_output_dir / "kubeconfig"
 
             # Debug: List all files in the bundle directory to diagnose file listing issues
             try:
@@ -366,6 +375,7 @@ class BundleManager:
                 path=bundle_output_dir,
                 kubeconfig_path=kubeconfig_path,
                 initialized=True,
+                host_only_bundle=self._host_only_bundle,
             )
             self.active_bundle = metadata
 
@@ -665,6 +675,7 @@ class BundleManager:
             # Kill any existing sbctl process
             await self._terminate_sbctl_process()
 
+            # First, check if this bundle contains cluster resources by running sbctl briefly
             # Start sbctl in serve mode with the bundle
             # Since sbctl may create files in the current directory, we'll start it from our output directory
             os.chdir(output_dir)
@@ -686,6 +697,53 @@ class BundleManager:
             self.sbctl_process = await asyncio.create_subprocess_exec(
                 *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
+
+            # First, wait a brief moment to see if sbctl exits quickly with "No cluster resources"
+            try:
+                # Wait for either process completion or a short timeout
+                await asyncio.wait_for(self.sbctl_process.wait(), timeout=5.0)
+
+                # Process completed quickly - check output
+                stdout_data = b""
+                stderr_data = b""
+
+                if self.sbctl_process.stdout:
+                    try:
+                        stdout_data = await asyncio.wait_for(
+                            self.sbctl_process.stdout.read(), timeout=1.0
+                        )
+                    except (asyncio.TimeoutError, Exception):
+                        pass
+
+                if self.sbctl_process.stderr:
+                    try:
+                        stderr_data = await asyncio.wait_for(
+                            self.sbctl_process.stderr.read(), timeout=1.0
+                        )
+                    except (asyncio.TimeoutError, Exception):
+                        pass
+
+                # Combine output and check for "No cluster resources"
+                all_output = ""
+                if stdout_data:
+                    all_output += stdout_data.decode("utf-8", errors="replace")
+                if stderr_data:
+                    all_output += stderr_data.decode("utf-8", errors="replace")
+
+                logger.info(f"sbctl output: {all_output}")
+
+                if "No cluster resources found in bundle" in all_output:
+                    logger.info("Bundle contains no cluster resources, marking as host-only bundle")
+                    self._host_only_bundle = True
+                    return kubeconfig_path  # Return dummy path, file won't exist but that's OK
+
+                # If we get here, sbctl exited quickly but not due to "no cluster resources"
+                # This might be an error, so continue with normal error handling
+
+            except asyncio.TimeoutError:
+                # Process didn't exit quickly, so it's likely starting up an API server
+                # Continue with normal initialization
+                logger.debug("sbctl process continuing, proceeding with normal initialization")
 
             # Wait for initialization to complete
             await self._wait_for_initialization(kubeconfig_path)
@@ -967,6 +1025,49 @@ class BundleManager:
             # Check if the process is still running
             if self.sbctl_process and self.sbctl_process.returncode is not None:
                 # Process exited before kubeconfig was created
+                if self.sbctl_process.returncode == 0:
+                    # Process exited successfully - check if this is the "no cluster resources" case
+                    try:
+                        # Read any remaining stdout/stderr to check for the "no cluster resources" message
+                        process_output = ""
+                        if self.sbctl_process.stdout:
+                            try:
+                                stdout_data = await asyncio.wait_for(
+                                    self.sbctl_process.stdout.read(), timeout=1.0
+                                )
+                                process_output += stdout_data.decode("utf-8", errors="replace")
+                            except (asyncio.TimeoutError, Exception):
+                                pass
+                        if self.sbctl_process.stderr:
+                            try:
+                                stderr_data = await asyncio.wait_for(
+                                    self.sbctl_process.stderr.read(), timeout=1.0
+                                )
+                                process_output += stderr_data.decode("utf-8", errors="replace")
+                            except (asyncio.TimeoutError, Exception):
+                                pass
+
+                        # Also check the output we might have captured earlier in the initialization loop
+                        if "stdout_data" in locals() and stdout_data:
+                            stdout_str = stdout_data.decode("utf-8", errors="replace")
+                            process_output += stdout_str
+                        if "stderr_data" in locals() and stderr_data:
+                            stderr_str = stderr_data.decode("utf-8", errors="replace")
+                            process_output += stderr_str
+
+                        if "No cluster resources found in bundle" in process_output:
+                            # This is a valid case - bundle has no cluster resources
+                            logger.info(
+                                "Bundle contains no cluster resources, marking as host-only bundle"
+                            )
+                            # Set flag to indicate this is a host-only bundle
+                            self._host_only_bundle = True
+                            return  # Exit successfully without kubeconfig
+
+                    except Exception as e:
+                        logger.debug(f"Error checking process output: {e}")
+                        # Continue with normal error handling
+
                 error_message = f"sbctl process exited with code {self.sbctl_process.returncode} before initialization completed"
                 break
 

@@ -150,6 +150,16 @@ class KubectlExecutor:
                 "Please initialize a bundle before executing kubectl commands",
             )
 
+        # Check if this is a host-only bundle
+        if active_bundle.host_only_bundle:
+            raise KubectlError(
+                "Host-only bundle detected",
+                1,
+                "This support bundle contains only host resources and no cluster resources. "
+                "kubectl commands are not available for host-only bundles. "
+                "Use file exploration tools instead.",
+            )
+
         # Construct the command
         return await self._run_kubectl_command(command, active_bundle, timeout, json_output)
 

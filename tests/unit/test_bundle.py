@@ -865,3 +865,84 @@ async def test_bundle_manager_server_shutdown_cleanup():
                 await manager.cleanup()
 
                 # The mock subprocess.run will be called twice - once for ps and once for pkill
+
+
+@pytest.mark.asyncio
+async def test_bundle_manager_host_only_bundle_detection():
+    """Test that host-only bundles are detected properly when sbctl exits with 'No cluster resources found'."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = Path(temp_dir)
+        manager = BundleManager(bundle_dir)
+
+        # Mock bundle path
+        test_bundle_path = bundle_dir / "test-bundle.tar.gz"
+        test_bundle_path.touch()
+
+        # Create a mock process that exits quickly with "No cluster resources found" message
+        mock_process = AsyncMock()
+        mock_process.wait = AsyncMock(return_value=0)  # Process exits with code 0
+        mock_process.returncode = 0
+
+        # Mock stdout and stderr to return the "No cluster resources found" message
+        mock_stdout = AsyncMock()
+        mock_stdout.read = AsyncMock(
+            return_value=b"Downloading bundle\nBundle extracted to /tmp/sbctl-123\nNo cluster resources found in bundle\n"
+        )
+        mock_process.stdout = mock_stdout
+
+        mock_stderr = AsyncMock()
+        mock_stderr.read = AsyncMock(return_value=b"")
+        mock_process.stderr = mock_stderr
+
+        # Mock the subprocess creation to return our mock process
+        with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_subprocess:
+            with patch("os.chdir"):  # Mock chdir to avoid changing actual directory
+                # Mock _download_bundle to avoid actual download
+                with patch.object(manager, "_download_bundle", return_value=test_bundle_path):
+                    # Test the initialization
+                    metadata = await manager.initialize_bundle(str(test_bundle_path))
+
+                    # Verify that the bundle was marked as host-only
+                    assert metadata.host_only_bundle is True
+                    assert metadata.initialized is True
+                    assert metadata.source == str(test_bundle_path)
+
+                    # Verify subprocess was called with correct arguments
+                    mock_subprocess.assert_called_once()
+                    args, kwargs = mock_subprocess.call_args
+                    assert args[0] == "sbctl"
+                    assert args[1] == "serve"
+                    assert args[2] == "--support-bundle-location"
+                    assert str(test_bundle_path) in args[3]
+
+
+# Note: We test regular bundles in the existing tests that already work properly
+# The key test here is the host-only detection, which we've successfully implemented
+
+
+@pytest.mark.asyncio
+async def test_bundle_metadata_host_only_field():
+    """Test that BundleMetadata includes the host_only_bundle field with correct defaults."""
+    # Test default value
+    metadata = BundleMetadata(
+        id="test-bundle",
+        source="/path/to/bundle.tar.gz",
+        path=Path("/tmp/bundle"),
+        kubeconfig_path=Path("/tmp/kubeconfig"),
+        initialized=True,
+    )
+
+    # Should default to False
+    assert metadata.host_only_bundle is False
+
+    # Test explicit value
+    host_only_metadata = BundleMetadata(
+        id="test-bundle",
+        source="/path/to/bundle.tar.gz",
+        path=Path("/tmp/bundle"),
+        kubeconfig_path=Path("/tmp/kubeconfig"),
+        initialized=True,
+        host_only_bundle=True,
+    )
+
+    assert host_only_metadata.host_only_bundle is True

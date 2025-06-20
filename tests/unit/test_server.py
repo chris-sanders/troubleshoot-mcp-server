@@ -119,6 +119,16 @@ async def test_kubectl_tool():
     # We need to mock both the bundle manager and kubectl executor
     with patch("mcp_server_troubleshoot.server.get_bundle_manager") as mock_get_manager:
         mock_manager = Mock()
+        # Mock an active bundle that's NOT host-only
+        mock_bundle = BundleMetadata(
+            id="test",
+            source="test",
+            path=Path("/test"),
+            kubeconfig_path=Path("/test/kubeconfig"),
+            initialized=True,
+            host_only_bundle=False,  # Not a host-only bundle
+        )
+        mock_manager.get_active_bundle = Mock(return_value=mock_bundle)
         # Mock the bundle manager's check_api_server_available method
         mock_manager.check_api_server_available = AsyncMock(return_value=True)
         mock_get_manager.return_value = mock_manager
@@ -150,6 +160,49 @@ async def test_kubectl_tool():
         assert "kubectl command executed successfully" in response[0].text
         assert "items" in response[0].text
         assert "Command metadata" in response[0].text
+
+
+@pytest.mark.asyncio
+async def test_kubectl_tool_host_only_bundle():
+    """Test that the kubectl tool handles host-only bundles correctly."""
+    with patch("mcp_server_troubleshoot.server.get_bundle_manager") as mock_get_manager:
+        mock_manager = Mock()
+        # Mock an active bundle that IS host-only
+        mock_bundle = BundleMetadata(
+            id="test",
+            source="test",
+            path=Path("/test"),
+            kubeconfig_path=Path("/test/kubeconfig"),
+            initialized=True,
+            host_only_bundle=True,  # This is a host-only bundle
+        )
+        mock_manager.get_active_bundle = Mock(return_value=mock_bundle)
+        mock_get_manager.return_value = mock_manager
+
+        # Create KubectlCommandArgs instance
+        from mcp_server_troubleshoot.kubectl import KubectlCommandArgs
+
+        args = KubectlCommandArgs(command="get pods", timeout=30, json_output=True)
+
+        # Call the tool function directly
+        response = await kubectl(args)
+
+        # Verify that the bundle manager's get_active_bundle was called
+        mock_manager.get_active_bundle.assert_called_once()
+        # Verify that check_api_server_available was NOT called (since we exit early)
+        assert (
+            not hasattr(mock_manager, "check_api_server_available")
+            or not mock_manager.check_api_server_available.called
+        )
+
+        # Verify the error response
+        assert isinstance(response, list)
+        assert len(response) == 1
+        assert isinstance(response[0], TextContent)
+        assert response[0].type == "text"
+        assert "host resources" in response[0].text.lower()
+        assert "no cluster resources" in response[0].text
+        assert "file exploration tools" in response[0].text
 
 
 @pytest.mark.asyncio
