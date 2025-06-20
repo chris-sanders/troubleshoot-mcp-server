@@ -273,7 +273,9 @@ def build_container_image(project_root, use_mock_sbctl=False):
             if tar_file.exists():
                 tar_file.unlink()
         else:
-            # Use the standard build script
+            # Use the standard build script with test keys
+            env = os.environ.copy()
+            env["MELANGE_TEST_BUILD"] = "true"
             result = subprocess.run(
                 [str(build_script)],
                 cwd=str(project_root),
@@ -281,6 +283,7 @@ def build_container_image(project_root, use_mock_sbctl=False):
                 stderr=subprocess.PIPE,
                 text=True,
                 timeout=300,
+                env=env,
                 check=True,
             )
 

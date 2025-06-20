@@ -43,5 +43,7 @@ ENV/
 # Git worktrees (development branches)
 trees/
 
-# Melange private key (keep public key but not private key)
+# Melange keys (keep public key in repo, ignore private keys)
 melange.rsa
+melange-test.rsa
+melange-test.rsa.pub

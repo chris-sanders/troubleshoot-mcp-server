@@ -278,20 +278,10 @@ jobs:
           echo "Configuration files found:"
           ls -la .melange.yaml apko.yaml
       
-      - name: Setup melange signing key
-        run: |
-          # Create temporary signing key from secret
-          echo "${{ secrets.MELANGE_RSA }}" > melange.rsa
-          chmod 600 melange.rsa
-      
       - name: Run container tests (melange/apko)
+        env:
+          MELANGE_TEST_BUILD: "true"
         run: uv run pytest tests/e2e/ -m container -v
-      
-      - name: Cleanup signing key
-        if: always()
-        run: |
-          # Remove temporary signing key
-          rm -f melange.rsa
   
   e2e-tests:
     name: E2E Tests (Non-Container)
