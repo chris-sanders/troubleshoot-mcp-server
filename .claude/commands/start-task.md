@@ -4,12 +4,12 @@ Begin implementation of a planned development task.
 
 ## Instructions
 
-Start working on task with name containing: **{{TASK_NAME}}**
+Start working on task with name containing: **$ARGUMENTS**
 
 **MANDATORY WORKFLOW (Execute in this exact order):**
 
 ### 1. Find and Prepare Task
-- [ ] Find matching task file in `tasks/backlog/` containing "{{TASK_NAME}}" in filename
+- [ ] Find matching task file in `tasks/backlog/` containing "$ARGUMENTS" in filename
 - [ ] Determine appropriate feature branch name based on task content
 - [ ] Create worktree FIRST: `git worktree add trees/[feature-name] -b task/[feature-name]`
 - [ ] Switch to worktree: `cd trees/[feature-name]`

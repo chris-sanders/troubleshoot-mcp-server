@@ -6,7 +6,7 @@ Plan a new development task with comprehensive analysis.
 
 You are planning a development task for the MCP Server for Kubernetes Support Bundles project.
 
-**Task to plan:** {{TASK_DESCRIPTION}}
+**Task to plan:** $ARGUMENTS
 
 **Requirements:**
 1. Analyze the task requirements and identify scope

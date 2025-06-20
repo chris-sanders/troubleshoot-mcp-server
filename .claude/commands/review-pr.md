@@ -4,12 +4,12 @@ Conduct a thorough code review of a pull request.
 
 ## Instructions
 
-Review pull request: **{{PR_URL}}**
+Review pull request: **$ARGUMENTS**
 
 **REVIEW CHECKLIST:**
 
 ### 1. Setup and Context
-- [ ] Checkout PR: `gh pr checkout {{PR_NUMBER}}` (if reviewing locally)
+- [ ] Checkout PR: `gh pr checkout $ARGUMENTS` (if reviewing locally)
 - [ ] Understand the feature/task being implemented
 - [ ] Review PR description and test plan
 
@@ -67,4 +67,4 @@ For each issue, provide:
 2. Issue category and description
 3. Suggested solution with code example if helpful
 
-Use GitHub CLI for review: `gh pr review {{PR_NUMBER}} --comment "feedback"` or `gh pr review {{PR_NUMBER}} --approve`
+Use GitHub CLI for review: `gh pr review $ARGUMENTS --comment "feedback"` or `gh pr review $ARGUMENTS --approve`
