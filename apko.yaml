@@ -1,0 +1,29 @@
+contents:
+  keyring:
+    - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+  repositories:
+    - https://packages.wolfi.dev/os
+    - "@local ./packages"
+  packages:
+    - ca-certificates-bundle
+    - wolfi-baselayout
+    - troubleshoot-mcp-server@local
+
+accounts:
+  groups:
+    - groupname: mcp
+      gid: 1000
+  users:
+    - username: mcp-user
+      uid: 1000
+      gid: 1000
+      shell: /bin/sh
+      home: /home/mcp-user
+
+work-dir: /home/mcp-user
+
+entrypoint:
+  command: /usr/bin/troubleshoot-mcp-server
+
+environment:
+  PATH: /usr/sbin:/sbin:/usr/bin:/bin
