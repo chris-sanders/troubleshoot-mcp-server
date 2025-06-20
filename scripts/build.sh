@@ -1,16 +1,22 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # Configuration - use environment variables if set, otherwise use defaults
 # This allows GitHub Actions to override these values
-IMAGE_NAME=${IMAGE_NAME:-"mcp-server-troubleshoot"}
+IMAGE_NAME=${IMAGE_NAME:-"troubleshoot-mcp-server"}
 IMAGE_TAG=${IMAGE_TAG:-"latest"}
 
 # Print commands before executing them
 set -x
 
-# Build the Podman image (without --no-cache to allow proper layer caching)
-podman build -t ${IMAGE_NAME}:${IMAGE_TAG} -f Containerfile .
+# Build melange package (multi-arch)
+podman run --rm -v "$PWD":/work cgr.dev/chainguard/melange build .melange.yaml --arch=amd64,arm64
+
+# Build apko image (multi-arch)
+podman run --rm -v "$PWD":/work cgr.dev/chainguard/apko build apko.yaml "${IMAGE_NAME}:${IMAGE_TAG}" "${IMAGE_NAME}.tar" --arch=amd64,arm64
+
+# Load into podman
+podman load < "${IMAGE_NAME}.tar"
 
 echo "Build completed successfully. The image is available as ${IMAGE_NAME}:${IMAGE_TAG}"
 echo ""

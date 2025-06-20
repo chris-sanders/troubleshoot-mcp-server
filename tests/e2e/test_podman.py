@@ -25,10 +25,12 @@ PROJECT_ROOT = Path(__file__).parents[2].absolute()
 pytestmark = [pytest.mark.e2e, pytest.mark.container]
 
 
-def test_containerfile_exists() -> None:
-    """Test that the Containerfile exists in the project directory."""
-    containerfile_path = PROJECT_ROOT / "Containerfile"
-    assert containerfile_path.exists(), "Containerfile does not exist"
+def test_melange_apko_configs_exist() -> None:
+    """Test that the melange and apko configuration files exist in the project directory."""
+    melange_path = PROJECT_ROOT / ".melange.yaml"
+    apko_path = PROJECT_ROOT / "apko.yaml"
+    assert melange_path.exists(), ".melange.yaml does not exist"
+    assert apko_path.exists(), "apko.yaml does not exist"
 
 
 def test_containerignore_exists() -> None:

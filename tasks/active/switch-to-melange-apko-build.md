@@ -205,3 +205,5 @@ uv run pytest tests/e2e/test_podman.py -v
 - **2025-06-20**: Started task implementation, created worktree and moved to active status
 - **2025-06-20**: Completed Phase 1 - Created .melange.yaml package configuration
 - **2025-06-20**: Completed Phase 2 - Created apko.yaml image configuration
+- **2025-06-20**: Completed Phase 3 - Updated scripts/build.sh for melange/apko workflow
+- **2025-06-20**: Completed Phase 4 - Updated container test infrastructure for melange/apko
