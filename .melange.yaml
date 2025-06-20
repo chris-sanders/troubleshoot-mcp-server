@@ -7,8 +7,6 @@ package:
   dependencies:
     runtime:
       - python3
-      - kubectl
-      - sbctl
 
 environment:
   contents:
@@ -28,3 +26,13 @@ pipeline:
   - name: Install package with dependencies
     runs: |
       python3 -m pip install .
+  - uses: fetch
+    with:
+      uri: https://github.com/replicatedhq/sbctl/releases/download/v0.17.2/sbctl_linux_amd64.tar.gz
+      expected-sha256: b90402ffba1319542589d3ad72fb21ecb6b5251480c3db54ffc0a3e08f2258ce
+  - name: Install sbctl
+    runs: |
+      tar -xzf sbctl_linux_amd64.tar.gz
+      chmod +x ./sbctl
+      mkdir -p /usr/bin
+      cp ./sbctl /usr/bin/sbctl

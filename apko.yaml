@@ -1,12 +1,14 @@
 contents:
   keyring:
     - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    - melange.rsa.pub
   repositories:
     - https://packages.wolfi.dev/os
     - "@local ./packages"
   packages:
     - ca-certificates-bundle
     - wolfi-baselayout
+    - kubectl-1.33-default
     - troubleshoot-mcp-server@local
 
 accounts:
@@ -18,7 +20,6 @@ accounts:
       uid: 1000
       gid: 1000
       shell: /bin/sh
-      home: /home/mcp-user
 
 work-dir: /home/mcp-user
 

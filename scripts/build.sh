@@ -9,16 +9,35 @@ IMAGE_TAG=${IMAGE_TAG:-"latest"}
 # Print commands before executing them
 set -x
 
-# Build melange package (multi-arch)
-podman run --rm -v "$PWD":/work cgr.dev/chainguard/melange build .melange.yaml --arch=amd64,arm64
+echo "Building with melange/apko..."
 
-# Build apko image (multi-arch)
-podman run --rm -v "$PWD":/work cgr.dev/chainguard/apko build apko.yaml "${IMAGE_NAME}:${IMAGE_TAG}" "${IMAGE_NAME}.tar" --arch=amd64,arm64
+# Build melange package (single arch for local development, multi-arch for CI)
+ARCH_FLAGS="--arch=amd64"
+if [[ "${CI:-false}" == "true" ]]; then
+    ARCH_FLAGS="--arch=amd64,arm64"
+fi
 
-# Load into podman
-podman load < "${IMAGE_NAME}.tar"
+echo "Building melange package..."
+if ! podman run --rm --privileged --cap-add=SYS_ADMIN -v "$PWD":/work cgr.dev/chainguard/melange build .melange.yaml ${ARCH_FLAGS} --signing-key=melange.rsa; then
+    echo "Melange build failed!"
+    exit 1
+fi
 
-echo "Build completed successfully. The image is available as ${IMAGE_NAME}:${IMAGE_TAG}"
+echo "Building apko image..."
+if ! podman run --rm --privileged --cap-add=SYS_ADMIN -v "$PWD":/work cgr.dev/chainguard/apko build apko.yaml "${IMAGE_NAME}:${IMAGE_TAG}" "${IMAGE_NAME}.tar" ${ARCH_FLAGS}; then
+    echo "Apko build failed!"
+    exit 1
+fi
+
+echo "Loading image into podman..."
+if ! podman load < "${IMAGE_NAME}.tar"; then
+    echo "Failed to load apko image!"
+    exit 1
+fi
+
+echo "✅ Melange/apko build completed successfully!"
+echo "📦 Image: ${IMAGE_NAME}:${IMAGE_TAG}"
+echo "🔧 Includes: sbctl v0.17.2, kubectl v1.33, Python MCP server"
 echo ""
 echo "To run the container:"
 echo "  podman run -it --rm \\"
