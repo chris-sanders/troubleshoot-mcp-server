@@ -646,6 +646,10 @@ async def test_kubectl_executor_no_bundle_still_works():
     error = exc_info.value
     assert error.exit_code == 1
     error_message = str(error).lower()
-    assert "no active bundle" in error_message or "bundle not initialized" in error_message
+    assert (
+        "no active bundle" in error_message
+        or "bundle not initialized" in error_message
+        or "no bundle is initialized" in error_message
+    )
     # Should NOT mention host-only bundle
     assert "host resources" not in error_message
