@@ -1,7 +1,8 @@
 # Task: Switch to Melange/Apko Based Image and Tooling
 
 ## Metadata
-- **Status**: backlog
+- **Status**: active
+- **Started**: 2025-06-20
 - **Dependencies**: none
 
 ## Context
@@ -201,4 +202,4 @@ uv run pytest tests/e2e/test_podman.py -v
 
 ## Progress Log
 
-(Add entries as work progresses)
+- **2025-06-20**: Started task implementation, created worktree and moved to active status
