@@ -1,6 +1,6 @@
 {
   "SPDXID": "SPDXRef-DOCUMENT",
-  "name": "sbom-sha256:fde84d2bdd33d47629b2e919dba5e35bf7c26d035f78bd3a43bb88921b79bf3a",
+  "name": "sbom-sha256:398abebb171e6ab5a786d722800f347181f443234b29732297f9eb77ed2adfaf",
   "spdxVersion": "SPDX-2.3",
   "creationInfo": {
     "created": "2025-06-19T19:06:33Z",
@@ -13,13 +13,13 @@
   "dataLicense": "CC0-1.0",
   "documentNamespace": "https://spdx.org/spdxdocs/apko/",
   "documentDescribes": [
-    "SPDXRef-Package-sha256-ef429bacb5dd3a900ac5dfe43c2c02a7fe52c15b70db64df30b5935f037775ca"
+    "SPDXRef-Package-sha256-64ffda0ecf6396d62bd49cec4a3c294a7180ceb2fb1e3988262eecdbbf084a68"
   ],
   "packages": [
     {
-      "SPDXID": "SPDXRef-Package-sha256-ef429bacb5dd3a900ac5dfe43c2c02a7fe52c15b70db64df30b5935f037775ca",
-      "name": "sha256:ef429bacb5dd3a900ac5dfe43c2c02a7fe52c15b70db64df30b5935f037775ca",
-      "versionInfo": "sha256:ef429bacb5dd3a900ac5dfe43c2c02a7fe52c15b70db64df30b5935f037775ca",
+      "SPDXID": "SPDXRef-Package-sha256-64ffda0ecf6396d62bd49cec4a3c294a7180ceb2fb1e3988262eecdbbf084a68",
+      "name": "sha256:64ffda0ecf6396d62bd49cec4a3c294a7180ceb2fb1e3988262eecdbbf084a68",
+      "versionInfo": "sha256:64ffda0ecf6396d62bd49cec4a3c294a7180ceb2fb1e3988262eecdbbf084a68",
       "filesAnalyzed": false,
       "description": "apko container image",
       "downloadLocation": "NOASSERTION",
@@ -28,20 +28,20 @@
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "ef429bacb5dd3a900ac5dfe43c2c02a7fe52c15b70db64df30b5935f037775ca"
+          "checksumValue": "64ffda0ecf6396d62bd49cec4a3c294a7180ceb2fb1e3988262eecdbbf084a68"
         }
       ],
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:oci/troubleshoot-mcp-server@sha256%3Aef429bacb5dd3a900ac5dfe43c2c02a7fe52c15b70db64df30b5935f037775ca?arch=amd64\u0026mediaType=application%2Fvnd.oci.image.manifest.v1%2Bjson\u0026os=linux",
+          "referenceLocator": "pkg:oci/troubleshoot-mcp-server@sha256%3A64ffda0ecf6396d62bd49cec4a3c294a7180ceb2fb1e3988262eecdbbf084a68?arch=amd64\u0026mediaType=application%2Fvnd.oci.image.manifest.v1%2Bjson\u0026os=linux",
           "referenceType": "purl"
         }
       ]
     },
     {
-      "SPDXID": "SPDXRef-Package-sha256-fde84d2bdd33d47629b2e919dba5e35bf7c26d035f78bd3a43bb88921b79bf3a",
-      "name": "sha256:fde84d2bdd33d47629b2e919dba5e35bf7c26d035f78bd3a43bb88921b79bf3a",
+      "SPDXID": "SPDXRef-Package-sha256-398abebb171e6ab5a786d722800f347181f443234b29732297f9eb77ed2adfaf",
+      "name": "sha256:398abebb171e6ab5a786d722800f347181f443234b29732297f9eb77ed2adfaf",
       "versionInfo": "20230201",
       "filesAnalyzed": false,
       "description": "apko operating system layer",
@@ -50,7 +50,7 @@
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:oci/troubleshoot-mcp-server@sha256%3Afde84d2bdd33d47629b2e919dba5e35bf7c26d035f78bd3a43bb88921b79bf3a?arch=amd64\u0026mediaType=application%2Fvnd.oci.image.layer.v1.tar%2Bgzip\u0026os=linux",
+          "referenceLocator": "pkg:oci/troubleshoot-mcp-server@sha256%3A398abebb171e6ab5a786d722800f347181f443234b29732297f9eb77ed2adfaf?arch=amd64\u0026mediaType=application%2Fvnd.oci.image.layer.v1.tar%2Bgzip\u0026os=linux",
           "referenceType": "purl"
         }
       ]
@@ -1282,9 +1282,9 @@
   ],
   "relationships": [
     {
-      "spdxElementId": "SPDXRef-Package-sha256-ef429bacb5dd3a900ac5dfe43c2c02a7fe52c15b70db64df30b5935f037775ca",
+      "spdxElementId": "SPDXRef-Package-sha256-64ffda0ecf6396d62bd49cec4a3c294a7180ceb2fb1e3988262eecdbbf084a68",
       "relationshipType": "CONTAINS",
-      "relatedSpdxElement": "SPDXRef-Package-sha256-fde84d2bdd33d47629b2e919dba5e35bf7c26d035f78bd3a43bb88921b79bf3a"
+      "relatedSpdxElement": "SPDXRef-Package-sha256-398abebb171e6ab5a786d722800f347181f443234b29732297f9eb77ed2adfaf"
     },
     {
       "spdxElementId": "SPDXRef-Package-wolfi-baselayout-20230201-r20",

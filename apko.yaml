@@ -24,7 +24,7 @@ accounts:
 work-dir: /home/mcp-user
 
 entrypoint:
-  command: /usr/bin/troubleshoot-mcp-server
+  command: /usr/bin/python3 -m mcp_server_troubleshoot
 
 environment:
-  PATH: /usr/sbin:/sbin:/usr/bin:/bin
+  PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/sbin:/usr/bin:/bin
