@@ -225,6 +225,7 @@ class BundleManager:
         self.active_bundle: Optional[BundleMetadata] = None
         self.sbctl_process: Optional[asyncio.subprocess.Process] = None
         self._host_only_bundle: bool = False
+        self._termination_requested: bool = False
 
     async def initialize_bundle(self, source: str, force: bool = False) -> BundleMetadata:
         """
@@ -697,6 +698,7 @@ class BundleManager:
             self.sbctl_process = await asyncio.create_subprocess_exec(
                 *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
+            self._termination_requested = False
 
             # First, wait a brief moment to see if sbctl exits quickly with "No cluster resources"
             try:
@@ -1068,6 +1070,11 @@ class BundleManager:
                         logger.debug(f"Error checking process output: {e}")
                         # Continue with normal error handling
 
+                # Check if this was an intentional termination (SIGTERM/-15)
+                if self.sbctl_process.returncode == -15 and self._termination_requested:
+                    logger.debug("sbctl process was intentionally terminated during cleanup")
+                    return  # Exit gracefully without raising an error
+
                 error_message = f"sbctl process exited with code {self.sbctl_process.returncode} before initialization completed"
                 break
 
@@ -1127,6 +1134,7 @@ class BundleManager:
         This helper method centralizes process termination logic to avoid duplication.
         """
         if self.sbctl_process:
+            self._termination_requested = True
             try:
                 logger.debug("Terminating sbctl process...")
                 self.sbctl_process.terminate()

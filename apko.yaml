@@ -1,0 +1,30 @@
+contents:
+  keyring:
+    - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    - melange.rsa.pub
+  repositories:
+    - https://packages.wolfi.dev/os
+    - "@local ./packages"
+  packages:
+    - ca-certificates-bundle
+    - wolfi-baselayout
+    - kubectl-1.33-default
+    - troubleshoot-mcp-server@local
+
+accounts:
+  groups:
+    - groupname: mcp
+      gid: 1000
+  users:
+    - username: mcp-user
+      uid: 1000
+      gid: 1000
+      shell: /bin/sh
+
+work-dir: /home/mcp-user
+
+entrypoint:
+  command: /usr/bin/python3 -m mcp_server_troubleshoot
+
+environment:
+  PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/sbin:/usr/bin:/bin

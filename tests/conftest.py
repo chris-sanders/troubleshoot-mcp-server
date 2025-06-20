@@ -11,6 +11,9 @@ from pathlib import Path
 # Set default verbosity to verbose for tests to maintain backward compatibility
 os.environ["MCP_VERBOSITY"] = "verbose"
 
+# Ensure test builds use test keys for melange/apko tests
+os.environ["MELANGE_TEST_BUILD"] = "true"
+
 # Configure pytest_asyncio globally
 pytest_plugins = ["pytest_asyncio"]
 
@@ -116,7 +119,7 @@ def test_support_bundle(fixtures_dir) -> Path:
     return bundle_path
 
 
-def is_docker_available():
+def is_container_runtime_available():
     """Check if Podman is available on the system."""
     try:
         result = subprocess.run(
@@ -144,7 +147,7 @@ def safe_open(file_path, mode):
 
 def build_container_image(project_root, use_mock_sbctl=False):
     """
-    Build the Podman image for tests.
+    Build the Podman image for tests using melange/apko.
 
     Args:
         project_root: The root directory of the project
@@ -160,65 +163,69 @@ def build_container_image(project_root, use_mock_sbctl=False):
     if not build_script.exists():
         return False, "Build script not found"
 
+    # Check for melange/apko config files
+    melange_config = project_root / ".melange.yaml"
+    apko_config = project_root / "apko.yaml"
+
+    if not melange_config.exists():
+        return False, ".melange.yaml not found"
+    if not apko_config.exists():
+        return False, "apko.yaml not found"
+
     try:
         # Remove any existing image first to ensure a clean build
         subprocess.run(
-            ["podman", "rmi", "-f", "mcp-server-troubleshoot:latest"],
+            ["podman", "rmi", "-f", "troubleshoot-mcp-server:latest"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             timeout=30,
             check=False,
         )
 
-        # For test mode with mock sbctl, we need to modify the Containerfile
+        # For test mode with mock sbctl, we need to modify the melange config
         if use_mock_sbctl:
-            # Create a temporary Containerfile.test
-            containerfile = project_root / "Containerfile"
-            if not containerfile.exists():
-                return False, "Containerfile not found"
+            # Create a temporary melange config with mock sbctl
+            melange_test_config = project_root / ".melange.test.yaml"
 
-            # Read the original Containerfile
-            containerfile_content = ""
-            with safe_open(containerfile, "r") as f:
-                containerfile_content = f.read()
+            # Read the original melange config
+            melange_content = ""
+            with safe_open(melange_config, "r") as f:
+                melange_content = f.read()
 
-            # Create a modified version that uses mock_sbctl.py
-            containerfile_test = project_root / "Containerfile.test"
+            # Modify the pipeline to use mock sbctl
+            mock_pipeline = """pipeline:
+  - name: Install package with dependencies
+    runs: |
+      python3 -m pip install .
+  - name: Install mock sbctl
+    runs: |
+      cp tests/fixtures/mock_sbctl.py /usr/bin/sbctl
+      chmod +x /usr/bin/sbctl"""
 
-            # Replace the sbctl installation section with the mock version
-            mock_sbctl_section = """
-# Use mock sbctl script instead of the real one
-COPY tests/fixtures/mock_sbctl.py /usr/local/bin/sbctl
-RUN chmod +x /usr/local/bin/sbctl
-"""
-            # Find the right section to replace
-            if "Install the real sbctl binary" in containerfile_content:
-                # Replace the real sbctl installation with the mock one
-                containerfile_content = containerfile_content.replace(
-                    '# Install the real sbctl binary - AMD64 version for standard container usage\nRUN mkdir -p /tmp/sbctl && cd /tmp/sbctl && \\\n    curl -L -o sbctl.tar.gz "https://github.com/replicatedhq/sbctl/releases/latest/download/sbctl_linux_amd64.tar.gz" && \\\n    tar xzf sbctl.tar.gz && \\\n    chmod +x sbctl && \\\n    mv sbctl /usr/local/bin/ && \\\n    cd / && \\\n    rm -rf /tmp/sbctl && \\\n    sbctl --help',
-                    mock_sbctl_section,
-                )
-            else:
-                # If we can't find the exact section, just add it before creating the data directory
-                containerfile_content = containerfile_content.replace(
-                    "# Create data directory for bundles",
-                    mock_sbctl_section + "\n# Create data directory for bundles",
-                )
+            # Replace the pipeline section
+            import re
 
-            # Write the modified Containerfile
-            with safe_open(containerfile_test, "w") as f:
-                f.write(containerfile_content)
+            melange_content = re.sub(
+                r"pipeline:.*", mock_pipeline, melange_content, flags=re.DOTALL
+            )
 
-            # Build using the temporary Containerfile
+            # Write the modified melange config
+            with safe_open(melange_test_config, "w") as f:
+                f.write(melange_content)
+
+            # Build using the temporary melange config
+            # First build the package
             result = subprocess.run(
                 [
                     "podman",
+                    "run",
+                    "--rm",
+                    "-v",
+                    f"{project_root}:/work",
+                    "cgr.dev/chainguard/melange",
                     "build",
-                    "-f",
-                    "Containerfile.test",
-                    "-t",
-                    "mcp-server-troubleshoot:latest",
-                    ".",
+                    ".melange.test.yaml",
+                    "--arch=amd64",
                 ],
                 cwd=str(project_root),
                 stdout=subprocess.PIPE,
@@ -228,11 +235,50 @@ RUN chmod +x /usr/local/bin/sbctl
                 check=True,
             )
 
-            # Clean up the temporary Containerfile
-            if containerfile_test.exists():
-                containerfile_test.unlink()
+            # Then build the image
+            result = subprocess.run(
+                [
+                    "podman",
+                    "run",
+                    "--rm",
+                    "-v",
+                    f"{project_root}:/work",
+                    "cgr.dev/chainguard/apko",
+                    "build",
+                    "apko.yaml",
+                    "troubleshoot-mcp-server:latest",
+                    "troubleshoot-mcp-server.tar",
+                    "--arch=amd64",
+                ],
+                cwd=str(project_root),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=300,
+                check=True,
+            )
+
+            # Load the image
+            result = subprocess.run(
+                ["podman", "load", "-i", "troubleshoot-mcp-server.tar"],
+                cwd=str(project_root),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=60,
+                check=True,
+            )
+
+            # Clean up temporary files
+            if melange_test_config.exists():
+                melange_test_config.unlink()
+            tar_file = project_root / "troubleshoot-mcp-server.tar"
+            if tar_file.exists():
+                tar_file.unlink()
         else:
-            # Use the standard build script
+            # Use the standard build script with test keys
+            env = os.environ.copy()
+            env["MELANGE_TEST_BUILD"] = "true"
             result = subprocess.run(
                 [str(build_script)],
                 cwd=str(project_root),
@@ -240,6 +286,7 @@ RUN chmod +x /usr/local/bin/sbctl
                 stderr=subprocess.PIPE,
                 text=True,
                 timeout=300,
+                env=env,
                 check=True,
             )
 
@@ -251,9 +298,9 @@ RUN chmod +x /usr/local/bin/sbctl
 
 
 @pytest.fixture(scope="session")
-def docker_image(request):
+def container_image(request):
     """
-    Session-scoped fixture that ensures the Podman image is built once for all tests.
+    Session-scoped fixture that ensures the OCI container image is built once for all tests.
 
     If the test is marked with 'mock_sbctl', a test image with mock sbctl will be built.
     Otherwise, the standard image will be built.
@@ -264,10 +311,10 @@ def docker_image(request):
         request: The pytest request object
 
     Returns:
-        The name of the Podman image
+        The name of the OCI container image
     """
     # Skip if Podman is not available
-    if not is_docker_available():
+    if not is_container_runtime_available():
         pytest.skip("Podman is not available")
 
     # Get project root directory
@@ -275,7 +322,7 @@ def docker_image(request):
 
     # Check if image already exists to avoid rebuilding
     image_check = subprocess.run(
-        ["podman", "image", "exists", "mcp-server-troubleshoot:latest"],
+        ["podman", "image", "exists", "troubleshoot-mcp-server:latest"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         check=False,
@@ -283,8 +330,8 @@ def docker_image(request):
 
     # Image exists already, just use it
     if image_check.returncode == 0:
-        print("\nUsing existing Podman image for tests...")
-        yield "mcp-server-troubleshoot:latest"
+        print("\nUsing existing container image for tests...")
+        yield "troubleshoot-mcp-server:latest"
         return
 
     # Determine if we should use mock sbctl based on markers
@@ -296,25 +343,25 @@ def docker_image(request):
 
     # Print what we're doing
     if use_mock_sbctl:
-        print("\nBuilding Podman image with mock sbctl for tests...")
+        print("\nBuilding OCI container image with mock sbctl for tests...")
     else:
-        print("\nBuilding standard Podman image for tests...")
+        print("\nBuilding standard OCI container image for tests...")
 
-    # Build the Podman image
+    # Build the container image
     success, result = build_container_image(project_root, use_mock_sbctl)
 
     if not success:
         if isinstance(result, str):
-            pytest.skip(f"Failed to build Podman image: {result}")
+            pytest.skip(f"Failed to build container image: {result}")
         else:
-            pytest.skip(f"Failed to build Podman image: {result.stderr}")
+            pytest.skip(f"Failed to build container image: {result.stderr}")
 
     # Yield to allow tests to run
-    yield "mcp-server-troubleshoot:latest"
+    yield "troubleshoot-mcp-server:latest"
 
     # Explicitly clean up any running containers
     containers_result = subprocess.run(
-        ["podman", "ps", "-q", "--filter", "ancestor=mcp-server-troubleshoot:latest"],
+        ["podman", "ps", "-q", "--filter", "ancestor=troubleshoot-mcp-server:latest"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,

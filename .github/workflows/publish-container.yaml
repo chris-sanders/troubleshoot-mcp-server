@@ -51,26 +51,51 @@ jobs:
         id: prep
         run: |
           REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE_NAME="ghcr.io/${REPO_NAME}/mcp-server-troubleshoot"
+          IMAGE_NAME="ghcr.io/${REPO_NAME}/troubleshoot-mcp-server"
           echo "image=${IMAGE_NAME}" >> $GITHUB_OUTPUT
           echo "Image name: ${IMAGE_NAME}"
       
-      - name: Build and tag container
+      - name: Install melange and apko
+        run: |
+          # Install melange and apko for CI environment
+          curl -L -o melange "https://github.com/chainguard-dev/melange/releases/latest/download/melange-linux-amd64"
+          curl -L -o apko "https://github.com/chainguard-dev/apko/releases/latest/download/apko-linux-amd64"
+          chmod +x melange apko
+          sudo mv melange /usr/local/bin/
+          sudo mv apko /usr/local/bin/
+          melange version
+          apko version
+      
+      - name: Setup melange signing key
+        run: |
+          # Create temporary signing key from secret
+          echo "${{ secrets.MELANGE_RSA }}" > melange.rsa
+          chmod 600 melange.rsa
+      
+      - name: Build with melange and apko
         env:
           IMAGE_NAME: ${{ steps.prep.outputs.image }}
           VERSION: ${{ steps.get-version.outputs.version }}
         run: |
-          # Modify the build script to use our variables
-          export IMAGE_NAME
-          export IMAGE_TAG=$VERSION
+          # Build melange package with signing key
+          melange build .melange.yaml --arch=amd64 --signing-key=melange.rsa
           
-          # Run the build script
-          bash ./scripts/build.sh
+          # Build apko image
+          apko build apko.yaml ${IMAGE_NAME}:${VERSION} ${IMAGE_NAME}.tar --arch=amd64
+          
+          # Load into podman
+          podman load < ${IMAGE_NAME##*/}.tar
           
           # Tag with "latest" if this is not a test run
           if [[ "${{ github.event_name }}" == "push" ]]; then
             podman tag ${IMAGE_NAME}:${VERSION} ${IMAGE_NAME}:latest
           fi
+      
+      - name: Cleanup signing key
+        if: always()
+        run: |
+          # Remove temporary signing key
+          rm -f melange.rsa
       
       - name: Push container to GitHub Container Registry
         env:
@@ -86,4 +111,4 @@ jobs:
       
       - name: Output image details
         run: |
-          echo "::notice::Published image: ghcr.io/${{ github.repository }}/mcp-server-troubleshoot:${{ steps.get-version.outputs.version }}"
+          echo "::notice::Published image: ghcr.io/${{ github.repository }}/troubleshoot-mcp-server:${{ steps.get-version.outputs.version }}"

@@ -46,7 +46,7 @@ The test suite uses a session-scoped fixture that builds the container image onc
 
 ```python
 @pytest.fixture(scope="session")
-def docker_image():
+def container_image():
     # This fixture builds the image once for all tests
     # ...
 ```
