@@ -9,6 +9,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import yaml
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -53,7 +54,7 @@ def load_config_from_path(config_path: str) -> Dict[str, Any]:
         raise FileNotFoundError(f"Configuration file not found: {path}")
 
     with open(path, "r") as f:
-        result: Dict[str, Any] = json.load(f)
+        result: Dict[str, Any] = yaml.safe_load(f)
         return result
 
 
