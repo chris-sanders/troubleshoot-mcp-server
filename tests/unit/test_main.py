@@ -3,7 +3,7 @@ Tests for the __main__ module.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from mcp_server_troubleshoot import __main__ as cli_main
 
 # Mark all tests in this file as unit tests
