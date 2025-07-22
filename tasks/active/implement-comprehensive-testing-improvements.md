@@ -21,6 +21,41 @@
 - **kubectl exec crash prevention**: Specific tests added for interactive commands that previously crashed server
 - **All tests passing**: 229 tests pass (unit, integration, e2e infrastructure, container validation, MCP protocol)
 
+## NEXT PHASE HANDOFF NOTES
+
+### For Phase 2 Agent:
+
+**Phase 1 Deliverables Available:**
+- `tests/e2e/test_mcp_protocol_integration.py` - New comprehensive real MCP protocol tests
+- Fixed container build script with proper image tagging
+- Working container validation tests (all passing)
+- MCPTestClient in `tests/integration/mcp_test_utils.py` - Ready for expansion
+
+**Phase 2 Prerequisites COMPLETE:**
+- ✅ E2E infrastructure working (can build and test containers)  
+- ✅ Real MCP protocol testing infrastructure exists and works
+- ✅ MCPTestClient fully functional for JSON-RPC communication
+- ✅ All existing tests passing (clean foundation for expansion)
+
+**Recommended Phase 2 Approach:**
+1. Start by running existing MCP protocol tests to verify infrastructure
+2. Use MCPTestClient as the base for all new protocol tests
+3. Focus on expanding test coverage for all 6 tools via JSON-RPC
+4. Test files to examine: `tests/integration/test_mcp_protocol_basic.py` (mentioned as needing rename/cleanup)
+5. Current test bundle: `tests/fixtures/support-bundle-2025-04-11T14_05_31.tar.gz`
+
+**Commands to verify setup:**
+```bash
+# Test MCP protocol infrastructure works:
+uv run pytest tests/e2e/test_mcp_protocol_integration.py::TestMCPProtocolLifecycle::test_server_startup_and_initialization -v
+
+# Run all container tests:
+uv run pytest tests/e2e/test_container_production_validation.py -v
+
+# Full test suite verification:
+uv run pytest tests/unit/ tests/integration/ -x --tb=no -q
+```
+
 ## Overview
 Critical production bug escaped due to testing gaps. Implement systematic testing improvements to prevent similar issues. Use parallel sub-agents extensively for efficient implementation and discovery.
 
