@@ -36,58 +36,11 @@ def test_container_has_required_tools_isolated(container_image: str):
     }
 
     for tool_name, expected_path in required_tools.items():
-        # Test 1: Tool exists at expected path
-        result = subprocess.run(
-            [
-                runtime,
-                "run",
-                "--name",
-                f"{container_name}-{tool_name}-path",
-                "--rm",
-                "--entrypoint",
-                "test",
-                container_image,
-                "-f",
-                expected_path,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        # For distroless containers, we can't use 'test' command since it's not available.
+        # Instead, we directly try to run the tools which is a more reliable test anyway.
 
-        assert result.returncode == 0, (
-            f"Tool {tool_name} not found at expected path {expected_path} in container. "
-            f"This indicates the tool is not properly packaged. "
-            f"stderr: {result.stderr}"
-        )
-
-        # Test 2: Tool is executable
-        result = subprocess.run(
-            [
-                runtime,
-                "run",
-                "--name",
-                f"{container_name}-{tool_name}-exec",
-                "--rm",
-                "--entrypoint",
-                "test",
-                container_image,
-                "-x",
-                expected_path,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-
-        assert result.returncode == 0, (
-            f"Tool {tool_name} at {expected_path} is not executable in container. "
-            f"stderr: {result.stderr}"
-        )
-
-        # Test 3: Tool can actually run (basic help/version check)
         if tool_name == "sbctl":
-            # sbctl should respond to --help
+            # Test sbctl exists and works
             result = subprocess.run(
                 [
                     runtime,
@@ -95,8 +48,10 @@ def test_container_has_required_tools_isolated(container_image: str):
                     "--name",
                     f"{container_name}-{tool_name}-run",
                     "--rm",
+                    "--entrypoint",
+                    "",
                     container_image,
-                    "sbctl",
+                    expected_path,
                     "--help",
                 ],
                 capture_output=True,
@@ -105,12 +60,72 @@ def test_container_has_required_tools_isolated(container_image: str):
             )
 
             assert result.returncode == 0, (
-                f"sbctl --help failed in container (returncode: {result.returncode}). "
-                f"stdout: {result.stdout}, stderr: {result.stderr}"
+                f"Tool {tool_name} not found or not working at {expected_path} in container. "
+                f"This indicates the tool is not properly packaged. "
+                f"returncode: {result.returncode}, stdout: {result.stdout}, stderr: {result.stderr}"
             )
             assert (
                 "Usage:" in result.stdout or "usage:" in result.stdout
             ), f"sbctl --help output doesn't contain expected usage text: {result.stdout}"
+
+        elif tool_name == "kubectl":
+            # Test kubectl exists and works
+            result = subprocess.run(
+                [
+                    runtime,
+                    "run",
+                    "--name",
+                    f"{container_name}-{tool_name}-run",
+                    "--rm",
+                    "--entrypoint",
+                    "",
+                    container_image,
+                    expected_path,
+                    "version",
+                    "--client",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
+            assert result.returncode == 0, (
+                f"Tool {tool_name} not found or not working at {expected_path} in container. "
+                f"This indicates the tool is not properly packaged. "
+                f"returncode: {result.returncode}, stdout: {result.stdout}, stderr: {result.stderr}"
+            )
+            assert (
+                "Client Version:" in result.stdout
+            ), f"kubectl version output doesn't contain expected version text: {result.stdout}"
+
+        elif tool_name == "python3":
+            # Test python3 exists and works
+            result = subprocess.run(
+                [
+                    runtime,
+                    "run",
+                    "--name",
+                    f"{container_name}-{tool_name}-run",
+                    "--rm",
+                    "--entrypoint",
+                    "",
+                    container_image,
+                    expected_path,
+                    "--version",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
+            assert result.returncode == 0, (
+                f"Tool {tool_name} not found or not working at {expected_path} in container. "
+                f"This indicates the tool is not properly packaged. "
+                f"returncode: {result.returncode}, stdout: {result.stdout}, stderr: {result.stderr}"
+            )
+            assert (
+                "Python" in result.stdout
+            ), f"python3 --version output doesn't contain expected version text: {result.stdout}"
 
 
 def test_container_bundle_initialization_isolated(container_image: str, temp_bundles_directory):

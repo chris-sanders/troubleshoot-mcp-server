@@ -67,9 +67,11 @@ def test_basic_container_check(container_runner, unique_container_name, system_i
     # Get project root
     project_root = get_project_root()
 
-    # Verify Containerfile exists
-    containerfile = project_root / "Containerfile"
-    assert containerfile.exists(), f"Containerfile not found at {containerfile}"
+    # Verify melange/apko config files exist (project switched from Containerfile to melange/apko)
+    melange_config = project_root / ".melange.yaml"
+    apko_config = project_root / "apko.yaml"
+    assert melange_config.exists(), f"Melange config not found at {melange_config}"
+    assert apko_config.exists(), f"Apko config not found at {apko_config}"
 
     # Verify scripts exist
     build_script = project_root / "scripts" / "build.sh"
