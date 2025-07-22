@@ -1,13 +1,19 @@
 """
-Basic MCP protocol tests for server initialization and bundle operations.
+Integration tests for MCP tool functions via direct function calls.
 
-This module tests the core MCP functionality by calling the tool functions
-directly. This approach is compatible with the current FastMCP architecture
-and provides comprehensive testing of the MCP tools without requiring
-stdio protocol communication.
+This module tests the core MCP tool functionality by calling the tool functions
+directly (NOT through the MCP protocol). These are integration tests that verify
+the business logic of each tool works correctly when called programmatically.
 
-NOTE: Full protocol testing via stdio transport will be implemented in
-Phase 4 using the container-based approach as documented in the e2e tests.
+IMPORTANT: These tests do NOT test the MCP protocol layer. They test the underlying
+functions that are exposed as MCP tools. For actual MCP protocol testing, see:
+- tests/e2e/test_mcp_protocol_integration.py (real protocol via MCPTestClient)
+
+These tests are valuable for:
+1. Testing tool business logic without protocol overhead
+2. Fast feedback during development
+3. Verifying function signatures and return formats
+4. Integration testing of bundle + tool workflows
 """
 
 import tempfile
@@ -53,15 +59,17 @@ async def bundle_storage_dir():
 
 
 @pytest.mark.asyncio
-async def test_list_available_bundles(bundle_storage_dir):
+async def test_list_available_bundles_function(bundle_storage_dir):
     """
-    Test MCP list_available_bundles tool functionality.
+    Test list_available_bundles function directly (NOT via MCP protocol).
 
-    This test verifies:
-    1. Tool can be called successfully
-    2. Returns proper response format
-    3. Handles empty bundle directory
-    4. Response structure is correct
+    This test verifies the function:
+    1. Can be called successfully with valid arguments
+    2. Returns proper response format (list of TextContent)
+    3. Handles empty bundle directory correctly
+    4. Response structure matches expected format
+
+    NOTE: This is a direct function call test, not MCP protocol testing.
     """
     # Test with empty bundle directory first
     args = ListAvailableBundlesArgs(include_invalid=False)
@@ -77,20 +85,22 @@ async def test_list_available_bundles(bundle_storage_dir):
 
 
 @pytest.mark.asyncio
-async def test_initialize_bundle_local_file(bundle_storage_dir):
+async def test_initialize_bundle_function_local_file(bundle_storage_dir):
     """
-    Complete E2E test: initialize bundle from local file.
+    Test initialize_bundle function with local file (NOT via MCP protocol).
 
-    This test verifies:
-    1. Server can initialize a bundle from a local file path
-    2. Bundle initialization returns expected metadata
-    3. Bundle path and kubeconfig path are provided
-    4. Success response format is correct
+    This test verifies the function:
+    1. Can initialize a bundle from a local file path
+    2. Returns expected metadata in response format
+    3. Provides bundle path and kubeconfig path in response
+    4. Response format matches expected TextContent structure
+
+    NOTE: This is a direct function call test, not MCP protocol testing.
     """
     # Get the test bundle path
     test_bundle = get_test_bundle_path()
 
-    # Call initialize_bundle tool directly
+    # Call initialize_bundle function directly (not via MCP protocol)
     args = InitializeBundleArgs(source=str(test_bundle), force=False)
     result = await initialize_bundle(args)
 
@@ -116,13 +126,16 @@ async def test_initialize_bundle_local_file(bundle_storage_dir):
 
 
 @pytest.mark.asyncio
-async def test_initialize_bundle_force_flag(bundle_storage_dir):
+async def test_initialize_bundle_function_force_flag(bundle_storage_dir):
     """
-    Test initialize_bundle with force flag functionality.
+    Test initialize_bundle function force flag behavior (NOT via MCP protocol).
 
-    This test verifies:
-    1. Bundle can be initialized normally
-    2. Second initialization with force=True succeeds
+    This test verifies the function:
+    1. Can initialize bundle normally (force=False)
+    2. Can reinitialize same bundle with force=True
+    3. Both operations return success responses
+
+    NOTE: This is a direct function call test, not MCP protocol testing.
     """
     test_bundle = get_test_bundle_path()
 
@@ -144,17 +157,20 @@ async def test_initialize_bundle_force_flag(bundle_storage_dir):
 
 
 @pytest.mark.asyncio
-async def test_initialize_bundle_nonexistent_file(bundle_storage_dir):
+async def test_initialize_bundle_validation_nonexistent_file(bundle_storage_dir):
     """
-    Test initialize_bundle error handling for nonexistent files.
+    Test Pydantic validation for initialize_bundle arguments.
 
     This test verifies:
-    1. Pydantic validation catches nonexistent files
-    2. ValidationError is raised for missing files
+    1. Pydantic model validation catches nonexistent files
+    2. ValidationError is raised with appropriate message
+
+    NOTE: This tests Pydantic validation, not MCP functionality.
+    This could be moved to unit tests as it's testing the framework.
     """
     from pydantic_core import ValidationError
 
-    # Try to initialize with a nonexistent file
+    # Try to create InitializeBundleArgs with nonexistent file (tests Pydantic validation)
     nonexistent_path = "/tmp/definitely-does-not-exist.tar.gz"
 
     # Should raise ValidationError due to file not existing
@@ -167,18 +183,20 @@ async def test_initialize_bundle_nonexistent_file(bundle_storage_dir):
 
 
 @pytest.mark.asyncio
-async def test_list_files_with_initialized_bundle(bundle_storage_dir):
+async def test_list_files_function_with_bundle(bundle_storage_dir):
     """
-    Test file listing functionality with an initialized bundle.
+    Test list_files function after bundle initialization (NOT via MCP protocol).
 
-    This test verifies:
-    1. Bundle can be initialized
-    2. File listing works on initialized bundle
-    3. Response contains expected file structure
+    This test verifies the function:
+    1. Works correctly after bundle is initialized
+    2. Returns proper file listing in expected format
+    3. Response contains JSON data and operation description
+
+    NOTE: This is a direct function call test, not MCP protocol testing.
     """
     test_bundle = get_test_bundle_path()
 
-    # Initialize bundle first
+    # Initialize bundle first by calling function directly
     init_args = InitializeBundleArgs(source=str(test_bundle), force=True)
     init_result = await initialize_bundle(init_args)
 
@@ -201,11 +219,15 @@ async def test_list_files_with_initialized_bundle(bundle_storage_dir):
 
 
 @pytest.mark.asyncio
-async def test_error_handling_invalid_parameters(bundle_storage_dir):
+async def test_pydantic_validation_invalid_parameters(bundle_storage_dir):
     """
-    Test error handling with invalid parameters.
+    Test Pydantic validation for list_files arguments.
 
-    This test verifies that Pydantic validation catches invalid parameters.
+    This test verifies Pydantic model validation catches invalid parameters
+    like directory traversal attempts.
+
+    NOTE: This tests Pydantic validation, not our business logic.
+    Could be moved to unit tests or removed as framework testing.
     """
     from pydantic_core import ValidationError
 
@@ -221,25 +243,28 @@ async def test_error_handling_invalid_parameters(bundle_storage_dir):
 
 
 @pytest.mark.asyncio
-async def test_kubectl_through_mcp(bundle_storage_dir):
+async def test_kubectl_function_execution(bundle_storage_dir):
     """
-    Test kubectl execution via MCP.
+    Test kubectl function execution (NOT via MCP protocol).
 
-    This test verifies:
-    1. Bundle can be initialized
-    2. kubectl commands can be executed through MCP
-    3. Response format is correct
-    4. Error handling works for commands when API server is not available
+    This test verifies the function:
+    1. Can execute kubectl commands after bundle initialization
+    2. Returns proper response format (TextContent)
+    3. Handles API server unavailability gracefully
+    4. Response indicates command execution status
+
+    NOTE: This is a direct function call test, not MCP protocol testing.
+    Despite the previous name, this does NOT test "through MCP".
     """
     test_bundle = get_test_bundle_path()
 
-    # Initialize bundle first
+    # Initialize bundle first by calling function directly
     init_args = InitializeBundleArgs(source=str(test_bundle), force=True)
     init_result = await initialize_bundle(init_args)
 
     assert len(init_result) > 0, "Bundle initialization should succeed"
 
-    # Try a simple kubectl command (get pods)
+    # Try a simple kubectl command via direct function call
     kubectl_args = KubectlCommandArgs(command="get pods", timeout=10, json_output=True)
     kubectl_result = await kubectl(kubectl_args)
 
@@ -260,25 +285,28 @@ async def test_kubectl_through_mcp(bundle_storage_dir):
 
 
 @pytest.mark.asyncio
-async def test_read_file_through_mcp(bundle_storage_dir):
+async def test_read_file_function_execution(bundle_storage_dir):
     """
-    Test file reading via MCP.
+    Test read_file function execution (NOT via MCP protocol).
 
-    This test verifies:
-    1. Bundle can be initialized
-    2. Files can be read through MCP
-    3. Response format is correct
-    4. File content is returned with line numbers
+    This test verifies the function:
+    1. Can read files after bundle initialization
+    2. Returns proper response format (TextContent)
+    3. Handles missing files gracefully
+    4. Response contains file content or appropriate error message
+
+    NOTE: This is a direct function call test, not MCP protocol testing.
+    Despite the previous name, this does NOT test "through MCP".
     """
     test_bundle = get_test_bundle_path()
 
-    # Initialize bundle first
+    # Initialize bundle first by calling function directly
     init_args = InitializeBundleArgs(source=str(test_bundle), force=True)
     init_result = await initialize_bundle(init_args)
 
     assert len(init_result) > 0, "Bundle initialization should succeed"
 
-    # Try to read a common file that might exist
+    # Try to read a common file via direct function call
     read_args = ReadFileArgs(path="cluster-info/version.json", start_line=0, num_lines=10)
 
     try:
@@ -299,30 +327,33 @@ async def test_read_file_through_mcp(bundle_storage_dir):
         ), "Response should show file content or indicate file not found"
 
     except Exception as e:
-        # It's OK if the specific file doesn't exist, we're testing the MCP integration
+        # It's OK if the specific file doesn't exist, we're testing the function integration
         assert "not found" in str(e).lower() or "does not exist" in str(e).lower()
 
 
 @pytest.mark.asyncio
-async def test_grep_files_through_mcp(bundle_storage_dir):
+async def test_grep_files_function_execution(bundle_storage_dir):
     """
-    Test file searching via MCP.
+    Test grep_files function execution (NOT via MCP protocol).
 
-    This test verifies:
-    1. Bundle can be initialized
-    2. File searching can be performed through MCP
-    3. Response format is correct
-    4. Search results are returned
+    This test verifies the function:
+    1. Can search files after bundle initialization
+    2. Returns proper response format (TextContent)
+    3. Handles search patterns correctly
+    4. Response contains search results or appropriate messages
+
+    NOTE: This is a direct function call test, not MCP protocol testing.
+    Despite the previous name, this does NOT test "through MCP".
     """
     test_bundle = get_test_bundle_path()
 
-    # Initialize bundle first
+    # Initialize bundle first by calling function directly
     init_args = InitializeBundleArgs(source=str(test_bundle), force=True)
     init_result = await initialize_bundle(init_args)
 
     assert len(init_result) > 0, "Bundle initialization should succeed"
 
-    # Search for a common pattern that should exist in many bundles
+    # Search for common pattern via direct function call
     grep_args = GrepFilesArgs(
         pattern="version", path="/", file_pattern="*.json", case_sensitive=False, recursive=True
     )
@@ -346,13 +377,16 @@ async def test_grep_files_through_mcp(bundle_storage_dir):
 
 
 @pytest.mark.asyncio
-async def test_error_handling_file_operations(bundle_storage_dir):
+async def test_file_operation_error_handling(bundle_storage_dir):
     """
-    Test error handling for file operations through MCP.
+    Test error handling for file operation functions (NOT via MCP protocol).
 
-    This test verifies:
-    1. Proper error handling when bundle is not initialized
-    2. Error messages are informative
+    This test verifies the functions:
+    1. Handle missing bundle initialization gracefully
+    2. Return informative error messages in proper format
+    3. Don't crash when called without proper setup
+
+    NOTE: This is a direct function call test, not MCP protocol testing.
     """
     # Try file operations without initializing bundle first
 
