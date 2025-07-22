@@ -158,6 +158,7 @@ def test_container_bundle_initialization_isolated(container_image: str, temp_bun
 
         # Test that the MCP server can start and the bundle initialization logic works
         # We'll test the sbctl availability check specifically
+        # Need to override entrypoint to run python directly
         result = subprocess.run(
             [
                 runtime,
@@ -165,10 +166,12 @@ def test_container_bundle_initialization_isolated(container_image: str, temp_bun
                 "--name",
                 container_name,
                 "--rm",
+                "--entrypoint",
+                "",
                 "-v",
                 f"{test_bundle_dir}:/test-bundle",
                 container_image,
-                "python3",
+                "/usr/bin/python3",
                 "-c",
                 """
 import asyncio
