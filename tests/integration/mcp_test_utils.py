@@ -138,11 +138,20 @@ class MCPTestClient:
             self.process.stdin.write(request_json + "\n")
             self.process.stdin.flush()
 
-            # Read the response
+            # Read the response with timeout (async)
             if self.process.stdout is None:
                 raise RuntimeError("Server stdout is not available")
 
-            response_line = self.process.stdout.readline()
+            # Use asyncio to make the blocking readline() call async with timeout
+            loop = asyncio.get_event_loop()
+            try:
+                response_line = await asyncio.wait_for(
+                    loop.run_in_executor(None, self.process.stdout.readline),
+                    timeout=30.0,  # 30 second timeout for responses
+                )
+            except asyncio.TimeoutError:
+                raise RuntimeError("Timeout waiting for response from MCP server")
+
             if not response_line:
                 # Check if process terminated
                 returncode = self.process.poll()
