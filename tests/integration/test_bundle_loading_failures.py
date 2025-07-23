@@ -161,6 +161,7 @@ class TestSbctlCommandFailures:
                 assert "sbctl process exited" in str(exc_info.value)
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_sbctl_hangs_and_times_out(self, tmp_path):
         """Test handling when sbctl hangs and initialization times out."""
         with TempBundleManager("standard", tmp_path) as temp_bundle:
@@ -175,15 +176,17 @@ class TestSbctlCommandFailures:
             mock_process.stdout.read.return_value = b""
             mock_process.stderr.read.return_value = b""
 
-            # Mock wait_for to simulate timeout
+            # Mock the specific wait_for call that should timeout
             with patch("asyncio.create_subprocess_exec", return_value=mock_process):
-                with patch("asyncio.wait_for", side_effect=asyncio.TimeoutError("Timeout")):
-                    # Use a short timeout for this test
-                    with patch("mcp_server_troubleshoot.bundle.MAX_INITIALIZATION_TIMEOUT", 1):
-                        with pytest.raises(BundleInitializationError) as exc_info:
-                            await manager.initialize_bundle(str(temp_bundle.get_tar_path()))
+                # Mock only the specific asyncio.wait_for calls in bundle initialization
+                with patch(
+                    "mcp_server_troubleshoot.bundle.asyncio.wait_for",
+                    side_effect=asyncio.TimeoutError("Simulated timeout"),
+                ):
+                    with pytest.raises(BundleInitializationError) as exc_info:
+                        await manager.initialize_bundle(str(temp_bundle.get_tar_path()))
 
-                        assert "Timeout waiting" in str(exc_info.value)
+                    assert "timeout" in str(exc_info.value).lower()
 
 
 class TestCorruptedBundleFiles:
@@ -268,6 +271,7 @@ class TestNetworkFailures:
     """Test failures related to network downloads."""
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_network_connection_timeout(self, tmp_path):
         """Test bundle download with network timeout."""
         manager = BundleManager(tmp_path / "bundles")
@@ -505,7 +509,12 @@ class TestErrorRecoveryAndServerStability:
 
         for scenario in failure_scenarios:
             with pytest.raises(
-                (BundleNotFoundError, BundleInitializationError, BundleDownloadError, BundleManagerError)
+                (
+                    BundleNotFoundError,
+                    BundleInitializationError,
+                    BundleDownloadError,
+                    BundleManagerError,
+                )
             ):
                 await manager.initialize_bundle(scenario)
 

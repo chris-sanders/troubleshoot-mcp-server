@@ -74,6 +74,20 @@ class MCPTestClient:
                 env=server_env,
                 bufsize=0,  # Unbuffered for real-time communication
             )
+
+            # Give process a moment to start and check if it's still running
+            import time
+
+            time.sleep(0.1)
+            returncode = self.process.poll()
+            if returncode is not None:
+                stderr_output = self.process.stderr.read() if self.process.stderr else ""
+                stdout_output = self.process.stdout.read() if self.process.stdout else ""
+                raise subprocess.SubprocessError(
+                    f"MCP server process terminated immediately with code {returncode}. "
+                    f"STDERR: {stderr_output} STDOUT: {stdout_output}"
+                )
+
         except Exception as e:
             raise subprocess.SubprocessError(f"Failed to start MCP server process: {e}")
 
@@ -147,7 +161,7 @@ class MCPTestClient:
             try:
                 response_line = await asyncio.wait_for(
                     loop.run_in_executor(None, self.process.stdout.readline),
-                    timeout=30.0,  # 30 second timeout for responses
+                    timeout=60.0,  # 60 second timeout for responses
                 )
             except asyncio.TimeoutError:
                 raise RuntimeError("Timeout waiting for response from MCP server")

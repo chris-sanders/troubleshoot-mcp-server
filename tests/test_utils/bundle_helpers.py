@@ -154,6 +154,28 @@ def create_host_only_bundle_structure(base_dir: Path) -> Dict[str, Path]:
     return structure
 
 
+def create_mock_bundle(output_path: Path) -> Path:
+    """
+    Create a simple mock bundle file for testing.
+
+    Args:
+        output_path: Path where to create the mock bundle file
+
+    Returns:
+        Path to the created bundle file
+    """
+    import tempfile
+
+    # Create a temporary directory with basic bundle structure
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        bundle_structure = create_test_bundle_structure(temp_path)
+
+        # Create the tar.gz file from the bundle structure
+        support_bundle_dir = bundle_structure["support_bundle"]
+        return create_test_tar_bundle(support_bundle_dir.parent, output_path)
+
+
 def create_minimal_kubeconfig(
     kubeconfig_path: Path, api_server_url: str = "https://127.0.0.1:6443"
 ) -> Path:
