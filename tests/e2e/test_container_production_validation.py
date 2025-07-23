@@ -7,7 +7,6 @@ in production scenarios, independent of host system setup.
 
 import pytest
 import subprocess
-import tempfile
 import uuid
 from pathlib import Path
 from .utils import get_container_runtime
@@ -128,7 +127,9 @@ def test_container_has_required_tools_isolated(container_image: str):
             ), f"python3 --version output doesn't contain expected version text: {result.stdout}"
 
 
-def test_container_bundle_initialization_isolated(container_image: str, temp_bundles_directory):
+def test_container_bundle_initialization_isolated(
+    container_image: str, temp_bundles_directory, tmp_path: Path
+):
     """
     Test that bundle initialization works using only container tools.
 
@@ -141,39 +142,41 @@ def test_container_bundle_initialization_isolated(container_image: str, temp_bun
     container_name = f"bundle-init-test-{uuid.uuid4().hex[:8]}"
 
     # Create a minimal test bundle structure
-    test_bundle_dir = Path(tempfile.mkdtemp())
-    try:
-        # Create a simple test bundle with minimal cluster resource
-        cluster_resource = {
-            "apiVersion": "v1",
-            "kind": "Namespace",
-            "metadata": {"name": "test-namespace"},
-        }
+    test_bundle_dir = tmp_path / "test_bundle"
+    test_bundle_dir.mkdir()
+    # No manual cleanup needed - tmp_path handles it automatically
 
-        import json
+    # Create a simple test bundle with minimal cluster resource
+    cluster_resource = {
+        "apiVersion": "v1",
+        "kind": "Namespace",
+        "metadata": {"name": "test-namespace"},
+    }
 
-        resource_file = test_bundle_dir / "cluster-resources.json"
-        with open(resource_file, "w") as f:
-            json.dump(cluster_resource, f)
+    import json
 
-        # Test that the MCP server can start and the bundle initialization logic works
-        # We'll test the sbctl availability check specifically
-        # Need to override entrypoint to run python directly
-        result = subprocess.run(
-            [
-                runtime,
-                "run",
-                "--name",
-                container_name,
-                "--rm",
-                "--entrypoint",
-                "",
-                "-v",
-                f"{test_bundle_dir}:/test-bundle",
-                container_image,
-                "/usr/bin/python3",
-                "-c",
-                """
+    resource_file = test_bundle_dir / "cluster-resources.json"
+    with open(resource_file, "w") as f:
+        json.dump(cluster_resource, f)
+
+    # Test that the MCP server can start and the bundle initialization logic works
+    # We'll test the sbctl availability check specifically
+    # Need to override entrypoint to run python directly
+    result = subprocess.run(
+        [
+            runtime,
+            "run",
+            "--name",
+            container_name,
+            "--rm",
+            "--entrypoint",
+            "",
+            "-v",
+            f"{test_bundle_dir}:/test-bundle",
+            container_image,
+            "/usr/bin/python3",
+            "-c",
+            """
 import asyncio
 import sys
 sys.path.insert(0, '/usr/lib/python3.13/site-packages')
@@ -197,28 +200,22 @@ async def test_sbctl_check():
 
 asyncio.run(test_sbctl_check())
 """,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
 
-        assert result.returncode == 0, (
-            f"Container sbctl availability check failed. "
-            f"This indicates sbctl is not properly installed in the container. "
-            f"stdout: {result.stdout}, stderr: {result.stderr}"
-        )
+    assert result.returncode == 0, (
+        f"Container sbctl availability check failed. "
+        f"This indicates sbctl is not properly installed in the container. "
+        f"stdout: {result.stdout}, stderr: {result.stderr}"
+    )
 
-        assert "PASS: sbctl is available" in result.stdout, (
-            f"sbctl availability check didn't pass as expected. "
-            f"stdout: {result.stdout}, stderr: {result.stderr}"
-        )
-
-    finally:
-        # Clean up
-        import shutil
-
-        shutil.rmtree(test_bundle_dir, ignore_errors=True)
+    assert "PASS: sbctl is available" in result.stdout, (
+        f"sbctl availability check didn't pass as expected. "
+        f"stdout: {result.stdout}, stderr: {result.stderr}"
+    )
 
 
 def test_container_isolated_from_host_tools():

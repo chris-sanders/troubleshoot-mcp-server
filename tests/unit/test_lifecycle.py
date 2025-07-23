@@ -6,7 +6,6 @@ import asyncio
 import os
 import shutil
 import signal
-import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -22,12 +21,12 @@ from mcp_server_troubleshoot.lifecycle import (
 
 
 @pytest.fixture
-def temp_bundle_dir():
+def temp_bundle_dir(tmp_path: Path):
     """Create a temporary directory for test bundles."""
-    temp_dir = tempfile.mkdtemp()
-    yield Path(temp_dir)
-    # Clean up
-    shutil.rmtree(temp_dir, ignore_errors=True)
+    temp_dir = tmp_path / "bundles"
+    temp_dir.mkdir()
+    yield temp_dir
+    # No manual cleanup needed - tmp_path handles it automatically
 
 
 def test_create_temp_directory():
@@ -35,7 +34,7 @@ def test_create_temp_directory():
     temp_dir = create_temp_directory()
     assert os.path.exists(temp_dir)
     assert "mcp-troubleshoot" in temp_dir
-    # Clean up
+    # Clean up - manual cleanup needed since we're testing the production temp dir function
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 
