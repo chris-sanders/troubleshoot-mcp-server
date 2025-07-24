@@ -93,7 +93,7 @@ def test_container_build_never_uses_cached_configs(temp_project_dir):
         # Verify the error is related to the path issue we introduced or signing key issue
         error_output = build_result.stderr + build_result.stdout
         assert (
-            "/invalid/path" in error_output 
+            "/invalid/path" in error_output
             or "No such file" in error_output
             or "no such file or directory" in error_output
             or "stat test-key" in error_output
