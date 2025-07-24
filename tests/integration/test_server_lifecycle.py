@@ -313,7 +313,6 @@ class TestBundleManagementBasics:
         for bundle_name in bundles_created:
             assert bundle_name in discovered_names
 
-
     @pytest.mark.asyncio
     async def test_concurrent_bundle_operations(self, tmp_path: Path):
         """Test server handles concurrent bundle operations safely."""
