@@ -5,6 +5,7 @@ These tests validate that the actual built container images work correctly
 in production scenarios, independent of host system setup.
 """
 
+import os
 import pytest
 import subprocess
 import uuid
