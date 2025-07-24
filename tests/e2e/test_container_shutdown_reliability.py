@@ -71,19 +71,23 @@ def run_server_as_subprocess(
             process.send_signal(signal_to_send)
         elif stdin_input and signal_to_send:
             # If both stdin and signal, handle carefully
+            # Write input but don't close stdin immediately
             process.stdin.write(stdin_input)
             process.stdin.flush()
-            # Don't close stdin yet to avoid the I/O error
+            # Wait before sending signal
             time.sleep(signal_delay)
+            # Send signal while stdin might still be open
             process.send_signal(signal_to_send)
-            # Now close stdin
-            process.stdin.close()
         elif stdin_input:
             # Just stdin input
             process.stdin.write(stdin_input)
             process.stdin.close()
 
         # Wait for process to complete
+        # Close stdin if it's still open before communicate
+        if process.stdin and not process.stdin.closed:
+            process.stdin.close()
+        
         stdout, stderr = process.communicate(timeout=timeout)
         return_code = process.returncode
 
