@@ -151,7 +151,10 @@ class TestSignalHandling:
             pytest.fail("Process timed out, likely the signal handler did not properly exit")
 
         # Should exit cleanly with code 0 or -15 (SIGTERM on Linux)
-        assert return_code in (0, -15), f"Expected exit code 0 or -15, got {return_code}\nstderr: {stderr}"
+        assert return_code in (
+            0,
+            -15,
+        ), f"Expected exit code 0 or -15, got {return_code}\nstderr: {stderr}"
 
         # Should not have Python runtime errors
         assert "Fatal Python error" not in stderr
