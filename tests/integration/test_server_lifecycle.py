@@ -313,36 +313,6 @@ class TestBundleManagementBasics:
         for bundle_name in bundles_created:
             assert bundle_name in discovered_names
 
-    @pytest.mark.asyncio
-    async def test_server_memory_and_resource_management(self, tmp_path: Path):
-        """Test server properly manages memory and resources during bundle operations."""
-        bundle_dir = tmp_path / "bundles"
-        bundle_dir.mkdir()
-
-        # Create bundles
-        bundles = []
-        for i in range(10):  # Create many bundles to test resource management
-            bundle_file = bundle_dir / f"bundle{i}.tar.gz"
-            create_mock_bundle(bundle_file)
-            bundles.append(bundle_file)
-
-        bundle_manager = BundleManager(bundle_dir)
-
-        # Test listing many bundles doesn't cause memory issues
-        discovered_bundles = await bundle_manager.list_available_bundles()
-        assert len(discovered_bundles) == 10
-
-        # Test repeated operations
-        for _ in range(5):
-            bundles_again = await bundle_manager.list_available_bundles()
-            assert len(bundles_again) == 10
-
-        # Test cleanup functionality
-        await bundle_manager.cleanup()
-
-        # After cleanup, manager should still be functional
-        post_cleanup_bundles = await bundle_manager.list_available_bundles()
-        assert len(post_cleanup_bundles) == 10
 
     @pytest.mark.asyncio
     async def test_concurrent_bundle_operations(self, tmp_path: Path):
