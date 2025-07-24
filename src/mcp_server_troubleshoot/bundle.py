@@ -1659,7 +1659,7 @@ class BundleManager:
             try:
                 # Try non-blocking read from process stdout with proper transport cleanup
                 from .subprocess_utils import pipe_transport_reader
-                
+
                 try:
                     async with pipe_transport_reader(self.sbctl_process.stdout) as stdout_reader:
                         # Set a timeout for reading
@@ -1744,13 +1744,17 @@ class BundleManager:
                 for endpoint in endpoints:
                     url = f"http://{host}:{port}{endpoint}"
                     logger.debug(f"Checking API server with backup aiohttp check: {url}")
-                    
+
                     try:
                         async with session.get(url) as response:
-                            logger.debug(f"Backup aiohttp check to {url} returned status code: {response.status}")
-                            
+                            logger.debug(
+                                f"Backup aiohttp check to {url} returned status code: {response.status}"
+                            )
+
                             if response.status == 200:
-                                logger.info(f"API server is available at {url} (backup aiohttp check)")
+                                logger.info(
+                                    f"API server is available at {url} (backup aiohttp check)"
+                                )
                                 return True
                     except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                         logger.warning(f"Backup aiohttp check failed for {url}: {e}")
@@ -1806,7 +1810,7 @@ class BundleManager:
 
         try:
             from .subprocess_utils import subprocess_exec_with_cleanup
-            
+
             returncode, stdout, stderr = await subprocess_exec_with_cleanup(
                 "sbctl", "--help", timeout=10.0
             )
@@ -1862,7 +1866,7 @@ class BundleManager:
             # Check network connections on the port
             try:
                 from .subprocess_utils import subprocess_exec_with_cleanup
-                
+
                 returncode, stdout, stderr = await subprocess_exec_with_cleanup(
                     "netstat", "-tuln", timeout=5.0
                 )
@@ -1888,7 +1892,7 @@ class BundleManager:
                 async with aiohttp.ClientSession(timeout=timeout) as session:
                     async with session.get(url) as response:
                         info[f"http_{port}_status_code"] = str(response.status)
-                        
+
                         # Get response body for diagnostics if available
                         try:
                             body = await asyncio.wait_for(response.text(), timeout=1.0)

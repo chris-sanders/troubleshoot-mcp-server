@@ -204,7 +204,7 @@ class KubectlExecutor:
 
             # Run the command with proper cleanup
             from .subprocess_utils import subprocess_exec_with_cleanup
-            
+
             try:
                 returncode, stdout, stderr = await subprocess_exec_with_cleanup(
                     *cmd, timeout=timeout, env=env
@@ -225,9 +225,7 @@ class KubectlExecutor:
             stderr_str = stderr.decode("utf-8")
 
             # Process the output
-            output, is_json = self._process_output(
-                stdout_str, returncode == 0 and json_output
-            )
+            output, is_json = self._process_output(stdout_str, returncode == 0 and json_output)
 
             # Create the result
             result = KubectlResult(
@@ -244,9 +242,7 @@ class KubectlExecutor:
             if returncode == 0:
                 logger.info(f"kubectl command completed successfully in {duration_ms}ms")
             else:
-                logger.error(
-                    f"kubectl command failed with exit code {returncode}: {stderr_str}"
-                )
+                logger.error(f"kubectl command failed with exit code {returncode}: {stderr_str}")
                 raise KubectlError("kubectl command failed", returncode, stderr_str)
 
             return result

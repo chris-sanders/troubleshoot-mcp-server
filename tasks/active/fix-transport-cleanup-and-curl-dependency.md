@@ -1,11 +1,13 @@
 # Fix AsyncIO Transport Cleanup and Curl Dependency Issues
 
 ## Task Metadata
-- **Status**: backlog
+- **Status**: active
 - **Priority**: high
 - **Estimated Effort**: 8-12 hours
 - **Dependencies**: None
 - **Labels**: bug, testing, subprocess, asyncio
+- **Started**: 2025-07-24
+- **Progress**: Task started, worktree created, beginning parallel sub-agent approach
 
 ## Problem Statement
 
