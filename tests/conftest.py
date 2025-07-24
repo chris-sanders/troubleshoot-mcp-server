@@ -221,7 +221,7 @@ def container_image(request):
     # Skip if Podman is not available
     if not is_container_runtime_available():
         pytest.skip("Podman is not available")
-    
+
     # Skip container builds in CI due to melange/apko limitations
     # Container builds are validated in the publish workflow
     if os.environ.get("CI") == "true":

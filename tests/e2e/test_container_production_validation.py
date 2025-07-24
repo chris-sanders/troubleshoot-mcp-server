@@ -259,7 +259,7 @@ def test_production_container_mcp_protocol():
     runtime, available = get_container_runtime()
     if not available:
         pytest.skip(f"Container runtime {runtime} not available")
-    
+
     # Skip in CI due to container build requirements
     # The publish workflow validates container functionality
     if os.environ.get("CI") == "true":
