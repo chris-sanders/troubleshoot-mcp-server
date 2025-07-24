@@ -1363,6 +1363,7 @@ class BundleManager:
                     # As a fallback, try to clean up any sbctl processes related to serve
                     try:
                         import subprocess
+
                         kill_cmd = ["pkill", "-f", "sbctl serve"]
                         result = subprocess.run(kill_cmd, capture_output=True, text=True)
                         if result.returncode == 0:
