@@ -1,10 +1,11 @@
 # Fix Container Shutdown Race Condition
 
-**Status**: ready  
+**Status**: active  
 **Priority**: high  
 **Complexity**: medium  
 **Component**: lifecycle  
 **Created**: 2025-07-24  
+**Started**: 2025-07-24  
 
 ## Problem Statement
 
