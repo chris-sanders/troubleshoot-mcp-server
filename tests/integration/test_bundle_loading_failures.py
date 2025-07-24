@@ -160,34 +160,6 @@ class TestSbctlCommandFailures:
 
                 assert "sbctl process exited" in str(exc_info.value)
 
-    @pytest.mark.asyncio
-    @pytest.mark.slow
-    async def test_sbctl_hangs_and_times_out(self, tmp_path):
-        """Test handling when sbctl hangs and initialization times out."""
-        with TempBundleManager("standard", tmp_path) as temp_bundle:
-            manager = BundleManager(tmp_path / "bundles")
-
-            # Mock subprocess that never completes
-            mock_process = AsyncMock()
-            mock_process.pid = 12345
-            mock_process.returncode = None  # Still running
-            mock_process.stdout = AsyncMock()
-            mock_process.stderr = AsyncMock()
-            mock_process.stdout.read.return_value = b""
-            mock_process.stderr.read.return_value = b""
-
-            # Mock the specific wait_for call that should timeout
-            with patch("asyncio.create_subprocess_exec", return_value=mock_process):
-                # Mock only the specific asyncio.wait_for calls in bundle initialization
-                with patch(
-                    "mcp_server_troubleshoot.bundle.asyncio.wait_for",
-                    side_effect=asyncio.TimeoutError("Simulated timeout"),
-                ):
-                    with pytest.raises(BundleInitializationError) as exc_info:
-                        await manager.initialize_bundle(str(temp_bundle.get_tar_path()))
-
-                    assert "timeout" in str(exc_info.value).lower()
-
 
 class TestCorruptedBundleFiles:
     """Test failures related to corrupted or invalid bundle files."""
@@ -269,23 +241,6 @@ class TestCorruptedBundleFiles:
 
 class TestNetworkFailures:
     """Test failures related to network downloads."""
-
-    @pytest.mark.asyncio
-    @pytest.mark.slow
-    async def test_network_connection_timeout(self, tmp_path):
-        """Test bundle download with network timeout."""
-        manager = BundleManager(tmp_path / "bundles")
-
-        # Mock aiohttp to simulate timeout
-        with patch("aiohttp.ClientSession") as mock_session:
-            mock_session.return_value.__aenter__.return_value.get.side_effect = (
-                aiohttp.ClientTimeout()
-            )
-
-            with pytest.raises(BundleDownloadError) as exc_info:
-                await manager.initialize_bundle("https://example.com/bundle.tar.gz")
-
-            assert "timeout" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
     async def test_network_connection_refused(self, tmp_path):

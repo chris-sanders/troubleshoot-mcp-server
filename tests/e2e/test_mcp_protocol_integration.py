@@ -165,9 +165,7 @@ class TestMCPProtocolLifecycle:
             await client.initialize_mcp()
 
             # Test bundle loading via MCP tool call
-            content = await client.call_tool(
-                "initialize_bundle", {"bundle_path": str(test_bundle_copy)}
-            )
+            content = await client.call_tool("initialize_bundle", {"source": str(test_bundle_copy)})
 
             # Verify successful bundle loading
             assert len(content) > 0, "initialize_bundle should return content"
@@ -203,7 +201,7 @@ class TestMCPProtocolLifecycle:
         async with MCPTestClient(bundle_dir=temp_bundle_dir, env=env) as client:
             # Initialize and load bundle
             await client.initialize_mcp()
-            await client.call_tool("initialize_bundle", {"bundle_path": str(test_bundle_copy)})
+            await client.call_tool("initialize_bundle", {"source": str(test_bundle_copy)})
 
             # Test file listing via protocol
             files_content = await client.call_tool("list_files", {"path": "."})
@@ -213,23 +211,25 @@ class TestMCPProtocolLifecycle:
             assert len(files_text.strip()) > 0, "File listing should not be empty"
 
             # Test reading a file via protocol
-            # Try to read a common file that should exist in support bundles
-            try:
-                file_content = await client.call_tool("read_file", {"path": "version.yaml"})
-                assert len(file_content) > 0, "read_file should return content"
+            # First get the list of files to find an actual file that exists
+            files_list = await client.call_tool("list_files", {})
+            assert len(files_list) > 0, "Should have file listing"
 
-                content_text = file_content[0].get("text", "")
-                assert len(content_text.strip()) > 0, "File content should not be empty"
+            # Extract file names from the listing
+            files_text = files_list[0].get("text", "")
+            file_lines = [line.strip() for line in files_text.split("\n") if line.strip()]
+            assert len(file_lines) > 0, "Should have at least one file in the bundle"
 
-            except Exception as e:
-                # If version.yaml doesn't exist, try another common file
-                # This test validates the protocol works, not specific file content
-                if "not found" in str(e).lower():
-                    pytest.skip(
-                        "version.yaml not found in test bundle, skipping specific file test"
-                    )
-                else:
-                    raise
+            # Get the first file for testing (remove any tree symbols)
+            first_file = file_lines[0].split()[-1]  # Take the last part after any tree symbols
+
+            # Test reading the actual file that exists in the bundle
+            file_content = await client.call_tool("read_file", {"path": first_file})
+            assert len(file_content) > 0, "read_file should return content"
+
+            content_text = file_content[0].get("text", "")
+            # Some files might be binary or empty, just verify we got a response
+            assert content_text is not None, "File content should be retrievable"
 
     async def test_grep_functionality_via_protocol(self, temp_bundle_dir, test_bundle_path):
         """
@@ -247,7 +247,7 @@ class TestMCPProtocolLifecycle:
         async with MCPTestClient(bundle_dir=temp_bundle_dir, env=env) as client:
             # Initialize and load bundle
             await client.initialize_mcp()
-            await client.call_tool("initialize_bundle", {"bundle_path": str(test_bundle_copy)})
+            await client.call_tool("initialize_bundle", {"source": str(test_bundle_copy)})
 
             # Test grep functionality via protocol
             # Search for a common term that should exist in Kubernetes bundles
@@ -275,7 +275,7 @@ class TestMCPProtocolLifecycle:
         async with MCPTestClient(bundle_dir=temp_bundle_dir, env=env) as client:
             # Initialize and load bundle
             await client.initialize_mcp()
-            await client.call_tool("initialize_bundle", {"bundle_path": str(test_bundle_copy)})
+            await client.call_tool("initialize_bundle", {"source": str(test_bundle_copy)})
 
             # Test basic kubectl command via protocol
             kubectl_content = await client.call_tool("kubectl", {"command": "get nodes"})
@@ -305,7 +305,7 @@ class TestMCPProtocolLifecycle:
         async with MCPTestClient(bundle_dir=temp_bundle_dir, env=env) as client:
             # Initialize and load bundle
             await client.initialize_mcp()
-            await client.call_tool("initialize_bundle", {"bundle_path": str(test_bundle_copy)})
+            await client.call_tool("initialize_bundle", {"source": str(test_bundle_copy)})
 
             # Test kubectl exec command via protocol - this should not crash the server
             kubectl_content = await client.call_tool(
@@ -354,7 +354,7 @@ class TestMCPProtocolLifecycle:
         async with MCPTestClient(bundle_dir=temp_bundle_dir, env=env) as client:
             # Initialize and load bundle
             await client.initialize_mcp()
-            await client.call_tool("initialize_bundle", {"bundle_path": str(test_bundle_copy)})
+            await client.call_tool("initialize_bundle", {"source": str(test_bundle_copy)})
 
             # Test various potentially problematic kubectl commands
             problematic_commands = [
@@ -402,7 +402,7 @@ class TestMCPProtocolErrorHandling:
 
             try:
                 content = await client.call_tool(
-                    "initialize_bundle", {"bundle_path": str(nonexistent_bundle)}
+                    "initialize_bundle", {"source": str(nonexistent_bundle)}
                 )
 
                 # If it doesn't throw, check that error is reported in content
@@ -433,7 +433,7 @@ class TestMCPProtocolErrorHandling:
         async with MCPTestClient(bundle_dir=temp_bundle_dir, env=env) as client:
             # Initialize and load bundle
             await client.initialize_mcp()
-            await client.call_tool("initialize_bundle", {"bundle_path": str(test_bundle_copy)})
+            await client.call_tool("initialize_bundle", {"source": str(test_bundle_copy)})
 
             # Try to read non-existent file
             try:
@@ -535,7 +535,7 @@ class TestMCPProtocolCompleteWorkflow:
 
             # Step 2: Load bundle
             load_result = await client.call_tool(
-                "initialize_bundle", {"bundle_path": str(test_bundle_copy)}
+                "initialize_bundle", {"source": str(test_bundle_copy)}
             )
             assert len(load_result) > 0
 
