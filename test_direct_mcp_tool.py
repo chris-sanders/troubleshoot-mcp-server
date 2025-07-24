@@ -42,18 +42,18 @@ async def test_direct_mcp_tool():
         os.environ["SBCTL_TOKEN"] = "test-token-12345"
         os.environ["MCP_BUNDLE_STORAGE"] = str(temp_bundle_dir)
 
-        print(f"\n=== Testing MCP tool call directly ===")
+        print("\n=== Testing MCP tool call directly ===")
 
         try:
             import time
 
             start_time = time.time()
 
-            print(f"Creating InitializeBundleArgs...")
+            print("Creating InitializeBundleArgs...")
             args = InitializeBundleArgs(source=str(test_bundle_copy))
             print(f"Args: source={args.source}, force={args.force}")
 
-            print(f"Calling initialize_bundle tool...")
+            print("Calling initialize_bundle tool...")
 
             # Call the MCP tool directly
             result = await asyncio.wait_for(

@@ -126,7 +126,7 @@ class TestDirectToolIntegration:
         # If not found, it might be a valid case where the bundle isn't recognized
         if bundle_name not in bundles_text and "No support bundles found" in bundles_text:
             # This is acceptable - bundle might need to be in a specific format
-            print(f"Bundle not automatically detected, this is expected for test bundles")
+            print("Bundle not automatically detected, this is expected for test bundles")
             assert (
                 "support bundles" in bundles_text.lower()
             ), f"Should mention bundles: {bundles_text}"

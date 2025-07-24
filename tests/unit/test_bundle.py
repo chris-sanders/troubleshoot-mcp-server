@@ -618,6 +618,7 @@ async def test_bundle_manager_initialize_with_sbctl():
                 self.killed = True
 
             async def wait(self):
+                self.returncode = 0
                 return 0
 
         class MockStreamReader:

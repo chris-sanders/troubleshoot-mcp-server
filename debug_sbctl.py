@@ -36,7 +36,7 @@ async def debug_sbctl():
 
         try:
             # Test 1: Check if sbctl can read the bundle
-            print(f"\n=== Test 1: Running sbctl with --help ===")
+            print("\n=== Test 1: Running sbctl with --help ===")
             process = await asyncio.create_subprocess_exec(
                 "sbctl", "--help", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
@@ -47,7 +47,7 @@ async def debug_sbctl():
             if stderr:
                 print(f"STDERR: {stderr.decode()}")
 
-            print(f"\n=== Test 2: Running sbctl serve with test bundle (long wait) ===")
+            print("\n=== Test 2: Running sbctl serve with test bundle (long wait) ===")
 
             # Set up environment
             env = os.environ.copy()
@@ -107,7 +107,7 @@ async def debug_sbctl():
                     stdout_data = await asyncio.wait_for(process.stdout.read(), timeout=1.0)
                     if stdout_data:
                         print(f"STDOUT: {stdout_data.decode()}")
-            except:
+            except asyncio.TimeoutError:
                 pass
 
             try:
@@ -115,7 +115,7 @@ async def debug_sbctl():
                     stderr_data = await asyncio.wait_for(process.stderr.read(), timeout=1.0)
                     if stderr_data:
                         print(f"STDERR: {stderr_data.decode()}")
-            except:
+            except asyncio.TimeoutError:
                 pass
 
             # Check what files were created

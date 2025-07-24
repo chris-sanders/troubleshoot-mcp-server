@@ -91,7 +91,7 @@ async def debug_mcp_server():
             try:
                 process.terminate()
                 await asyncio.wait_for(process.wait(), timeout=3.0)
-            except:
+            except asyncio.TimeoutError:
                 process.kill()
                 await process.wait()
             print("✅ Process terminated")

@@ -7,7 +7,6 @@ import asyncio
 import tempfile
 from pathlib import Path
 import sys
-import os
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))

@@ -79,7 +79,7 @@ async def test_production_server():
                 if response_line:
                     try:
                         response_data = json.loads(response_line)
-                        print(f"✅ Valid JSON response received")
+                        print("✅ Valid JSON response received")
                         print(
                             f"Server info: {response_data.get('result', {}).get('serverInfo', {})}"
                         )

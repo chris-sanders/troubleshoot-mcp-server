@@ -5,7 +5,6 @@ Test bundle loading via MCP protocol to debug the timeout.
 
 import asyncio
 import tempfile
-import json
 from pathlib import Path
 import sys
 
@@ -47,8 +46,8 @@ async def test_bundle_loading():
             print("✅ Server started successfully")
 
             print("\n=== Step 2: MCP Initialization ===")
-            init_response = await client.initialize_mcp()
-            print(f"✅ MCP initialized")
+            await client.initialize_mcp()
+            print("✅ MCP initialized")
 
             print("\n=== Step 3: Testing initialize_bundle tool (with timeout tracking) ===")
             print(f"Calling initialize_bundle with path: {test_bundle_copy}")

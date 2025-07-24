@@ -43,14 +43,14 @@ async def test_direct_bundle_manager():
         # Create bundle manager
         bundle_manager = BundleManager(temp_bundle_dir)
 
-        print(f"\n=== Testing bundle initialization directly ===")
+        print("\n=== Testing bundle initialization directly ===")
 
         try:
             import time
 
             start_time = time.time()
 
-            print(f"Starting bundle initialization...")
+            print("Starting bundle initialization...")
 
             # This should either succeed or fail quickly with our fix
             result = await asyncio.wait_for(
@@ -91,7 +91,7 @@ async def test_direct_bundle_manager():
                 print(f"Failed to get diagnostics: {diag_err}")
 
         finally:
-            print(f"\n=== Cleanup ===")
+            print("\n=== Cleanup ===")
             try:
                 await bundle_manager.cleanup()
                 print("✅ Cleanup completed")

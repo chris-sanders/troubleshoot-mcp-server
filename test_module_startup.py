@@ -77,8 +77,8 @@ async def test_module_startup():
 
                 if response_line:
                     try:
-                        response_data = json.loads(response_line)
-                        print(f"✅ Valid JSON response received")
+                        json.loads(response_line)
+                        print("✅ Valid JSON response received")
                     except json.JSONDecodeError:
                         print(f"❌ Invalid JSON: {response_line}")
 

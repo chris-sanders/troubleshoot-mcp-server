@@ -111,7 +111,7 @@ async def test_initialize_bundle_tool():
                     if response_line:
                         try:
                             response_data = json.loads(response_line)
-                            print(f"✅ Valid JSON tool response received")
+                            print("✅ Valid JSON tool response received")
                             if "result" in response_data:
                                 print(f"Tool result: {response_data['result']}")
                             elif "error" in response_data:

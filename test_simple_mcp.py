@@ -62,7 +62,7 @@ async def test_simple_mcp():
                 try:
                     response = json.loads(response_line)
                     print(f"Parsed: {response}")
-                except:
+                except json.JSONDecodeError:
                     print("Not valid JSON, but got some response")
         except asyncio.TimeoutError:
             print("❌ No response at all")
@@ -79,7 +79,7 @@ async def test_simple_mcp():
                 stderr_data = await asyncio.wait_for(process.stderr.read(1024), timeout=1.0)
                 if stderr_data:
                     print(f"STDERR: {stderr_data.decode()}")
-            except:
+            except asyncio.TimeoutError:
                 pass
 
     finally:
@@ -87,7 +87,7 @@ async def test_simple_mcp():
         try:
             process.terminate()
             await asyncio.wait_for(process.wait(), timeout=2.0)
-        except:
+        except asyncio.TimeoutError:
             process.kill()
             await process.wait()
         print("Process terminated")

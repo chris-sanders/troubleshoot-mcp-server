@@ -5,7 +5,6 @@ Test sbctl behavior directly to understand bundle initialization issue.
 
 import asyncio
 import tempfile
-import os
 from pathlib import Path
 import sys
 
@@ -33,7 +32,7 @@ async def test_sbctl_direct():
         bundle_manager = BundleManager(temp_bundle_dir)
 
         # Test the bundle initialization
-        print(f"\n=== Testing bundle initialization ===")
+        print("\n=== Testing bundle initialization ===")
 
         try:
             # Test with reduced timeout to see what happens
@@ -47,7 +46,7 @@ async def test_sbctl_direct():
             # This should either succeed or fail quickly
             result = await bundle_manager.initialize_bundle(str(test_bundle_path))
 
-            print(f"✅ Bundle initialization succeeded!")
+            print("✅ Bundle initialization succeeded!")
             print(f"Bundle ID: {result.id}")
             print(f"Bundle path: {result.path}")
             print(f"Kubeconfig path: {result.kubeconfig_path}")
@@ -59,7 +58,7 @@ async def test_sbctl_direct():
             print(f"Exception type: {type(e)}")
 
             # Check if there are any alternative kubeconfig files created
-            print(f"\n=== Checking for alternative kubeconfig files ===")
+            print("\n=== Checking for alternative kubeconfig files ===")
 
             # Check common locations where sbctl might create kubeconfig
             temp_locations = [
@@ -90,7 +89,7 @@ async def test_sbctl_direct():
 
         finally:
             # Cleanup
-            print(f"\n=== Cleanup ===")
+            print("\n=== Cleanup ===")
             try:
                 await bundle_manager._cleanup_active_bundle()
                 print("✅ Cleanup completed")

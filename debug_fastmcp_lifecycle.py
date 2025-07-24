@@ -6,7 +6,14 @@ Debug FastMCP lifecycle to find where initialization hangs.
 import asyncio
 import logging
 import sys
+import tempfile
+import os
+import json
 from pathlib import Path
+from contextlib import asynccontextmanager
+
+from mcp.server.fastmcp import FastMCP
+from mcp.types import TextContent
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -22,14 +29,6 @@ logging.basicConfig(
 logging.getLogger("mcp").setLevel(logging.DEBUG)
 logging.getLogger("fastmcp").setLevel(logging.DEBUG)
 logging.getLogger("anyio").setLevel(logging.DEBUG)
-
-from mcp.server.fastmcp import FastMCP
-from mcp.types import TextContent
-import tempfile
-import os
-
-
-from contextlib import asynccontextmanager
 
 
 @asynccontextmanager
@@ -132,8 +131,6 @@ debug_mcp.run()
             "clientInfo": {"name": "debug", "version": "1.0.0"},
         },
     }
-
-    import json
 
     request_json = json.dumps(request)
     print(f"🔍 DEBUG: Sending request: {request_json}")
