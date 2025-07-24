@@ -2,11 +2,10 @@
 Integration test to reproduce the container shutdown race condition.
 
 This test simulates the exact error encountered during container shutdown:
-"Fatal Python error: _enter_buffered_busy: could not acquire lock for <_io.BufferedReader name='<stdin>'> 
+"Fatal Python error: _enter_buffered_busy: could not acquire lock for <_io.BufferedReader name='<stdin>'>
 at interpreter shutdown, possibly due to daemon threads"
 """
 
-import asyncio
 import os
 import signal
 import subprocess
@@ -19,12 +18,12 @@ import pytest
 
 
 @pytest.mark.integration
-def test_reproduce_shutdown_race_condition():
+def test_shutdown_race_condition_fixed():
     """
-    Reproduce the race condition that occurs during container shutdown.
-    
-    This test should initially FAIL by producing the Python runtime error,
-    proving that the issue exists before we fix it.
+    Verify that the race condition during container shutdown has been fixed.
+
+    This test verifies that the signal handler no longer causes Python runtime
+    errors during shutdown.
     """
     # Create a test script that simulates the server with active logging during shutdown
     test_script = '''
@@ -85,61 +84,61 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
 '''
-    
+
     # Write the test script to a temporary file
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(test_script)
         test_script_path = f.name
-    
+
     try:
         # Start the subprocess
         env = os.environ.copy()
-        env['PYTHONUNBUFFERED'] = '1'  # Ensure we see all output
-        
+        env["PYTHONUNBUFFERED"] = "1"  # Ensure we see all output
+
         process = subprocess.Popen(
             [sys.executable, test_script_path],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            env=env
+            env=env,
         )
-        
+
         # Give the server time to start and begin logging
         time.sleep(0.5)
-        
+
         # Send SIGTERM to trigger the race condition
         process.send_signal(signal.SIGTERM)
-        
+
         # Wait for the process to exit
         stdout, stderr = process.communicate(timeout=5)
-        
+
         # Check for the race condition error in stderr
         race_condition_indicators = [
             "Fatal Python error",
             "_enter_buffered_busy",
             "could not acquire lock",
             "interpreter shutdown",
-            "daemon threads"
+            "daemon threads",
         ]
-        
+
         # The test "passes" if it reproduces the race condition
         # (which means the bug exists and needs to be fixed)
         race_condition_found = any(indicator in stderr for indicator in race_condition_indicators)
-        
+
+        # The test now verifies that the race condition is FIXED
         if race_condition_found:
-            # This is expected behavior before the fix
-            print("Successfully reproduced the race condition!")
-            print(f"stderr output:\n{stderr}")
-            assert True, "Race condition reproduced as expected"
-        else:
-            # If we don't see the race condition, the test should fail
-            # because we expect to reproduce it before fixing
+            # If we see the race condition, the fix didn't work
             pytest.fail(
-                f"Failed to reproduce the race condition. This might mean it's already fixed.\n"
-                f"stdout: {stdout}\n"
-                f"stderr: {stderr}"
+                f"Race condition still present! Fix didn't work.\n"
+                f"stderr output:\n{stderr}"
             )
-            
+        else:
+            # Good! No race condition detected
+            print("No race condition detected - fix is working!")
+            # Verify clean shutdown occurred
+            assert "Received signal" in stderr or "shutdown" in stderr.lower()
+            assert process.returncode in (0, -15, 143)  # Clean exit codes
+
     finally:
         # Clean up the temporary file
         Path(test_script_path).unlink(missing_ok=True)
@@ -149,7 +148,7 @@ if __name__ == "__main__":
 def test_multiple_shutdown_attempts():
     """
     Test multiple rapid shutdown signals to increase chance of race condition.
-    
+
     This test sends multiple signals in quick succession to stress test
     the shutdown mechanism.
     """
@@ -205,33 +204,33 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 '''
-    
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(test_script)
         test_script_path = f.name
-    
+
     try:
         env = os.environ.copy()
-        env['PYTHONUNBUFFERED'] = '1'
-        
+        env["PYTHONUNBUFFERED"] = "1"
+
         process = subprocess.Popen(
             [sys.executable, test_script_path],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            env=env
+            env=env,
         )
-        
+
         # Let it start
         time.sleep(0.3)
-        
+
         # Send multiple signals rapidly
         for _ in range(3):
             process.send_signal(signal.SIGTERM)
             time.sleep(0.1)
-        
+
         stdout, stderr = process.communicate(timeout=5)
-        
+
         # Check for race condition indicators
         if "Fatal Python error" in stderr or "_enter_buffered_busy" in stderr:
             print("Race condition reproduced with multiple signals!")
@@ -239,10 +238,10 @@ if __name__ == "__main__":
             assert True
         else:
             # Log the output for debugging
-            print(f"No race condition detected")
+            print("No race condition detected")
             print(f"stdout: {stdout}")
             print(f"stderr: {stderr}")
             # Don't fail - race conditions are non-deterministic
-            
+
     finally:
         Path(test_script_path).unlink(missing_ok=True)

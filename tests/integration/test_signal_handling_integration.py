@@ -5,7 +5,6 @@ These tests verify that the server handles various signals correctly
 without race conditions or crashes during shutdown.
 """
 
-import asyncio
 import os
 import signal
 import subprocess
@@ -13,7 +12,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Tuple
 
 import pytest
 
@@ -21,14 +20,14 @@ import pytest
 def create_test_server_script(signal_delay: float = 0.1) -> str:
     """
     Create a test server script that simulates the real server behavior.
-    
+
     Args:
         signal_delay: Delay in signal handler to simulate work
-        
+
     Returns:
         Python script as a string
     """
-    return f'''
+    return '''
 import asyncio
 import logging
 import signal
@@ -81,50 +80,47 @@ if __name__ == "__main__":
 
 
 def run_server_with_signal(
-    script_content: str,
-    signal_to_send: int,
-    delay_before_signal: float = 0.5,
-    timeout: float = 5.0
+    script_content: str, signal_to_send: int, delay_before_signal: float = 0.5, timeout: float = 5.0
 ) -> Tuple[int, str, str]:
     """
     Run a server script and send it a signal.
-    
+
     Args:
         script_content: The Python script to run
         signal_to_send: Signal number to send (e.g., signal.SIGTERM)
         delay_before_signal: Time to wait before sending signal
         timeout: Maximum time to wait for process to exit
-        
+
     Returns:
         Tuple of (return_code, stdout, stderr)
     """
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(script_content)
         script_path = f.name
-    
+
     try:
         # Get the project root directory
         project_root = Path(__file__).parent.parent.parent
-        
+
         env = os.environ.copy()
-        env['PYTHONUNBUFFERED'] = '1'
-        env['PYTHONPATH'] = str(project_root)
-        
+        env["PYTHONUNBUFFERED"] = "1"
+        env["PYTHONPATH"] = str(project_root)
+
         process = subprocess.Popen(
             [sys.executable, script_path],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             env=env,
-            cwd=str(project_root)
+            cwd=str(project_root),
         )
-        
+
         # Give the server time to start
         time.sleep(delay_before_signal)
-        
+
         # Send the signal
         process.send_signal(signal_to_send)
-        
+
         # Wait for the process to exit
         try:
             stdout, stderr = process.communicate(timeout=timeout)
@@ -133,9 +129,9 @@ def run_server_with_signal(
             process.kill()
             stdout, stderr = process.communicate()
             return_code = -1
-            
+
         return return_code, stdout, stderr
-        
+
     finally:
         Path(script_path).unlink(missing_ok=True)
 
@@ -143,41 +139,41 @@ def run_server_with_signal(
 @pytest.mark.integration
 class TestSignalHandling:
     """Test various signal handling scenarios."""
-    
+
     def test_sigterm_clean_shutdown(self):
         """Test that SIGTERM results in clean shutdown without errors."""
         script = create_test_server_script()
         return_code, stdout, stderr = run_server_with_signal(script, signal.SIGTERM)
-        
+
         # Check what happened
         if return_code == -1:
             print(f"Process timed out. stderr:\n{stderr}")
             pytest.fail("Process timed out, likely the signal handler did not properly exit")
-        
+
         # Should exit cleanly with code 0
         assert return_code == 0, f"Expected exit code 0, got {return_code}\nstderr: {stderr}"
-        
+
         # Should not have Python runtime errors
         assert "Fatal Python error" not in stderr
         assert "_enter_buffered_busy" not in stderr
         assert "could not acquire lock" not in stderr
-        
+
         # Should see shutdown messages
         assert "Received signal SIGTERM" in stderr
         assert "Shutdown requested" in stderr or "Cleanup completed" in stderr
-    
+
     def test_sigint_clean_shutdown(self):
         """Test that SIGINT (Ctrl+C) results in clean shutdown."""
         script = create_test_server_script()
         return_code, stdout, stderr = run_server_with_signal(script, signal.SIGINT)
-        
+
         # Should exit cleanly
         assert return_code in (0, -2), f"Expected exit code 0 or -2, got {return_code}"
-        
+
         # Should not have Python runtime errors
         assert "Fatal Python error" not in stderr
         assert "_enter_buffered_busy" not in stderr
-    
+
     def test_multiple_signals_ignored(self):
         """Test that multiple signals don't cause issues."""
         script = '''
@@ -224,26 +220,26 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 '''
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(script)
             script_path = f.name
-        
+
         try:
             project_root = Path(__file__).parent.parent.parent
             env = os.environ.copy()
-            env['PYTHONUNBUFFERED'] = '1'
-            env['PYTHONPATH'] = str(project_root)
-            
+            env["PYTHONUNBUFFERED"] = "1"
+            env["PYTHONPATH"] = str(project_root)
+
             process = subprocess.Popen(
                 [sys.executable, script_path],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 env=env,
-                cwd=str(project_root)
+                cwd=str(project_root),
             )
-            
+
             # Send multiple signals
             time.sleep(0.5)
             process.send_signal(signal.SIGTERM)
@@ -251,18 +247,18 @@ if __name__ == "__main__":
             process.send_signal(signal.SIGTERM)
             time.sleep(0.1)
             process.send_signal(signal.SIGTERM)
-            
+
             stdout, stderr = process.communicate(timeout=5)
-            
+
             # Should handle gracefully - return code of 0 or -15 (SIGTERM) is acceptable
             assert process.returncode in (0, -15), f"Unexpected return code: {process.returncode}"
             assert "Fatal Python error" not in stderr
             assert "count: 1" in stderr
             # The process may exit before receiving additional signals, which is fine
-            
+
         finally:
             Path(script_path).unlink(missing_ok=True)
-    
+
     def test_signal_during_heavy_logging(self):
         """Test signal handling while actively logging (race condition scenario)."""
         script = '''
@@ -306,20 +302,20 @@ if __name__ == "__main__":
     import time
     asyncio.run(main())
 '''
-        
+
         # Run this test multiple times to increase chance of catching race condition
         for i in range(3):
             return_code, stdout, stderr = run_server_with_signal(
                 script, signal.SIGTERM, delay_before_signal=0.3
             )
-            
+
             # Should not crash with Python runtime error
             assert "Fatal Python error" not in stderr, f"Race condition detected on iteration {i+1}"
             assert "_enter_buffered_busy" not in stderr
-            
+
     def test_signal_with_resource_cleanup(self):
         """Test signal handling with simulated resource cleanup."""
-        script = '''
+        script = """
 import asyncio
 import logging
 import signal
@@ -371,14 +367,14 @@ if __name__ == "__main__":
         logger.info("Server exited cleanly")
     except KeyboardInterrupt:
         pass
-'''
-        
+"""
+
         return_code, stdout, stderr = run_server_with_signal(script, signal.SIGTERM)
-        
+
         # Should exit cleanly
         assert return_code == 0
         assert "Fatal Python error" not in stderr
-        
+
         # Should see cleanup messages
         assert "Created temp directory" in stderr
         assert "Cleaning up resources" in stderr or "Cleaned up temp directory" in stderr

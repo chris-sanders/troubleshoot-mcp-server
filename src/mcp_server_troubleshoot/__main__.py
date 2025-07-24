@@ -149,7 +149,7 @@ def main(args: Optional[List[str]] = None) -> None:
     try:
         logger.debug("Starting FastMCP server")
         mcp.run()
-        
+
         # After mcp.run() returns, check if shutdown was requested via signal
         if is_shutdown_requested():
             logger.info("Shutdown requested via signal, performing cleanup")

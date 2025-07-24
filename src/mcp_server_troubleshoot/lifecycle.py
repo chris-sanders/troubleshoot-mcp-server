@@ -11,7 +11,6 @@ import logging
 import os
 import shutil
 import signal
-import sys
 import tempfile
 import time
 import uuid
@@ -230,7 +229,7 @@ def handle_signal(signum: int, frame: Any) -> None:
     # Set a flag to indicate shutdown was requested but don't call sys.exit()
     # This allows the Python runtime to shutdown gracefully without race conditions
     logger.info("Cleanup completed, allowing graceful exit")
-    
+
     # Set a global flag that the main loop can check
     global _shutdown_requested
     _shutdown_requested = True
