@@ -37,8 +37,8 @@ This document outlines the comprehensive testing strategy for the MCP Troublesho
 ### 4. **E2E Tests - Container Validation** (`tests/e2e/test_container_bundle_validation.py`)
 **Purpose**: Test production container with actual melange/apko build  
 **Speed**: Slow (2-5 minutes)  
-**CI**: Runs on every PR (with container build)  
-**Local**: See [Container Testing](#container-testing) section
+**CI**: ⚠️ **SKIPPED** - Must run locally before PR completion  
+**Local**: **REQUIRED** - See [Container Testing](#container-testing) section
 
 - **Coverage**: Production container functionality, bundle initialization in real environment
 - **Dependencies**: Podman/Docker, melange/apko build process
@@ -109,9 +109,10 @@ uv run pytest tests/e2e/test_direct_tool_integration.py -v
 uv run pytest tests/integration/ --cov=src --cov-report=xml -v
 ```
 
-**Job: `container-tests`** (~2-5 minutes)
+**Job: `container-tests`** (Skipped in CI)
 ```bash
-# Runs: Container-based E2E tests with melange/apko build
+# NOTE: Container tests are skipped in CI due to melange/apko limitations
+# Developers MUST run these locally before marking tasks complete:
 uv run pytest tests/e2e/ -m container -v
 ```
 
@@ -141,9 +142,14 @@ uv run pytest tests/e2e/test_direct_tool_integration.py -v      # ~7s
 # Full test suite (< 3 minutes total)
 uv run pytest tests/unit/ tests/integration/ -v                 # ~60s
 uv run pytest tests/e2e/ -m "not container" -v                  # ~10s
+
+# REQUIRED: Run slow tests locally before PR completion
+uv run pytest -m slow -v                                       # ~2-5 minutes
 ```
 
 ### Container Testing
+
+⚠️ **IMPORTANT**: Container tests are skipped in CI due to melange/apko container-in-container limitations. **You MUST run these tests locally before marking any task as complete or creating a PR.**
 
 Container tests require the production image to be built first:
 
@@ -151,10 +157,13 @@ Container tests require the production image to be built first:
 # 1. Build production container (one-time, ~2-3 minutes)
 MELANGE_TEST_BUILD=true ./scripts/build.sh
 
-# 2. Run container tests (~30-60 seconds)
+# 2. Run container tests (~30-60 seconds) - REQUIRED before PR
 uv run pytest tests/e2e/ -m container -v
 
-# 3. Run specific container test
+# 3. Run all slow tests (includes container tests) - REQUIRED before PR
+uv run pytest -m slow -v
+
+# 4. Run specific container test
 uv run pytest tests/e2e/test_container_bundle_validation.py::TestContainerBundleValidation::test_container_bundle_initialization -v
 ```
 
@@ -270,4 +279,10 @@ When adding new features:
 3. **Update direct E2E tests** for MCP tool changes
 4. **Consider container tests** for production-specific features
 
-Follow the existing patterns and ensure all CI jobs pass before merging.
+**Before PR Submission Checklist**:
+- [ ] All CI jobs pass (lint, unit, integration, e2e-fast)
+- [ ] **Container/slow tests pass locally** (`uv run pytest -m slow -v`)
+- [ ] Code quality checks pass (`uv run black . && uv run ruff check . && uv run mypy src`)
+- [ ] Documentation updated if needed
+
+⚠️ **IMPORTANT**: The `pytest -m slow` tests are **REQUIRED** to pass locally before marking any task complete or submitting a PR. These tests validate the production container build and functionality.

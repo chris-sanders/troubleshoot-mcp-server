@@ -64,6 +64,7 @@ uv run mypy src                   # Type check - MANDATORY
 
 ### Step 1: Final Quality Check
 - [ ] Run complete test suite: `uv run pytest`
+- [ ] Run slow/container tests locally: `uv run pytest -m slow -v` (REQUIRED - these skip in CI)
 - [ ] Run final quality check: `uv run black . && uv run ruff check . && uv run mypy src`
 - [ ] All commands MUST pass
 

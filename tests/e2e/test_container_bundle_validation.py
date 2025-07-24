@@ -371,6 +371,11 @@ class TestContainerBuildValidation:
 
         This validates the entire build process from melange package to final image.
         """
+        # Skip in CI due to melange/apko container-in-container limitations
+        # The publish workflow already validates the build process works correctly
+        if os.environ.get("CI") == "true":
+            pytest.skip("Container build tests are skipped in CI - run locally with 'pytest -m slow'")
+            
         build_script = Path("scripts/build.sh")
         if not build_script.exists():
             pytest.skip("Build script not found")
