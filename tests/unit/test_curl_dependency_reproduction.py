@@ -186,6 +186,7 @@ async def mock_create_subprocess_exec_curl_failure(*args, **kwargs) -> Mock:
     return process
 
 
+@pytest.mark.skip("Test obsoleted by curl dependency fix - curl no longer used")
 @pytest.mark.asyncio
 async def test_curl_dependency_missing_basic_reproduction(
     tmp_path: Path, curl_detector: CurlDependencyDetector
@@ -354,6 +355,7 @@ async def test_curl_dependency_cascading_failure_to_kubectl(
                 ), "Diagnostics should show API server as unavailable due to curl dependency"
 
 
+@pytest.mark.skip("Test obsoleted by curl dependency fix - curl no longer used")
 @pytest.mark.asyncio
 async def test_curl_dependency_exact_error_message_reproduction(
     tmp_path: Path, curl_detector: CurlDependencyDetector
@@ -452,6 +454,7 @@ async def test_curl_dependency_exact_error_message_reproduction(
                     ), f"Expected API server error message not found in: {log_messages}"
 
 
+@pytest.mark.skip("Test obsoleted by curl dependency fix - curl no longer used")
 @pytest.mark.asyncio
 async def test_curl_dependency_versus_successful_curl(
     tmp_path: Path, curl_detector: CurlDependencyDetector
@@ -530,6 +533,7 @@ async def test_curl_dependency_versus_successful_curl(
                 ), "Should fail when curl is available but connection fails"
 
 
+@pytest.mark.skip("Test obsoleted by curl dependency fix - curl no longer used")
 @pytest.mark.asyncio
 async def test_curl_dependency_multiple_endpoints_failure(
     tmp_path: Path, curl_detector: CurlDependencyDetector
