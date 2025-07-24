@@ -683,7 +683,7 @@ async def test_demonstrate_transport_cleanup_fix_success():
 
     # Track any warnings that occur during the test
     transport_warnings = []
-    
+
     def warning_handler(message, category, filename, lineno, file=None, line=None):
         if "transport" in str(message).lower() or "_closing" in str(message):
             transport_warnings.append(str(message))
@@ -704,7 +704,7 @@ async def test_demonstrate_transport_cleanup_fix_success():
             assert returncode == 0, f"kubectl-simulation-{i} should succeed"
             processes_created += 1
 
-        # Pattern 2: Operations with timeouts using subprocess_exec_with_cleanup  
+        # Pattern 2: Operations with timeouts using subprocess_exec_with_cleanup
         try:
             returncode, stdout, stderr = await subprocess_exec_with_cleanup(
                 "sleep", "0.1", timeout=1.0  # Should complete successfully
@@ -757,4 +757,3 @@ async def test_demonstrate_transport_cleanup_fix_success():
     finally:
         # Restore original warning handler
         warnings.showwarning = original_showwarning
-

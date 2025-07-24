@@ -359,7 +359,10 @@ async def test_kubectl_executor_run_kubectl_command_timeout():
     async def mock_subprocess_timeout(*args, **kwargs):
         raise asyncio.TimeoutError("Command timed out")
 
-    with patch("mcp_server_troubleshoot.subprocess_utils.subprocess_exec_with_cleanup", side_effect=mock_subprocess_timeout):
+    with patch(
+        "mcp_server_troubleshoot.subprocess_utils.subprocess_exec_with_cleanup",
+        side_effect=mock_subprocess_timeout,
+    ):
         # Execute a command with a short timeout
         with pytest.raises(KubectlError) as excinfo:
             await executor._run_kubectl_command("get pods", bundle, 0.1, True)  # 0.1 second timeout
