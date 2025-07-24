@@ -1742,38 +1742,27 @@ class BundleManager:
                 logger.warning(f"Failed to connect to API server at {url}: {str(e)}")
                 continue
 
-        # Try checking with curl as a backup method
+        # Try checking with a more aggressive aiohttp retry as backup
         try:
-            for endpoint in endpoints:
-                url = f"http://{host}:{port}{endpoint}"
-                logger.debug(f"Checking API server with curl: {url}")
-
-                curl_proc = await asyncio.create_subprocess_exec(
-                    "curl",
-                    "-s",
-                    "-o",
-                    "/dev/null",
-                    "-w",
-                    "%{http_code}",
-                    url,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-
-                try:
-                    stdout, stderr = await asyncio.wait_for(curl_proc.communicate(), timeout=3.0)
-                    status_code = stdout.decode().strip()
-
-                    logger.debug(f"Curl to {url} returned status code: {status_code}")
-
-                    if status_code == "200":
-                        logger.info(f"API server is available at {url} (curl check)")
-                        return True
-                except asyncio.TimeoutError:
-                    logger.warning(f"Curl timeout for {url}")
-                    continue
+            # Use a longer timeout for backup check
+            backup_timeout = aiohttp.ClientTimeout(total=3.0)
+            async with aiohttp.ClientSession(timeout=backup_timeout) as session:
+                for endpoint in endpoints:
+                    url = f"http://{host}:{port}{endpoint}"
+                    logger.debug(f"Checking API server with backup aiohttp check: {url}")
+                    
+                    try:
+                        async with session.get(url) as response:
+                            logger.debug(f"Backup aiohttp check to {url} returned status code: {response.status}")
+                            
+                            if response.status == 200:
+                                logger.info(f"API server is available at {url} (backup aiohttp check)")
+                                return True
+                    except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                        logger.warning(f"Backup aiohttp check failed for {url}: {e}")
+                        continue
         except Exception as e:
-            logger.warning(f"Error using curl to check API server: {e}")
+            logger.warning(f"Error in backup aiohttp API server check: {e}")
 
         logger.warning("API server is not available at any endpoint")
         return False
@@ -1899,28 +1888,25 @@ class BundleManager:
             except Exception as e:
                 info["netstat_exception_text"] = str(e)
 
-            # Try curl to test API server on this port
+            # Try aiohttp to test API server on this port
             try:
                 url = f"http://localhost:{port}/api"
-                proc = await asyncio.create_subprocess_exec(
-                    "curl",
-                    "-s",
-                    "-o",
-                    "/dev/null",
-                    "-w",
-                    "%{http_code}",
-                    url,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                stdout, stderr = await proc.communicate()
-
-                if proc.returncode == 0:
-                    info[f"curl_{port}_status_code"] = stdout.decode().strip()
-                else:
-                    info[f"curl_{port}_error_text"] = stderr.decode()
+                timeout = aiohttp.ClientTimeout(total=3.0)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(url) as response:
+                        info[f"http_{port}_status_code"] = str(response.status)
+                        
+                        # Get response body for diagnostics if available
+                        try:
+                            body = await asyncio.wait_for(response.text(), timeout=1.0)
+                            if body:
+                                info[f"http_{port}_response_body"] = body[:200]  # Limit body size
+                        except (asyncio.TimeoutError, UnicodeDecodeError):
+                            pass
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                info[f"http_{port}_error_text"] = str(e)
             except Exception as e:
-                info[f"curl_{port}_exception_text"] = str(e)
+                info[f"http_{port}_exception_text"] = str(e)
 
         # Add environment info
         info["env_mock_k8s_api_port"] = os.environ.get("MOCK_K8S_API_PORT", "not set")
