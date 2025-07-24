@@ -28,6 +28,14 @@ from .kubectl import KubectlExecutor
 
 logger = logging.getLogger(__name__)
 
+# Global flag to track shutdown request from signal handler
+_shutdown_requested = False
+
+
+def is_shutdown_requested() -> bool:
+    """Check if shutdown has been requested via signal handler."""
+    return _shutdown_requested
+
 
 @dataclass
 class AppContext:
@@ -219,11 +227,13 @@ def handle_signal(signum: int, frame: Any) -> None:
     except Exception as e:
         logger.error(f"Error during explicit shutdown: {e}")
 
-    # Exit immediately - no delay needed
-    logger.info("Cleanup completed, exiting process")
-
-    # Exit the process
-    sys.exit(0)
+    # Set a flag to indicate shutdown was requested but don't call sys.exit()
+    # This allows the Python runtime to shutdown gracefully without race conditions
+    logger.info("Cleanup completed, allowing graceful exit")
+    
+    # Set a global flag that the main loop can check
+    global _shutdown_requested
+    _shutdown_requested = True
 
 
 def setup_signal_handlers() -> None:
