@@ -1657,45 +1657,39 @@ class BundleManager:
         # Check sbctl logs for clues about server URL (real sbctl prints this on startup)
         if self.sbctl_process and self.sbctl_process.stdout:
             try:
-                # Try non-blocking read from process stdout
-                stdout_reader = asyncio.StreamReader()
-                stdout_protocol = asyncio.StreamReaderProtocol(stdout_reader)
-                loop = asyncio.get_event_loop()
-                transport, _ = await loop.connect_read_pipe(
-                    lambda: stdout_protocol, self.sbctl_process.stdout
-                )
-
-                # Set a timeout for reading
+                # Try non-blocking read from process stdout with proper transport cleanup
+                from .subprocess_utils import pipe_transport_reader
+                
                 try:
-                    data = await asyncio.wait_for(stdout_reader.read(1024), timeout=0.5)
-                    if data:
-                        output = data.decode("utf-8", errors="replace")
-                        logger.debug(f"sbctl process output: {output}")
+                    async with pipe_transport_reader(self.sbctl_process.stdout) as stdout_reader:
+                        # Set a timeout for reading
+                        data = await asyncio.wait_for(stdout_reader.read(1024), timeout=0.5)
+                        if data:
+                            output = data.decode("utf-8", errors="replace")
+                            logger.debug(f"sbctl process output: {output}")
 
-                        # Look for server URL pattern in output
-                        # Example: Server is running at http://localhost:8080
-                        import re
+                            # Look for server URL pattern in output
+                            # Example: Server is running at http://localhost:8080
+                            import re
 
-                        url_pattern = re.compile(r"https?://[^\s]+")
-                        urls = url_pattern.findall(output)
-                        if urls:
-                            for url in urls:
-                                logger.debug(f"Found URL in sbctl output: {url}")
-                                try:
-                                    from urllib.parse import urlparse
+                            url_pattern = re.compile(r"https?://[^\s]+")
+                            urls = url_pattern.findall(output)
+                            if urls:
+                                for url in urls:
+                                    logger.debug(f"Found URL in sbctl output: {url}")
+                                    try:
+                                        from urllib.parse import urlparse
 
-                                    parsed_url = urlparse(url)
-                                    if parsed_url.port:
-                                        port = parsed_url.port
-                                        logger.debug(f"Using port from sbctl output: {port}")
-                                    if parsed_url.hostname:
-                                        host = parsed_url.hostname
-                                except Exception:
-                                    pass
+                                        parsed_url = urlparse(url)
+                                        if parsed_url.port:
+                                            port = parsed_url.port
+                                            logger.debug(f"Using port from sbctl output: {port}")
+                                        if parsed_url.hostname:
+                                            host = parsed_url.hostname
+                                    except Exception:
+                                        pass
                 except asyncio.TimeoutError:
                     logger.debug("Timeout reading from sbctl stdout")
-                finally:
-                    transport.close()
             except Exception as e:
                 logger.debug(f"Error reading sbctl output: {e}")
 
@@ -1811,12 +1805,13 @@ class BundleManager:
         """
 
         try:
-            proc = await asyncio.create_subprocess_exec(
-                "sbctl", "--help", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            from .subprocess_utils import subprocess_exec_with_cleanup
+            
+            returncode, stdout, stderr = await subprocess_exec_with_cleanup(
+                "sbctl", "--help", timeout=10.0
             )
-            stdout, stderr = await proc.communicate()
 
-            if proc.returncode == 0:
+            if returncode == 0:
                 logger.debug("sbctl is available")
                 return True
             else:
@@ -1866,15 +1861,13 @@ class BundleManager:
 
             # Check network connections on the port
             try:
-                proc = await asyncio.create_subprocess_exec(
-                    "netstat",
-                    "-tuln",
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+                from .subprocess_utils import subprocess_exec_with_cleanup
+                
+                returncode, stdout, stderr = await subprocess_exec_with_cleanup(
+                    "netstat", "-tuln", timeout=5.0
                 )
-                stdout, stderr = await proc.communicate()
 
-                if proc.returncode == 0:
+                if returncode == 0:
                     netstat_output = stdout.decode()
                     for line in netstat_output.splitlines():
                         if f":{port}" in line:
