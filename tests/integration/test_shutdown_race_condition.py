@@ -129,8 +129,7 @@ if __name__ == "__main__":
         if race_condition_found:
             # If we see the race condition, the fix didn't work
             pytest.fail(
-                f"Race condition still present! Fix didn't work.\n"
-                f"stderr output:\n{stderr}"
+                f"Race condition still present! Fix didn't work.\n" f"stderr output:\n{stderr}"
             )
         else:
             # Good! No race condition detected

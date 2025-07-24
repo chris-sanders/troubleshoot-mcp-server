@@ -87,7 +87,7 @@ def run_server_as_subprocess(
         # Close stdin if it's still open before communicate
         if process.stdin and not process.stdin.closed:
             process.stdin.close()
-        
+
         stdout, stderr = process.communicate(timeout=timeout)
         return_code = process.returncode
 
