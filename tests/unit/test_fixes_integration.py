@@ -119,7 +119,7 @@ async def test_netstat_replaced_in_diagnostic_info():
         port_checked_keys = [
             key for key in diagnostic_info.keys() if "port_" in key and "_checked" in key
         ]
-        
+
         # Note: Port checking only happens when sbctl is available
         # In CI environments without sbctl, this is expected behavior
         if len(port_checked_keys) == 0:
@@ -206,8 +206,8 @@ async def test_both_fixes_work_together():
         port_checked_keys = [
             key for key in diagnostic_info.keys() if "port_" in key and "_checked" in key
         ]
-        
-        # Note: Port checking only happens when sbctl is available  
+
+        # Note: Port checking only happens when sbctl is available
         # In CI environments without sbctl, this is expected behavior
         if len(port_checked_keys) == 0:
             print("ℹ️ No ports checked - sbctl not available in CI environment")
