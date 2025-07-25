@@ -218,9 +218,9 @@ async def test_port_checking_functionality_without_netstat():
         # For TDD: The current (netstat) approach should fail,
         # and the replacement (Python socket) approach should work
         if netstat_failed and python_socket_works:
-            print(f"✅ TDD SUCCESS: Demonstrated the netstat dependency problem and solution!")
+            print("✅ TDD SUCCESS: Demonstrated the netstat dependency problem and solution!")
             print(f"❌ Current netstat approach failed: {netstat_error}")
-            print(f"✅ Python socket replacement works correctly")
+            print("✅ Python socket replacement works correctly")
             print("✅ Test confirms both the problem and the solution work as expected")
             # Test passes - we've demonstrated both the problem and the working solution
             return
@@ -286,7 +286,7 @@ def test_socket_based_port_checking_implementation():
         assert isinstance(port_status_after, bool), "Function should return boolean"
 
         # SUCCESS: The socket-based implementation works correctly
-        print(f"✅ TDD SUCCESS: Python socket-based port checking works correctly!")
+        print("✅ TDD SUCCESS: Python socket-based port checking works correctly!")
         print(f"✅ Port 0 check: {port_0_result} (expected: False)")
         print(f"✅ Bound port {bound_port} check: {port_in_use} (expected: True)")
         print(f"✅ Post-close port {bound_port} check: {port_status_after}")
