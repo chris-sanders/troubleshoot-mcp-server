@@ -1,11 +1,15 @@
 # Fix AsyncIO Transport Cleanup and Netstat Dependency Issues
 
 ## Task Metadata
-- **Status**: backlog
+- **Status**: active
+- **Started**: 2025-07-25
 - **Priority**: high
 - **Estimated Effort**: 6-8 hours
 - **Dependencies**: None
 - **Labels**: bug, asyncio, python313, tdd
+
+## Progress
+- Started TDD implementation for AsyncIO transport cleanup and netstat dependency issues
 
 ## Problem Statement
 
