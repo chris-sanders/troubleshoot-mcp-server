@@ -11,7 +11,6 @@ cleanup behavior to catch missing dependencies at the functional level.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
 import tempfile
 import os
 from pathlib import Path
@@ -30,52 +29,53 @@ async def test_bundle_cleanup_functional_dependency_validation():
     This test validates ANY missing cleanup dependencies, not just ps/pkill.
     """
     from mcp_server_troubleshoot.bundle import BundleManager
-    
+
     # Create a temporary directory for the test bundle
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_manager = BundleManager(Path(temp_dir))
-        
+
         # Create a realistic bundle structure to trigger cleanup behavior
         mock_bundle_path = Path(temp_dir) / "test-bundle"
         mock_bundle_path.mkdir(exist_ok=True)
-        
+
         # Create some mock bundle content to make it look real
         (mock_bundle_path / "bundle.yaml").write_text("apiVersion: v1\nkind: Bundle\n")
-        
+
         # Create a mock BundleMetadata object to simulate an active bundle
         from mcp_server_troubleshoot.bundle import BundleMetadata
+
         mock_kubeconfig = mock_bundle_path / "kubeconfig"
         mock_kubeconfig.write_text("apiVersion: v1\nkind: Config\n")
-        
+
         mock_metadata = BundleMetadata(
             id="test-bundle-123",
             source="file:///test",
             path=mock_bundle_path,
             kubeconfig_path=mock_kubeconfig,
             initialized=True,
-            host_only_bundle=False
+            host_only_bundle=False,
         )
-        
-        # Set the bundle as active to trigger cleanup processes  
+
+        # Set the bundle as active to trigger cleanup processes
         bundle_manager.active_bundle = mock_metadata
-        
+
         try:
             # This is the critical functional test - actually run cleanup
             # If ps/pkill or other dependencies are missing in container,
             # this will fail with FileNotFoundError or similar
             await bundle_manager.cleanup()
-            
+
             # If we reach here, cleanup succeeded
             print("✅ Bundle cleanup completed successfully")
             print("✅ No missing dependencies detected in cleanup process")
-            
+
             # Verify cleanup actually did something
             assert bundle_manager.active_bundle is None, "Bundle should be cleared after cleanup"
-            
+
         except FileNotFoundError as e:
             # This is what we expect to see if dependencies are missing in container
             error_msg = str(e)
-            if any(cmd in error_msg for cmd in ['ps', 'pkill', 'netstat', 'curl']):
+            if any(cmd in error_msg for cmd in ["ps", "pkill", "netstat", "curl"]):
                 pytest.fail(
                     f"❌ TDD SUCCESS: Detected missing container dependency!\n"
                     f"Missing command dependency: {error_msg}\n"
@@ -88,9 +88,10 @@ async def test_bundle_cleanup_functional_dependency_validation():
         except Exception as e:
             # Other errors might indicate dependency issues too
             error_msg = str(e)
-            if any(indicator in error_msg.lower() for indicator in [
-                'no such file or directory', 'command not found', 'not found'
-            ]):
+            if any(
+                indicator in error_msg.lower()
+                for indicator in ["no such file or directory", "command not found", "not found"]
+            ):
                 pytest.fail(
                     f"❌ TDD SUCCESS: Detected potential missing dependency!\n"
                     f"Error: {error_msg}\n"
@@ -102,49 +103,50 @@ async def test_bundle_cleanup_functional_dependency_validation():
                 raise
 
 
-@pytest.mark.asyncio 
+@pytest.mark.asyncio
 async def test_bundle_process_cleanup_dependencies():
     """
-    TDD Functional Test: Exercise the bundle cleanup process that includes 
+    TDD Functional Test: Exercise the bundle cleanup process that includes
     process termination and resource cleanup.
-    
-    This test specifically targets the cleanup code paths that originally 
+
+    This test specifically targets the cleanup code paths that originally
     used external commands (ps/pkill) for process management.
     """
     from mcp_server_troubleshoot.bundle import BundleManager
-    
+
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_manager = BundleManager(Path(temp_dir))
-        
+
         # Set up a mock active bundle
         mock_bundle_path = Path(temp_dir) / "server-test-bundle"
         mock_bundle_path.mkdir(exist_ok=True)
-        
+
         from mcp_server_troubleshoot.bundle import BundleMetadata
+
         mock_kubeconfig = mock_bundle_path / "kubeconfig"
         mock_kubeconfig.write_text("apiVersion: v1\nkind: Config\n")
-        
+
         mock_metadata = BundleMetadata(
             id="server-test-bundle-456",
             source="file:///server-test",
             path=mock_bundle_path,
             kubeconfig_path=mock_kubeconfig,
             initialized=True,
-            host_only_bundle=False
+            host_only_bundle=False,
         )
         bundle_manager.active_bundle = mock_metadata
-        
+
         try:
-            # This exercises the cleanup method which contains the process 
+            # This exercises the cleanup method which contains the process
             # management code that originally used ps/pkill subprocess calls
             await bundle_manager.cleanup()
-            
+
             print("✅ Bundle cleanup completed successfully")
             print("✅ No missing process management dependencies detected")
-            
+
         except FileNotFoundError as e:
-            error_msg = str(e) 
-            if any(cmd in error_msg for cmd in ['ps', 'pkill']):
+            error_msg = str(e)
+            if any(cmd in error_msg for cmd in ["ps", "pkill"]):
                 pytest.fail(
                     f"❌ TDD SUCCESS: Bundle cleanup caught missing dependency!\n"
                     f"Missing process management command: {error_msg}\n"
@@ -155,7 +157,7 @@ async def test_bundle_process_cleanup_dependencies():
                 raise
         except Exception as e:
             error_msg = str(e)
-            if 'no such file or directory' in error_msg.lower():
+            if "no such file or directory" in error_msg.lower():
                 pytest.fail(
                     f"❌ TDD SUCCESS: Bundle cleanup detected dependency issue!\n"
                     f"Error: {error_msg}\n"
@@ -167,27 +169,26 @@ async def test_bundle_process_cleanup_dependencies():
 
 def test_container_environment_simulation():
     """
-    TDD Test: Simulate minimal container environment by completely removing 
+    TDD Test: Simulate minimal container environment by completely removing
     external commands and verifying that cleanup still works.
-    
+
     This test demonstrates that the psutil fix eliminates external dependencies.
     Without the fix, this test would have failed when ps/pkill were unavailable.
     """
     import subprocess
-    import shutil
-    
+
     # Save original PATH
     original_path = os.environ.get("PATH", "")
-    
+
     try:
         # Simulate a truly minimal container environment with no external tools
         # This would be typical of a distroless or minimal container image
         os.environ["PATH"] = "/nonexistent/path"
-        
+
         # Verify that the problematic commands are indeed unavailable
         commands_that_would_fail = ["ps", "pkill"]
         unavailable_commands = []
-        
+
         for cmd in commands_that_would_fail:
             try:
                 # This should fail in our simulated minimal environment
@@ -200,18 +201,20 @@ def test_container_environment_simulation():
                 # Any other error also indicates the command isn't working normally
                 unavailable_commands.append(cmd)
                 print(f"✅ Command not functional in minimal environment: {cmd}")
-        
+
         if len(unavailable_commands) < len(commands_that_would_fail):
             pytest.skip(
                 f"Container simulation incomplete - some commands still available: "
                 f"{set(commands_that_would_fail) - set(unavailable_commands)}"
             )
-        
-        print(f"✅ Successfully simulated minimal container environment")
-        print(f"✅ Confirmed {len(unavailable_commands)} commands unavailable: {unavailable_commands}")
-        print(f"✅ This environment would have broken the original ps/pkill subprocess calls")
-        print(f"✅ The psutil fix ensures cleanup works even without external commands")
-            
+
+        print("✅ Successfully simulated minimal container environment")
+        print(
+            f"✅ Confirmed {len(unavailable_commands)} commands unavailable: {unavailable_commands}"
+        )
+        print("✅ This environment would have broken the original ps/pkill subprocess calls")
+        print("✅ The psutil fix ensures cleanup works even without external commands")
+
     finally:
         # Restore original PATH
         os.environ["PATH"] = original_path
@@ -224,40 +227,41 @@ async def test_actual_container_cleanup_validation():
     TDD Container Test: This test is marked with @pytest.mark.container
     and should be run in an actual container environment to validate
     that cleanup works without external dependencies.
-    
+
     Run with: pytest -m container tests/unit/test_bundle_cleanup_dependencies.py
     """
     from mcp_server_troubleshoot.bundle import BundleManager
-    
+
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_manager = BundleManager(Path(temp_dir))
-        
+
         # Create realistic test scenario
         bundle_path = Path(temp_dir) / "container-test-bundle"
         bundle_path.mkdir(exist_ok=True)
-        
+
         # Create proper bundle metadata
         mock_kubeconfig = bundle_path / "kubeconfig"
         mock_kubeconfig.write_text("apiVersion: v1\nkind: Config\n")
-        
+
         from mcp_server_troubleshoot.bundle import BundleMetadata
+
         mock_metadata = BundleMetadata(
             id="container-test-bundle-789",
             source="file:///container-test",
             path=bundle_path,
             kubeconfig_path=mock_kubeconfig,
             initialized=True,
-            host_only_bundle=False
+            host_only_bundle=False,
         )
         bundle_manager.active_bundle = mock_metadata
-        
+
         try:
             # Run full cleanup in actual container
             await bundle_manager.cleanup()
-            
+
             print("✅ CONTAINER TEST SUCCESS: All cleanup operations completed")
             print("✅ No external dependencies required in container environment")
-            
+
         except Exception as e:
             # Any failure here indicates a real container compatibility issue
             pytest.fail(
