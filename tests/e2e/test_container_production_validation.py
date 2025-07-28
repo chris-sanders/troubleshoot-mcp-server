@@ -260,10 +260,7 @@ def test_production_container_mcp_protocol():
     if not available:
         pytest.skip(f"Container runtime {runtime} not available")
 
-    # Skip in CI due to container build requirements
-    # The publish workflow validates container functionality
-    if os.environ.get("CI") == "true":
-        pytest.skip("Container runtime tests are skipped in CI - run locally with 'pytest -m slow'")
+    # Container tests now run in CI to catch deployment issues
 
     container_name = f"mcp-protocol-test-{uuid.uuid4().hex[:8]}"
 
