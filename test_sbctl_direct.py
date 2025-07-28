@@ -80,13 +80,9 @@ async def test_sbctl_direct():
                             print(f"  Found kubeconfig files: {kubeconfig_files}")
 
                         # Look for local-kubeconfig files
-                        local_kubeconfig_files = list(
-                            location.glob("**/local-kubeconfig*")
-                        )
+                        local_kubeconfig_files = list(location.glob("**/local-kubeconfig*"))
                         if local_kubeconfig_files:
-                            print(
-                                f"  Found local-kubeconfig files: {local_kubeconfig_files}"
-                            )
+                            print(f"  Found local-kubeconfig files: {local_kubeconfig_files}")
 
                     except Exception as search_e:
                         print(f"  Error searching {location}: {search_e}")

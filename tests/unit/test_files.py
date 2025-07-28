@@ -122,9 +122,7 @@ def test_grep_files_args_validation():
     assert args_defaults.max_files == 10  # Default value
 
     # Test new parameters with custom values
-    args_custom = GrepFilesArgs(
-        pattern="test", path="dir1", max_results_per_file=3, max_files=5
-    )
+    args_custom = GrepFilesArgs(pattern="test", path="dir1", max_results_per_file=3, max_files=5)
     assert args_custom.max_results_per_file == 3
     assert args_custom.max_files == 5
 
@@ -180,13 +178,9 @@ async def test_file_explorer_list_files():
         result = await explorer.list_files("cluster-resources", True)
 
         # Verify behavior expectations for recursive listing
-        assert (
-            result.path == "cluster-resources"
-        ), "Path should match requested directory"
+        assert result.path == "cluster-resources", "Path should match requested directory"
         assert result.recursive is True, "Recursive flag should be preserved"
-        assert (
-            result.total_files >= 1
-        ), "Should find at least 1 file in cluster-resources"
+        assert result.total_files >= 1, "Should find at least 1 file in cluster-resources"
 
         # Test 3: Verify result structure is correct (behavior contracts)
         for entry in result.entries:
@@ -273,37 +267,27 @@ async def test_file_explorer_read_file():
         result = await explorer.read_file("cluster-resources/pods/kube-system.json")
 
         # Verify behavior expectations
-        assert isinstance(
-            result, FileContentResult
-        ), "Result should be a FileContentResult"
-        assert (
-            result.path == "cluster-resources/pods/kube-system.json"
-        ), "Path should be preserved in result"
-        assert (
-            "test-pod" in result.content
-        ), "Content should match expected JSON content"
+        assert isinstance(result, FileContentResult), "Result should be a FileContentResult"
+        assert result.path == "cluster-resources/pods/kube-system.json", (
+            "Path should be preserved in result"
+        )
+        assert "test-pod" in result.content, "Content should match expected JSON content"
         assert result.binary is False, "JSON file should not be marked as binary"
         assert result.total_lines > 0, "Line count should be available"
 
         # Test 2: Reading a line range from the same file
-        result = await explorer.read_file(
-            "cluster-resources/pods/kube-system.json", 1, 3
-        )
+        result = await explorer.read_file("cluster-resources/pods/kube-system.json", 1, 3)
 
         # Verify behavior expectations for line ranges
         assert result.start_line == 1, "Start line should match requested value"
         assert result.end_line >= 1, "End line should be at least start line"
-        assert (
-            len(result.content.split("\n")) <= 4
-        ), "Should have limited lines based on range"
+        assert len(result.content.split("\n")) <= 4, "Should have limited lines based on range"
 
         # Test 3: Reading binary file (from the with_binaries structure)
         result = await explorer.read_file("binaries/fake_binary")
 
         # Verify behavior expectations for binary files
-        assert (
-            result.path == "binaries/fake_binary"
-        ), "Path should be preserved in result"
+        assert result.path == "binaries/fake_binary", "Path should be preserved in result"
         assert result.binary is True, "Binary file should be marked as binary"
 
 
@@ -369,9 +353,7 @@ async def test_file_explorer_grep_files():
         test_dir.mkdir(exist_ok=True)
 
         # Create files with specific content for pattern matching
-        (test_dir / "case_test.txt").write_text(
-            "This contains UPPERCASE and lowercase text\n"
-        )
+        (test_dir / "case_test.txt").write_text("This contains UPPERCASE and lowercase text\n")
         (test_dir / "pattern_test.txt").write_text(
             "This is a test file with patterns\nAnother line with test word\n"
         )
@@ -427,12 +409,8 @@ async def test_file_explorer_grep_files():
 
         # Verify behavior expectations for case sensitivity
         assert case_sensitive.total_matches >= 1, "Should find exact case matches"
-        assert (
-            case_insensitive.total_matches >= 1
-        ), "Should find case-insensitive matches"
-        assert (
-            case_insensitive.case_sensitive is False
-        ), "Should preserve case sensitivity flag"
+        assert case_insensitive.total_matches >= 1, "Should find case-insensitive matches"
+        assert case_insensitive.case_sensitive is False, "Should preserve case sensitivity flag"
 
 
 @pytest.mark.asyncio
@@ -492,9 +470,7 @@ async def test_file_explorer_grep_files_with_kubeconfig():
 
         # There should be matches in our reference file
         ref_file_matches = [m for m in result.matches if "reference.txt" in m.path]
-        assert (
-            len(ref_file_matches) >= 3
-        ), "Should find multiple matches in reference.txt"
+        assert len(ref_file_matches) >= 3, "Should find multiple matches in reference.txt"
 
 
 @pytest.mark.asyncio
@@ -563,15 +539,11 @@ def test_file_explorer_is_binary():
 
         # Test 1: Text file should not be marked as binary (JSON file from real structure)
         text_file_path = bundle_structure["kube_system_pods"]
-        assert not explorer._is_binary(
-            text_file_path
-        ), "JSON file should not be detected as binary"
+        assert not explorer._is_binary(text_file_path), "JSON file should not be detected as binary"
 
         # Test 2: Binary file should be marked as binary (real binary file)
         binary_file_path = bundle_structure["fake_binary"]
-        assert explorer._is_binary(
-            binary_file_path
-        ), "Binary file should be detected as binary"
+        assert explorer._is_binary(binary_file_path), "Binary file should be detected as binary"
 
 
 def test_file_explorer_normalize_path():
@@ -604,21 +576,21 @@ def test_file_explorer_normalize_path():
 
         # Test 1: Normalizing a relative path
         normalized = explorer._normalize_path("cluster-resources")
-        assert (
-            normalized == bundle_path / "cluster-resources"
-        ), "Relative path should be resolved to absolute path"
+        assert normalized == bundle_path / "cluster-resources", (
+            "Relative path should be resolved to absolute path"
+        )
 
         # Test 2: Normalizing a path with leading slashes
         normalized = explorer._normalize_path("/cluster-resources")
-        assert (
-            normalized == bundle_path / "cluster-resources"
-        ), "Leading slashes should be handled properly"
+        assert normalized == bundle_path / "cluster-resources", (
+            "Leading slashes should be handled properly"
+        )
 
         # Test 3: Normalizing a nested path
         normalized = explorer._normalize_path("cluster-resources/pods")
-        assert (
-            normalized == bundle_path / "cluster-resources" / "pods"
-        ), "Nested paths should be resolved correctly"
+        assert normalized == bundle_path / "cluster-resources" / "pods", (
+            "Nested paths should be resolved correctly"
+        )
 
         # Test 4: Security check - block directory traversal attempts
         with pytest.raises(InvalidPathError):

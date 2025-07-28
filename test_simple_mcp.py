@@ -54,9 +54,7 @@ async def test_simple_mcp():
         # Wait for any response at all
         try:
             if process.stdout:
-                response_bytes = await asyncio.wait_for(
-                    process.stdout.readline(), timeout=3.0
-                )
+                response_bytes = await asyncio.wait_for(process.stdout.readline(), timeout=3.0)
                 response_line = response_bytes.decode().strip()
                 print(f"Got response: {response_line}")
 
@@ -78,9 +76,7 @@ async def test_simple_mcp():
         # Read stderr to see what's happening
         if process.stderr:
             try:
-                stderr_data = await asyncio.wait_for(
-                    process.stderr.read(1024), timeout=1.0
-                )
+                stderr_data = await asyncio.wait_for(process.stderr.read(1024), timeout=1.0)
                 if stderr_data:
                     print(f"STDERR: {stderr_data.decode()}")
             except asyncio.TimeoutError:

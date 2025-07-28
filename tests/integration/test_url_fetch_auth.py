@@ -53,9 +53,9 @@ class TestUrlPatternMatching:
             match = REPLICATED_VENDOR_URL_PATTERN.match(url)
             if should_match:
                 assert match is not None, f"URL {url} should match pattern"
-                assert (
-                    match.group(1) == expected_slug
-                ), f"Expected slug {expected_slug}, got {match.group(1)}"
+                assert match.group(1) == expected_slug, (
+                    f"Expected slug {expected_slug}, got {match.group(1)}"
+                )
             else:
                 assert match is None, f"URL {url} should not match pattern"
 
@@ -123,9 +123,7 @@ class TestAuthenticationErrorHandling:
             )
 
             with patch("httpx.AsyncClient") as mock_client:
-                mock_client.return_value.__aenter__.return_value.get.return_value = (
-                    mock_response
-                )
+                mock_client.return_value.__aenter__.return_value.get.return_value = mock_response
 
                 with pytest.raises(
                     BundleDownloadError,
@@ -149,9 +147,7 @@ class TestAuthenticationErrorHandling:
             )
 
             with patch("httpx.AsyncClient") as mock_client:
-                mock_client.return_value.__aenter__.return_value.get.return_value = (
-                    mock_response
-                )
+                mock_client.return_value.__aenter__.return_value.get.return_value = mock_response
 
                 with pytest.raises(
                     BundleDownloadError,
@@ -191,9 +187,7 @@ class TestAuthenticationErrorHandling:
         mock_response.content_length = 2000000000  # 2GB
 
         with patch("aiohttp.ClientSession") as mock_session:
-            mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = (
-                mock_response
-            )
+            mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_response
 
             with pytest.raises(
                 BundleDownloadError, match="Bundle size.*exceeds maximum allowed size"
@@ -216,9 +210,7 @@ class TestAuthenticationErrorHandling:
             )
 
             with patch("aiohttp.ClientSession") as mock_session:
-                mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = (
-                    mock_response
-                )
+                mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_response
 
                 with pytest.raises(
                     BundleDownloadError, match="Failed to download bundle.*HTTP 401"
@@ -265,16 +257,14 @@ class TestRealTokenAuthentication:
         ):
             # This mirrors the logic in bundle.py line 397-398
             token = os.environ.get("SBCTL_TOKEN") or os.environ.get("REPLICATED")
-            assert (
-                token == "sbctl-token"
-            ), "SBCTL_TOKEN should take precedence over REPLICATED"
+            assert token == "sbctl-token", "SBCTL_TOKEN should take precedence over REPLICATED"
 
         with patch.dict(os.environ, {"REPLICATED": "replicated-token"}, clear=True):
             # When only REPLICATED is set (clear all env vars first)
             token = os.environ.get("SBCTL_TOKEN") or os.environ.get("REPLICATED")
-            assert (
-                token == "replicated-token"
-            ), "REPLICATED should be used when SBCTL_TOKEN is not set"
+            assert token == "replicated-token", (
+                "REPLICATED should be used when SBCTL_TOKEN is not set"
+            )
 
         with patch.dict(os.environ, {}, clear=True):
             # When neither is set

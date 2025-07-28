@@ -23,9 +23,7 @@ async def test_transport_cleanup_fix_integration():
     works correctly with subprocess_utils.
     """
     if sys.version_info < (3, 13):
-        pytest.skip(
-            "This test is specifically for Python 3.13+ transport fix verification"
-        )
+        pytest.skip("This test is specifically for Python 3.13+ transport fix verification")
 
     from mcp_server_troubleshoot.subprocess_utils import subprocess_exec_with_cleanup
 
@@ -34,10 +32,7 @@ async def test_transport_cleanup_fix_integration():
 
     def warning_capture(message, category, filename, lineno, file=None, line=None):
         msg_str = str(message)
-        if any(
-            keyword in msg_str.lower()
-            for keyword in ["transport", "_closing", "unclosed"]
-        ):
+        if any(keyword in msg_str.lower() for keyword in ["transport", "_closing", "unclosed"]):
             transport_issues.append(f"{category.__name__}: {msg_str}")
 
     original_showwarning = warnings.showwarning
@@ -63,9 +58,7 @@ async def test_transport_cleanup_fix_integration():
             f"The Python 3.13 transport cleanup fix may not be working correctly."
         )
 
-        print(
-            "✅ Python 3.13 transport cleanup fix verified: No transport issues detected"
-        )
+        print("✅ Python 3.13 transport cleanup fix verified: No transport issues detected")
 
     finally:
         warnings.showwarning = original_showwarning
@@ -90,18 +83,12 @@ async def test_socket_port_checking_fix_integration():
         try:
             # This should work without any netstat dependency
             result = bundle_manager._check_port_listening_python(port)
-            assert isinstance(
-                result, bool
-            ), f"Port check should return boolean for port {port}"
-            print(
-                f"✅ Port {port} check successful: {result} (socket-based, no netstat required)"
-            )
+            assert isinstance(result, bool), f"Port check should return boolean for port {port}"
+            print(f"✅ Port {port} check successful: {result} (socket-based, no netstat required)")
         except Exception as e:
             pytest.fail(f"Socket-based port checking failed for port {port}: {e}")
 
-    print(
-        "✅ Socket-based port checking fix verified: All ports checked without netstat"
-    )
+    print("✅ Socket-based port checking fix verified: All ports checked without netstat")
 
 
 @pytest.mark.asyncio
@@ -126,15 +113,11 @@ async def test_netstat_replaced_in_diagnostic_info():
         diagnostic_info = await bundle_manager.get_diagnostic_info()
 
         # Verify we got diagnostic information
-        assert isinstance(
-            diagnostic_info, dict
-        ), "Diagnostic info should be a dictionary"
+        assert isinstance(diagnostic_info, dict), "Diagnostic info should be a dictionary"
 
         # Look for evidence that socket-based checking was used
         port_checked_keys = [
-            key
-            for key in diagnostic_info.keys()
-            if "port_" in key and "_checked" in key
+            key for key in diagnostic_info.keys() if "port_" in key and "_checked" in key
         ]
 
         # Note: Port checking only happens when sbctl is available
@@ -147,19 +130,13 @@ async def test_netstat_replaced_in_diagnostic_info():
             assert len(port_checked_keys) > 0, "Should have checked at least one port"
 
         # Verify no netstat-related errors
-        netstat_error_keys = [
-            key for key in diagnostic_info.keys() if "netstat" in key.lower()
-        ]
+        netstat_error_keys = [key for key in diagnostic_info.keys() if "netstat" in key.lower()]
         if netstat_error_keys:
             # If there are netstat-related keys, they should be from old code, not our new code
-            print(
-                f"Found netstat-related keys (may be from old code): {netstat_error_keys}"
-            )
+            print(f"Found netstat-related keys (may be from old code): {netstat_error_keys}")
 
         # Look for socket-based port checking evidence
-        socket_evidence = [
-            key for key in diagnostic_info.keys() if "socket" in key.lower()
-        ]
+        socket_evidence = [key for key in diagnostic_info.keys() if "socket" in key.lower()]
         if socket_evidence:
             print(f"✅ Found evidence of socket-based checking: {socket_evidence}")
 
@@ -187,10 +164,7 @@ async def test_both_fixes_work_together():
 
     def warning_capture(message, category, filename, lineno, file=None, line=None):
         msg_str = str(message)
-        if any(
-            keyword in msg_str.lower()
-            for keyword in ["transport", "_closing", "unclosed"]
-        ):
+        if any(keyword in msg_str.lower() for keyword in ["transport", "_closing", "unclosed"]):
             transport_issues.append(f"{category.__name__}: {msg_str}")
 
     original_showwarning = warnings.showwarning
@@ -215,9 +189,7 @@ async def test_both_fixes_work_together():
         test_ports = [8080, 9090, 3000]
         for port in test_ports:
             port_status = bundle_manager._check_port_listening_python(port)
-            assert isinstance(
-                port_status, bool
-            ), f"Port {port} check should return boolean"
+            assert isinstance(port_status, bool), f"Port {port} check should return boolean"
 
         # Test full diagnostic info (integration of both fixes)
         diagnostic_info = await bundle_manager.get_diagnostic_info()
@@ -229,14 +201,10 @@ async def test_both_fixes_work_together():
             await asyncio.sleep(0.1)
 
         # Verify both fixes work
-        assert (
-            len(transport_issues) == 0
-        ), f"No transport issues should occur: {transport_issues}"
+        assert len(transport_issues) == 0, f"No transport issues should occur: {transport_issues}"
 
         port_checked_keys = [
-            key
-            for key in diagnostic_info.keys()
-            if "port_" in key and "_checked" in key
+            key for key in diagnostic_info.keys() if "port_" in key and "_checked" in key
         ]
 
         # Note: Port checking only happens when sbctl is available
@@ -246,9 +214,7 @@ async def test_both_fixes_work_together():
             print("✅ Socket-based port checking is ready when sbctl is present")
         else:
             print(f"✅ Port checking worked: {port_checked_keys}")
-            assert (
-                len(port_checked_keys) > 0
-            ), "Port checking should work without netstat"
+            assert len(port_checked_keys) > 0, "Port checking should work without netstat"
 
         print("✅ Both fixes work correctly together:")
         print("  - Python 3.13 transport cleanup: No transport issues")
@@ -271,15 +237,9 @@ def test_fixes_are_properly_implemented():
     source = inspect.getsource(subprocess_utils)
 
     # Verify Python 3.13 specific code is present
-    assert (
-        "sys.version_info >= (3, 13)" in source
-    ), "Should have Python 3.13 version check"
-    assert (
-        "_safe_transport_cleanup" in source
-    ), "Should have safe transport cleanup function"
-    assert (
-        "_safe_transport_wait_close" in source
-    ), "Should have safe transport wait function"
+    assert "sys.version_info >= (3, 13)" in source, "Should have Python 3.13 version check"
+    assert "_safe_transport_cleanup" in source, "Should have safe transport cleanup function"
+    assert "_safe_transport_wait_close" in source, "Should have safe transport wait function"
 
     # Check bundle.py has socket-based port checking
     from mcp_server_troubleshoot import bundle
@@ -288,12 +248,12 @@ def test_fixes_are_properly_implemented():
 
     # Verify socket import and usage
     assert "import socket" in bundle_source, "Should import socket module"
-    assert (
-        "_check_port_listening_python" in bundle_source
-    ), "Should have Python port checking method"
-    assert (
-        "socket.socket(socket.AF_INET, socket.SOCK_STREAM)" in bundle_source
-    ), "Should use socket for port checking"
+    assert "_check_port_listening_python" in bundle_source, (
+        "Should have Python port checking method"
+    )
+    assert "socket.socket(socket.AF_INET, socket.SOCK_STREAM)" in bundle_source, (
+        "Should use socket for port checking"
+    )
 
     # Verify netstat is no longer used in the port checking code
     # (It might still be mentioned in comments or documentation)
@@ -302,9 +262,9 @@ def test_fixes_are_properly_implemented():
         if "netstat" in line.lower() and "subprocess_exec_with_cleanup(" in line:
             netstat_usage_lines.append(f"Line {line_num}: {line.strip()}")
 
-    assert (
-        len(netstat_usage_lines) == 0
-    ), f"Found active netstat usage that should be replaced: {netstat_usage_lines}"
+    assert len(netstat_usage_lines) == 0, (
+        f"Found active netstat usage that should be replaced: {netstat_usage_lines}"
+    )
 
     print("✅ Both fixes are properly implemented in the codebase:")
     print("  - subprocess_utils: Python 3.13 transport handling")

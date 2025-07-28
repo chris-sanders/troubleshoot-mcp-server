@@ -143,9 +143,7 @@ debug_mcp.run()
     # Try to get response with short timeout
     try:
         if process.stdout:
-            response_bytes = await asyncio.wait_for(
-                process.stdout.readline(), timeout=5.0
-            )
+            response_bytes = await asyncio.wait_for(process.stdout.readline(), timeout=5.0)
             response_line = response_bytes.decode().strip()
             print(f"🔍 DEBUG: Got response: {response_line}")
     except asyncio.TimeoutError:

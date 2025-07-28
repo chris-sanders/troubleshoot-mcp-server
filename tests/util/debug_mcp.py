@@ -83,9 +83,7 @@ def main():
             if response_line:
                 try:
                     response = json.loads(response_line.decode("utf-8"))
-                    print(
-                        f"Received JSON-RPC response: {json.dumps(response, indent=2)}"
-                    )
+                    print(f"Received JSON-RPC response: {json.dumps(response, indent=2)}")
                 except json.JSONDecodeError as e:
                     print(f"Failed to decode response as JSON: {e}")
             else:

@@ -53,9 +53,7 @@ async def test_bundle_cleanup_without_ps_pkill():
         pkill_failed = False
         pkill_error = None
         try:
-            pkill_result = subprocess.run(
-                ["pkill", "-f", "sbctl"], capture_output=True, text=True
-            )
+            pkill_result = subprocess.run(["pkill", "-f", "sbctl"], capture_output=True, text=True)
             pytest.fail(
                 f"❌ TDD PROBLEM: pkill command was found and executed successfully!\n"
                 f"Return code: {pkill_result.returncode}\n"
@@ -133,15 +131,11 @@ def test_psutil_based_process_management_implementation():
         python_processes = find_processes_by_name("python")
 
         # Should find at least this test process
-        assert (
-            len(python_processes) >= 1
-        ), "Should find at least the current python process"
+        assert len(python_processes) >= 1, "Should find at least the current python process"
 
         # Verify the returned objects are psutil Process instances
         for proc in python_processes:
-            assert isinstance(
-                proc, psutil.Process
-            ), "Should return psutil Process objects"
+            assert isinstance(proc, psutil.Process), "Should return psutil Process objects"
 
         # Test that we can access process information
         current_process = psutil.Process()  # Current process
@@ -153,9 +147,7 @@ def test_psutil_based_process_management_implementation():
 
         # Test termination function (but don't actually terminate anything)
         # Just verify the function structure works without causing harm
-        fake_process_count = terminate_processes_by_name(
-            "nonexistent_process_name_12345"
-        )
+        fake_process_count = terminate_processes_by_name("nonexistent_process_name_12345")
         assert fake_process_count == 0, "Should return 0 for non-existent processes"
 
         # SUCCESS: The psutil-based implementation works correctly
@@ -259,9 +251,7 @@ def test_psutil_availability():
 
         # Test process filtering functionality
         python_procs = [
-            p
-            for p in psutil.process_iter(["name"])
-            if "python" in p.info["name"].lower()
+            p for p in psutil.process_iter(["name"]) if "python" in p.info["name"].lower()
         ]
         assert len(python_procs) >= 1, "Should find at least one python process"
 
@@ -271,9 +261,7 @@ def test_psutil_availability():
         print(f"✅ Found {len(python_procs)} python processes")
 
     except ImportError:
-        pytest.fail(
-            "❌ psutil is not available! Add psutil to pyproject.toml dependencies."
-        )
+        pytest.fail("❌ psutil is not available! Add psutil to pyproject.toml dependencies.")
     except Exception as e:
         pytest.fail(
             f"❌ psutil functionality test failed: {str(e)}\nError type: {type(e).__name__}"

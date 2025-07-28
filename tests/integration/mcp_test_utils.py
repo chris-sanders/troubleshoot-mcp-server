@@ -25,9 +25,7 @@ class MCPTestClient:
     with it using the JSON-RPC 2.0 protocol over stdio transport.
     """
 
-    def __init__(
-        self, bundle_dir: Optional[Path] = None, env: Optional[Dict[str, str]] = None
-    ):
+    def __init__(self, bundle_dir: Optional[Path] = None, env: Optional[Dict[str, str]] = None):
         """
         Initialize the MCP test client.
 
@@ -202,9 +200,7 @@ class MCPTestClient:
                 raise RuntimeError(f"Response is not a JSON object: {response}")
 
             if response.get("jsonrpc") != "2.0":
-                raise RuntimeError(
-                    f"Invalid JSON-RPC version: {response.get('jsonrpc')}"
-                )
+                raise RuntimeError(f"Invalid JSON-RPC version: {response.get('jsonrpc')}")
 
             if response.get("id") != request_id:
                 raise RuntimeError(
@@ -225,9 +221,7 @@ class MCPTestClient:
             logger.error(f"Error during RPC communication: {e}")
             raise
 
-    async def send_notification(
-        self, method: str, params: Optional[Dict[str, Any]] = None
-    ) -> None:
+    async def send_notification(self, method: str, params: Optional[Dict[str, Any]] = None) -> None:
         """
         Send JSON-RPC notification (no response expected).
 
@@ -265,9 +259,7 @@ class MCPTestClient:
             logger.error(f"Error sending notification: {e}")
             raise
 
-    async def initialize_mcp(
-        self, client_info: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    async def initialize_mcp(self, client_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Send MCP initialize request to establish connection.
 
@@ -280,8 +272,7 @@ class MCPTestClient:
         params = {
             "protocolVersion": "2024-11-05",
             "capabilities": {"tools": {}},
-            "clientInfo": client_info
-            or {"name": "mcp-test-client", "version": "1.0.0"},
+            "clientInfo": client_info or {"name": "mcp-test-client", "version": "1.0.0"},
         }
 
         response = await self.send_request("initialize", params)

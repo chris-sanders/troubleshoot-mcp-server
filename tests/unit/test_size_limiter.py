@@ -107,9 +107,7 @@ def test_token_estimation_accuracy(text, expected_tokens):
         ("mixed_whitespace", True),  # Various whitespace scenarios
     ],
 )
-def test_token_estimation_within_tolerance(
-    sample_texts, text_key, expected_within_10_percent
-):
+def test_token_estimation_within_tolerance(sample_texts, text_key, expected_within_10_percent):
     """
     Test that token estimation is within acceptable tolerance (±10%).
 
@@ -236,9 +234,7 @@ def test_custom_size_limits(sample_texts, text_key, custom_limit, should_exceed)
         (None, 25000),  # Default when not set
     ],
 )
-def test_mcp_token_limit_environment_variable(
-    mock_environment, env_value, expected_limit
-):
+def test_mcp_token_limit_environment_variable(mock_environment, env_value, expected_limit):
     """
     Test MCP_TOKEN_LIMIT environment variable configuration.
 
@@ -279,9 +275,7 @@ def test_mcp_token_limit_environment_variable(
         (None, True),  # Default when not set
     ],
 )
-def test_mcp_size_check_enabled_environment_variable(
-    mock_environment, env_value, expected_enabled
-):
+def test_mcp_size_check_enabled_environment_variable(mock_environment, env_value, expected_enabled):
     """
     Test MCP_SIZE_CHECK_ENABLED environment variable configuration.
 

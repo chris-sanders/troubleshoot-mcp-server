@@ -88,9 +88,7 @@ class TestServerLifecycleSimplified:
                 os.environ.pop("MCP_BUNDLE_STORAGE", None)
 
     @pytest.mark.asyncio
-    async def test_server_startup_with_bundle_directory_scanning(
-        self, tmp_path: Path, mock_server
-    ):
+    async def test_server_startup_with_bundle_directory_scanning(self, tmp_path: Path, mock_server):
         """Test server startup automatically scans bundle directory for available bundles."""
         bundle_dir = tmp_path / "bundles"
         bundle_dir.mkdir()
@@ -153,9 +151,7 @@ class TestServerLifecycleSimplified:
                 os.environ.pop("MCP_BUNDLE_STORAGE", None)
 
     @pytest.mark.asyncio
-    async def test_server_startup_invalid_bundles_handling(
-        self, tmp_path: Path, mock_server
-    ):
+    async def test_server_startup_invalid_bundles_handling(self, tmp_path: Path, mock_server):
         """Test server startup with invalid bundles (should handle errors gracefully)."""
         bundle_dir = tmp_path / "bundles"
         bundle_dir.mkdir()
@@ -187,9 +183,7 @@ class TestServerLifecycleSimplified:
                 assert len(valid_bundles) == 1
 
                 # Test including invalid bundles
-                all_bundles = await bundle_manager.list_available_bundles(
-                    include_invalid=True
-                )
+                all_bundles = await bundle_manager.list_available_bundles(include_invalid=True)
                 assert len(all_bundles) >= len(bundles)
 
         finally:
@@ -298,9 +292,7 @@ class TestBundleManagementBasics:
         return bundle_dir
 
     @pytest.mark.asyncio
-    async def test_automatic_bundle_discovery_on_startup(
-        self, bundle_manager_context: Path
-    ):
+    async def test_automatic_bundle_discovery_on_startup(self, bundle_manager_context: Path):
         """Test automatic bundle discovery when server starts."""
         # Create multiple bundles
         bundles_created = []
@@ -376,9 +368,7 @@ class TestUtilityFunctions:
         bundle_manager = BundleManager(bundle_dir)
 
         # Create cleanup task with short interval
-        cleanup_task = asyncio.create_task(
-            periodic_bundle_cleanup(bundle_manager, interval=0.1)
-        )
+        cleanup_task = asyncio.create_task(periodic_bundle_cleanup(bundle_manager, interval=0.1))
 
         # Let it run briefly
         await asyncio.sleep(0.3)
