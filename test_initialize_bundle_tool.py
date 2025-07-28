@@ -75,9 +75,7 @@ async def test_initialize_bundle_tool():
 
             # Read initialize response
             if process.stdout:
-                init_response_bytes = await asyncio.wait_for(
-                    process.stdout.readline(), timeout=5.0
-                )
+                init_response_bytes = await asyncio.wait_for(process.stdout.readline(), timeout=5.0)
                 init_response = init_response_bytes.decode().strip()
                 print(f"Initialize response: {init_response}")
 
@@ -103,9 +101,7 @@ async def test_initialize_bundle_tool():
             # Try to read response with timeout
             try:
                 if process.stdout:
-                    print(
-                        "Waiting for tool response (this should complete in ~6 seconds)..."
-                    )
+                    print("Waiting for tool response (this should complete in ~6 seconds)...")
                     response_bytes = await asyncio.wait_for(
                         process.stdout.readline(),
                         timeout=30.0,  # Generous timeout
@@ -130,9 +126,7 @@ async def test_initialize_bundle_tool():
                 # Check stderr for errors
                 if process.stderr:
                     try:
-                        stderr_data = await asyncio.wait_for(
-                            process.stderr.read(4096), timeout=1.0
-                        )
+                        stderr_data = await asyncio.wait_for(process.stderr.read(4096), timeout=1.0)
                         if stderr_data:
                             stderr_text = stderr_data.decode()
                             print(f"STDERR during timeout: {stderr_text}")

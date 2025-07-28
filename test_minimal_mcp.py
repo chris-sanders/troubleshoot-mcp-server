@@ -83,9 +83,7 @@ mcp.run()
         # Try to get response
         try:
             if process.stdout:
-                response_bytes = await asyncio.wait_for(
-                    process.stdout.readline(), timeout=5.0
-                )
+                response_bytes = await asyncio.wait_for(process.stdout.readline(), timeout=5.0)
                 response_line = response_bytes.decode().strip()
                 print(f"Response: {response_line}")
 

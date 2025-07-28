@@ -95,9 +95,7 @@ class ContainerMCPClient:
             raise RuntimeError("Container stdout not available")
 
         try:
-            response_bytes = await asyncio.wait_for(
-                self.process.stdout.readline(), timeout=60.0
-            )
+            response_bytes = await asyncio.wait_for(self.process.stdout.readline(), timeout=60.0)
             response_line = response_bytes.decode().strip()
             logger.debug(f"Received: {response_line}")
 
@@ -123,9 +121,7 @@ class ContainerMCPClient:
 
     async def call_tool(self, tool_name: str, arguments: dict) -> dict:
         """Call an MCP tool in the container."""
-        return await self.send_request(
-            "tools/call", {"name": tool_name, "arguments": arguments}
-        )
+        return await self.send_request("tools/call", {"name": tool_name, "arguments": arguments})
 
     async def stop(self) -> None:
         """Stop the container."""
@@ -344,17 +340,13 @@ class TestContainerBundleValidation:
 
             # Step 1: Initialize bundle
             bundle_path = f"/data/bundles/{test_bundle_in_dir.name}"
-            init_response = await client.call_tool(
-                "initialize_bundle", {"source": bundle_path}
-            )
+            init_response = await client.call_tool("initialize_bundle", {"source": bundle_path})
 
             assert "result" in init_response
             logger.info("✅ Bundle initialized in container")
 
             # Step 2: List files
-            files_response = await client.call_tool(
-                "list_files", {"path": "/", "recursive": False}
-            )
+            files_response = await client.call_tool("list_files", {"path": "/", "recursive": False})
 
             assert "result" in files_response
             files_content = files_response["result"]["content"][0]["text"]

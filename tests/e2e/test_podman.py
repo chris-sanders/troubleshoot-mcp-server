@@ -106,9 +106,7 @@ def test_podman_availability() -> None:
     print(f"Using Podman version: {result.stdout.strip()}")
 
 
-def test_basic_podman_run(
-    container_image: str, container_name: str, temp_bundle_dir: Path
-) -> None:
+def test_basic_podman_run(container_image: str, container_name: str, temp_bundle_dir: Path) -> None:
     """Test that the Podman container runs and exits successfully."""
     result = subprocess.run(
         [
@@ -170,9 +168,7 @@ def test_installed_tools(container_image: str, container_name: str) -> None:
         assert result.stdout.strip(), f"{tool} path is empty"
 
 
-def test_help_command(
-    container_image: str, container_name: str, temp_bundle_dir: Path
-) -> None:
+def test_help_command(container_image: str, container_name: str, temp_bundle_dir: Path) -> None:
     """Test that the application's help command works."""
     result = subprocess.run(
         [
@@ -201,9 +197,7 @@ def test_help_command(
     assert "usage:" in combined_output.lower(), "Application help command failed"
 
 
-def test_version_command(
-    container_image: str, container_name: str, temp_bundle_dir: Path
-) -> None:
+def test_version_command(container_image: str, container_name: str, temp_bundle_dir: Path) -> None:
     """Test that the application's version command works."""
     result = subprocess.run(
         [
@@ -272,9 +266,7 @@ def test_process_dummy_bundle(
 
     # Verify the application CLI works
     assert result.returncode == 0, f"Failed to run container: {result.stderr}"
-    assert (
-        "usage:" in (result.stdout + result.stderr).lower()
-    ), "Application CLI is not working"
+    assert "usage:" in (result.stdout + result.stderr).lower(), "Application CLI is not working"
 
 
 if __name__ == "__main__":

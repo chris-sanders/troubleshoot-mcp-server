@@ -78,9 +78,7 @@ def test_mcp_server():
             import select
 
             # Use select to wait for output with timeout
-            ready, _, _ = select.select(
-                [process.stdout], [], [], 5.0
-            )  # 5 second timeout
+            ready, _, _ = select.select([process.stdout], [], [], 5.0)  # 5 second timeout
 
             if ready:
                 response = process.stdout.readline()

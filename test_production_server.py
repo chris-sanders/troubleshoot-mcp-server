@@ -71,9 +71,7 @@ async def test_production_server():
         try:
             if process.stdout:
                 print("Waiting for response...")
-                response_bytes = await asyncio.wait_for(
-                    process.stdout.readline(), timeout=10.0
-                )
+                response_bytes = await asyncio.wait_for(process.stdout.readline(), timeout=10.0)
                 response_line = response_bytes.decode().strip()
                 print(f"✅ Response: {response_line}")
 
@@ -96,9 +94,7 @@ async def test_production_server():
             # Check stderr for errors
             if process.stderr:
                 try:
-                    stderr_data = await asyncio.wait_for(
-                        process.stderr.read(4096), timeout=1.0
-                    )
+                    stderr_data = await asyncio.wait_for(process.stderr.read(4096), timeout=1.0)
                     if stderr_data:
                         stderr_text = stderr_data.decode()
                         print(f"STDERR during timeout: {stderr_text}")

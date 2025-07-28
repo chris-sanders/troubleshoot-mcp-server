@@ -35,15 +35,11 @@ async def test_bundle_api_check_without_netstat():
         clean_path_parts = []
         for path_part in original_path.split(":"):
             # Skip paths that typically contain netstat
-            if not any(
-                common in path_part.lower() for common in ["/bin", "/sbin", "/usr"]
-            ):
+            if not any(common in path_part.lower() for common in ["/bin", "/sbin", "/usr"]):
                 clean_path_parts.append(path_part)
 
         # Set a very minimal PATH that won't have netstat
-        os.environ["PATH"] = (
-            ":".join(clean_path_parts) if clean_path_parts else "/nonexistent"
-        )
+        os.environ["PATH"] = ":".join(clean_path_parts) if clean_path_parts else "/nonexistent"
 
         # Now try to execute netstat - this should fail with FileNotFoundError
         try:
@@ -211,9 +207,7 @@ async def test_port_checking_functionality_without_netstat():
 
         try:
             # Test on a port that's likely free
-            port_free = check_port_listening_python(
-                0
-            )  # Port 0 is special - always available
+            port_free = check_port_listening_python(0)  # Port 0 is special - always available
             # Test on a port that might be in use
             port_in_use = check_port_listening_python(22)  # SSH port often in use
 
@@ -228,9 +222,7 @@ async def test_port_checking_functionality_without_netstat():
         # For TDD: The current (netstat) approach should fail,
         # and the replacement (Python socket) approach should work
         if netstat_failed and python_socket_works:
-            print(
-                "✅ TDD SUCCESS: Demonstrated the netstat dependency problem and solution!"
-            )
+            print("✅ TDD SUCCESS: Demonstrated the netstat dependency problem and solution!")
             print(f"❌ Current netstat approach failed: {netstat_error}")
             print("✅ Python socket replacement works correctly")
             print("✅ Test confirms both the problem and the solution work as expected")

@@ -145,15 +145,11 @@ async def test_initialize_bundle_tool_parametrized(
         patch.object(
             bundle_manager, "_check_sbctl_available", new_callable=AsyncMock
         ) as mock_sbctl,
-        patch.object(
-            bundle_manager, "initialize_bundle", new_callable=AsyncMock
-        ) as mock_init,
+        patch.object(bundle_manager, "initialize_bundle", new_callable=AsyncMock) as mock_init,
         patch.object(
             bundle_manager, "check_api_server_available", new_callable=AsyncMock
         ) as mock_api,
-        patch.object(
-            bundle_manager, "get_diagnostic_info", new_callable=AsyncMock
-        ) as mock_diag,
+        patch.object(bundle_manager, "get_diagnostic_info", new_callable=AsyncMock) as mock_diag,
         patch("mcp_server_troubleshoot.server.get_bundle_manager") as mock_get_manager,
     ):
         # Set up mocks for external dependencies only
@@ -166,9 +162,7 @@ async def test_initialize_bundle_tool_parametrized(
         # Create InitializeBundleArgs instance
         from mcp_server_troubleshoot.bundle import InitializeBundleArgs
 
-        args = InitializeBundleArgs(
-            source=str(temp_source_file), force=force, verbosity="verbose"
-        )
+        args = InitializeBundleArgs(source=str(temp_source_file), force=force, verbosity="verbose")
 
         # Call the tool function
         response = await initialize_bundle(args)
@@ -278,16 +272,10 @@ async def test_kubectl_tool_parametrized(
         patch.object(
             bundle_manager, "check_api_server_available", new_callable=AsyncMock
         ) as mock_api,
-        patch.object(
-            bundle_manager, "get_diagnostic_info", new_callable=AsyncMock
-        ) as mock_diag,
-        patch.object(
-            kubectl_executor, "execute", new_callable=AsyncMock
-        ) as mock_execute,
+        patch.object(bundle_manager, "get_diagnostic_info", new_callable=AsyncMock) as mock_diag,
+        patch.object(kubectl_executor, "execute", new_callable=AsyncMock) as mock_execute,
         patch("mcp_server_troubleshoot.server.get_bundle_manager") as mock_get_manager,
-        patch(
-            "mcp_server_troubleshoot.server.get_kubectl_executor"
-        ) as mock_get_executor,
+        patch("mcp_server_troubleshoot.server.get_kubectl_executor") as mock_get_executor,
     ):
         # Set up mocks
         mock_api.return_value = True
@@ -655,22 +643,16 @@ async def test_file_operations_error_handling(
         )
 
         # 1. Test list_files
-        list_args = ListFilesArgs(
-            path="test/path", recursive=False, verbosity="verbose"
-        )
+        list_args = ListFilesArgs(path="test/path", recursive=False, verbosity="verbose")
         list_response = await list_files(list_args)
-        test_assertions.assert_api_response_valid(
-            list_response, "text", expected_strings
-        )
+        test_assertions.assert_api_response_valid(list_response, "text", expected_strings)
 
         # 2. Test read_file
         read_args = ReadFileArgs(
             path="test/file.txt", start_line=0, end_line=None, verbosity="verbose"
         )
         read_response = await read_file(read_args)
-        test_assertions.assert_api_response_valid(
-            read_response, "text", expected_strings
-        )
+        test_assertions.assert_api_response_valid(read_response, "text", expected_strings)
 
         # 3. Test grep_files
         grep_args = GrepFilesArgs(
@@ -685,9 +667,7 @@ async def test_file_operations_error_handling(
             verbosity="verbose",
         )
         grep_response = await grep_files(grep_args)
-        test_assertions.assert_api_response_valid(
-            grep_response, "text", expected_strings
-        )
+        test_assertions.assert_api_response_valid(grep_response, "text", expected_strings)
 
     # No manual cleanup needed - tmp_path handles it automatically
 
@@ -787,9 +767,7 @@ async def test_list_available_bundles_parametrized(
 
     # Mock only the list_available_bundles method, keep rest of BundleManager real
     with (
-        patch.object(
-            bundle_manager, "list_available_bundles", new_callable=AsyncMock
-        ) as mock_list,
+        patch.object(bundle_manager, "list_available_bundles", new_callable=AsyncMock) as mock_list,
         patch("mcp_server_troubleshoot.server.get_bundle_manager") as mock_get_manager,
     ):
         mock_list.return_value = bundles
@@ -798,9 +776,7 @@ async def test_list_available_bundles_parametrized(
         # Create ListAvailableBundlesArgs instance
         from mcp_server_troubleshoot.bundle import ListAvailableBundlesArgs
 
-        args = ListAvailableBundlesArgs(
-            include_invalid=include_invalid, verbosity="verbose"
-        )
+        args = ListAvailableBundlesArgs(include_invalid=include_invalid, verbosity="verbose")
 
         # Call the tool function
         response = await list_available_bundles(args)

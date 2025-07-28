@@ -49,9 +49,7 @@ async def test_bundle_loading():
             await client.initialize_mcp()
             print("✅ MCP initialized")
 
-            print(
-                "\n=== Step 3: Testing initialize_bundle tool (with timeout tracking) ==="
-            )
+            print("\n=== Step 3: Testing initialize_bundle tool (with timeout tracking) ===")
             print(f"Calling initialize_bundle with path: {test_bundle_copy}")
 
             # Add timeout tracking to see where it gets stuck
@@ -62,9 +60,7 @@ async def test_bundle_loading():
             try:
                 print("Sending tool call request...")
                 content = await asyncio.wait_for(
-                    client.call_tool(
-                        "initialize_bundle", {"source": str(test_bundle_copy)}
-                    ),
+                    client.call_tool("initialize_bundle", {"source": str(test_bundle_copy)}),
                     timeout=30.0,  # 30 second timeout to see what happens
                 )
                 elapsed = time.time() - start_time

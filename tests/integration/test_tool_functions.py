@@ -84,9 +84,7 @@ async def test_list_available_bundles_function(bundle_storage_dir):
 
     content_item = result[0]
     assert content_item.type == "text", "Content should be text type"
-    assert (
-        "No support bundles found" in content_item.text
-    ), "Should indicate no bundles found"
+    assert "No support bundles found" in content_item.text, "Should indicate no bundles found"
 
 
 @pytest.mark.asyncio
@@ -150,9 +148,7 @@ async def test_initialize_bundle_function_force_flag(bundle_storage_dir):
 
     assert len(result1) > 0, "First initialization should succeed"
     response1_text = result1[0].text
-    assert (
-        "Bundle initialized" in response1_text
-    ), "First initialization should report success"
+    assert "Bundle initialized" in response1_text, "First initialization should report success"
 
     # Second initialization with force=True should also work
     args2 = InitializeBundleArgs(source=str(test_bundle), force=True)
@@ -160,9 +156,7 @@ async def test_initialize_bundle_function_force_flag(bundle_storage_dir):
 
     assert len(result2) > 0, "Second initialization with force should succeed"
     response2_text = result2[0].text
-    assert (
-        "Bundle initialized" in response2_text
-    ), "Second initialization should report success"
+    assert "Bundle initialized" in response2_text, "Second initialization should report success"
 
 
 @pytest.mark.asyncio
@@ -188,9 +182,7 @@ async def test_initialize_bundle_validation_nonexistent_file(bundle_storage_dir)
 
     # Verify the error message indicates the file wasn't found
     error_msg = str(exc_info.value)
-    assert (
-        "Bundle source not found" in error_msg
-    ), "Should indicate bundle source not found"
+    assert "Bundle source not found" in error_msg, "Should indicate bundle source not found"
 
 
 @pytest.mark.asyncio
@@ -226,9 +218,7 @@ async def test_list_files_function_with_bundle(bundle_storage_dir):
 
     # Should contain file listing information
     assert "```json" in response_text, "Response should contain JSON data"
-    assert (
-        "Listed files in" in response_text
-    ), "Response should indicate listing operation"
+    assert "Listed files in" in response_text, "Response should indicate listing operation"
 
 
 @pytest.mark.asyncio
@@ -250,9 +240,9 @@ async def test_pydantic_validation_invalid_parameters(bundle_storage_dir):
 
     # Verify the error indicates path validation failure
     error_msg = str(exc_info.value)
-    assert (
-        "Path cannot contain directory traversal" in error_msg
-    ), "Should indicate path validation error"
+    assert "Path cannot contain directory traversal" in error_msg, (
+        "Should indicate path validation error"
+    )
 
 
 @pytest.mark.asyncio
@@ -320,9 +310,7 @@ async def test_read_file_function_execution(bundle_storage_dir):
     assert len(init_result) > 0, "Bundle initialization should succeed"
 
     # Try to read a common file via direct function call
-    read_args = ReadFileArgs(
-        path="cluster-info/version.json", start_line=0, num_lines=10
-    )
+    read_args = ReadFileArgs(path="cluster-info/version.json", start_line=0, num_lines=10)
 
     try:
         read_result = await read_file(read_args)

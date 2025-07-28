@@ -79,9 +79,7 @@ def test_size_limit_thresholds(token_count, limit, should_pass):
         (None, 25000),  # Default when not set
     ],
 )
-def test_mcp_token_limit_environment_variable(
-    mock_environment, env_value, expected_limit
-):
+def test_mcp_token_limit_environment_variable(mock_environment, env_value, expected_limit):
     """
     Test MCP_TOKEN_LIMIT environment variable configuration.
     """
@@ -100,9 +98,7 @@ def test_mcp_token_limit_environment_variable(
         (None, True),  # Default when not set
     ],
 )
-def test_mcp_size_check_enabled_environment_variable(
-    mock_environment, env_value, expected_enabled
-):
+def test_mcp_size_check_enabled_environment_variable(mock_environment, env_value, expected_enabled):
     """
     Test MCP_SIZE_CHECK_ENABLED environment variable configuration.
     """

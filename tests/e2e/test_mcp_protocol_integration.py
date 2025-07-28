@@ -39,9 +39,7 @@ def temp_bundle_dir():
 class TestMCPProtocolLifecycle:
     """Test complete MCP server lifecycle via JSON-RPC protocol."""
 
-    async def test_server_startup_and_initialization(
-        self, temp_bundle_dir, test_bundle_path
-    ):
+    async def test_server_startup_and_initialization(self, temp_bundle_dir, test_bundle_path):
         """
         Test server startup and MCP initialization handshake.
 
@@ -141,9 +139,9 @@ class TestMCPProtocolLifecycle:
             }
 
             actual_tools = {tool["name"] for tool in tools}
-            assert expected_tools.issubset(
-                actual_tools
-            ), f"Missing expected tools. Expected: {expected_tools}, Actual: {actual_tools}"
+            assert expected_tools.issubset(actual_tools), (
+                f"Missing expected tools. Expected: {expected_tools}, Actual: {actual_tools}"
+            )
 
             # Verify each tool has required properties
             for tool in tools:
@@ -173,33 +171,26 @@ class TestMCPProtocolLifecycle:
             await client.initialize_mcp()
 
             # Test bundle loading via MCP tool call
-            content = await client.call_tool(
-                "initialize_bundle", {"source": str(test_bundle_copy)}
-            )
+            content = await client.call_tool("initialize_bundle", {"source": str(test_bundle_copy)})
 
             # Verify successful bundle loading
             assert len(content) > 0, "initialize_bundle should return content"
 
             result_text = content[0].get("text", "")
-            assert (
-                "successfully" in result_text.lower()
-                or "initialized" in result_text.lower()
-            ), f"Bundle initialization appears to have failed. Response: {result_text}"
+            assert "successfully" in result_text.lower() or "initialized" in result_text.lower(), (
+                f"Bundle initialization appears to have failed. Response: {result_text}"
+            )
 
             # Verify bundle is now accessible via list_available_bundles
             bundles_content = await client.call_tool("list_available_bundles")
-            assert (
-                len(bundles_content) > 0
-            ), "Should have at least one bundle after initialization"
+            assert len(bundles_content) > 0, "Should have at least one bundle after initialization"
 
             bundles_text = bundles_content[0].get("text", "")
-            assert (
-                bundle_name in bundles_text
-            ), f"Loaded bundle {bundle_name} should appear in bundle list: {bundles_text}"
+            assert bundle_name in bundles_text, (
+                f"Loaded bundle {bundle_name} should appear in bundle list: {bundles_text}"
+            )
 
-    async def test_file_operations_via_protocol(
-        self, temp_bundle_dir, test_bundle_path
-    ):
+    async def test_file_operations_via_protocol(self, temp_bundle_dir, test_bundle_path):
         """
         Test file operations (list_files, read_file) via MCP protocol.
 
@@ -216,9 +207,7 @@ class TestMCPProtocolLifecycle:
         async with MCPTestClient(bundle_dir=temp_bundle_dir, env=env) as client:
             # Initialize and load bundle
             await client.initialize_mcp()
-            await client.call_tool(
-                "initialize_bundle", {"source": str(test_bundle_copy)}
-            )
+            await client.call_tool("initialize_bundle", {"source": str(test_bundle_copy)})
 
             # Test file listing via protocol
             files_content = await client.call_tool("list_files", {"path": "."})
@@ -234,15 +223,11 @@ class TestMCPProtocolLifecycle:
 
             # Extract file names from the listing
             files_text = files_list[0].get("text", "")
-            file_lines = [
-                line.strip() for line in files_text.split("\n") if line.strip()
-            ]
+            file_lines = [line.strip() for line in files_text.split("\n") if line.strip()]
             assert len(file_lines) > 0, "Should have at least one file in the bundle"
 
             # Get the first file for testing (remove any tree symbols)
-            first_file = file_lines[0].split()[
-                -1
-            ]  # Take the last part after any tree symbols
+            first_file = file_lines[0].split()[-1]  # Take the last part after any tree symbols
 
             # Test reading the actual file that exists in the bundle
             file_content = await client.call_tool("read_file", {"path": first_file})
@@ -252,9 +237,7 @@ class TestMCPProtocolLifecycle:
             # Some files might be binary or empty, just verify we got a response
             assert content_text is not None, "File content should be retrievable"
 
-    async def test_grep_functionality_via_protocol(
-        self, temp_bundle_dir, test_bundle_path
-    ):
+    async def test_grep_functionality_via_protocol(self, temp_bundle_dir, test_bundle_path):
         """
         Test file searching via the grep_files MCP tool.
 
@@ -270,15 +253,11 @@ class TestMCPProtocolLifecycle:
         async with MCPTestClient(bundle_dir=temp_bundle_dir, env=env) as client:
             # Initialize and load bundle
             await client.initialize_mcp()
-            await client.call_tool(
-                "initialize_bundle", {"source": str(test_bundle_copy)}
-            )
+            await client.call_tool("initialize_bundle", {"source": str(test_bundle_copy)})
 
             # Test grep functionality via protocol
             # Search for a common term that should exist in Kubernetes bundles
-            grep_content = await client.call_tool(
-                "grep_files", {"pattern": "kind:", "path": "."}
-            )
+            grep_content = await client.call_tool("grep_files", {"pattern": "kind:", "path": "."})
 
             assert len(grep_content) > 0, "grep_files should return content"
 
@@ -302,14 +281,10 @@ class TestMCPProtocolLifecycle:
         async with MCPTestClient(bundle_dir=temp_bundle_dir, env=env) as client:
             # Initialize and load bundle
             await client.initialize_mcp()
-            await client.call_tool(
-                "initialize_bundle", {"source": str(test_bundle_copy)}
-            )
+            await client.call_tool("initialize_bundle", {"source": str(test_bundle_copy)})
 
             # Test basic kubectl command via protocol
-            kubectl_content = await client.call_tool(
-                "kubectl", {"command": "get nodes"}
-            )
+            kubectl_content = await client.call_tool("kubectl", {"command": "get nodes"})
 
             assert len(kubectl_content) > 0, "kubectl should return content"
 
@@ -319,9 +294,7 @@ class TestMCPProtocolLifecycle:
             # The command might fail (no nodes in test bundle), but should not crash
             # We just verify the protocol layer works correctly
 
-    async def test_kubectl_exec_handling_via_protocol(
-        self, temp_bundle_dir, test_bundle_path
-    ):
+    async def test_kubectl_exec_handling_via_protocol(self, temp_bundle_dir, test_bundle_path):
         """
         Test kubectl exec command handling via MCP protocol.
 
@@ -338,23 +311,17 @@ class TestMCPProtocolLifecycle:
         async with MCPTestClient(bundle_dir=temp_bundle_dir, env=env) as client:
             # Initialize and load bundle
             await client.initialize_mcp()
-            await client.call_tool(
-                "initialize_bundle", {"source": str(test_bundle_copy)}
-            )
+            await client.call_tool("initialize_bundle", {"source": str(test_bundle_copy)})
 
             # Test kubectl exec command via protocol - this should not crash the server
             kubectl_content = await client.call_tool(
                 "kubectl", {"command": "exec -it some-pod -- /bin/bash"}
             )
 
-            assert (
-                len(kubectl_content) > 0
-            ), "kubectl exec should return content (even if error)"
+            assert len(kubectl_content) > 0, "kubectl exec should return content (even if error)"
 
             kubectl_text = kubectl_content[0].get("text", "")
-            assert isinstance(
-                kubectl_text, str
-            ), "kubectl exec result should be a string"
+            assert isinstance(kubectl_text, str), "kubectl exec result should be a string"
 
             # The command will likely fail, but should return a sensible error message
             # and not crash the server. The key is that the server doesn't crash
@@ -362,20 +329,18 @@ class TestMCPProtocolLifecycle:
 
             # It's OK if kubectl exec fails - the important thing is it doesn't crash
             # and returns a meaningful response
-            assert (
-                len(kubectl_text.strip()) > 0
-            ), "kubectl exec should return some response, even if it's an error message"
+            assert len(kubectl_text.strip()) > 0, (
+                "kubectl exec should return some response, even if it's an error message"
+            )
 
             # Verify server is still responsive after kubectl exec
             # by making another tool call
             tools_response = await client.send_request("tools/list")
-            assert (
-                "result" in tools_response
-            ), "Server should still be responsive after kubectl exec"
+            assert "result" in tools_response, (
+                "Server should still be responsive after kubectl exec"
+            )
 
-    async def test_kubectl_interactive_commands_handling(
-        self, temp_bundle_dir, test_bundle_path
-    ):
+    async def test_kubectl_interactive_commands_handling(self, temp_bundle_dir, test_bundle_path):
         """
         Test that interactive kubectl commands are handled gracefully.
 
@@ -395,9 +360,7 @@ class TestMCPProtocolLifecycle:
         async with MCPTestClient(bundle_dir=temp_bundle_dir, env=env) as client:
             # Initialize and load bundle
             await client.initialize_mcp()
-            await client.call_tool(
-                "initialize_bundle", {"source": str(test_bundle_copy)}
-            )
+            await client.call_tool("initialize_bundle", {"source": str(test_bundle_copy)})
 
             # Test various potentially problematic kubectl commands
             problematic_commands = [
@@ -414,18 +377,14 @@ class TestMCPProtocolLifecycle:
 
                 assert len(kubectl_content) > 0, f"kubectl {cmd} should return content"
                 kubectl_text = kubectl_content[0].get("text", "")
-                assert isinstance(
-                    kubectl_text, str
-                ), f"kubectl {cmd} result should be a string"
-                assert (
-                    len(kubectl_text.strip()) > 0
-                ), f"kubectl {cmd} should return some response"
+                assert isinstance(kubectl_text, str), f"kubectl {cmd} result should be a string"
+                assert len(kubectl_text.strip()) > 0, f"kubectl {cmd} should return some response"
 
                 # Verify server is still responsive after each command
                 tools_response = await client.send_request("tools/list")
-                assert (
-                    "result" in tools_response
-                ), f"Server should be responsive after kubectl {cmd}"
+                assert "result" in tools_response, (
+                    f"Server should be responsive after kubectl {cmd}"
+                )
 
 
 class TestMCPProtocolErrorHandling:
@@ -455,17 +414,15 @@ class TestMCPProtocolErrorHandling:
                 # If it doesn't throw, check that error is reported in content
                 assert len(content) > 0, "Should return error content"
                 result_text = content[0].get("text", "")
-                assert (
-                    "error" in result_text.lower() or "not found" in result_text.lower()
-                ), f"Should report error for non-existent bundle: {result_text}"
+                assert "error" in result_text.lower() or "not found" in result_text.lower(), (
+                    f"Should report error for non-existent bundle: {result_text}"
+                )
 
             except RuntimeError as e:
                 # It's also acceptable for this to raise an RPC error
                 assert "error" in str(e).lower(), f"Error should be descriptive: {e}"
 
-    async def test_file_access_error_via_protocol(
-        self, temp_bundle_dir, test_bundle_path
-    ):
+    async def test_file_access_error_via_protocol(self, temp_bundle_dir, test_bundle_path):
         """
         Test file access error handling via MCP protocol.
 
@@ -482,9 +439,7 @@ class TestMCPProtocolErrorHandling:
         async with MCPTestClient(bundle_dir=temp_bundle_dir, env=env) as client:
             # Initialize and load bundle
             await client.initialize_mcp()
-            await client.call_tool(
-                "initialize_bundle", {"source": str(test_bundle_copy)}
-            )
+            await client.call_tool("initialize_bundle", {"source": str(test_bundle_copy)})
 
             # Try to read non-existent file
             try:
@@ -495,16 +450,15 @@ class TestMCPProtocolErrorHandling:
                 # Should either throw or return error in content
                 if len(content) > 0:
                     result_text = content[0].get("text", "")
-                    assert (
-                        "error" in result_text.lower()
-                        or "not found" in result_text.lower()
-                    ), f"Should report error for non-existent file: {result_text}"
+                    assert "error" in result_text.lower() or "not found" in result_text.lower(), (
+                        f"Should report error for non-existent file: {result_text}"
+                    )
 
             except RuntimeError as e:
                 # It's also acceptable for this to raise an RPC error
-                assert (
-                    "error" in str(e).lower() or "not found" in str(e).lower()
-                ), f"Error should be descriptive: {e}"
+                assert "error" in str(e).lower() or "not found" in str(e).lower(), (
+                    f"Error should be descriptive: {e}"
+                )
 
     async def test_invalid_tool_call_via_protocol(self, temp_bundle_dir):
         """
@@ -521,9 +475,7 @@ class TestMCPProtocolErrorHandling:
 
             # Try to call non-existent tool
             try:
-                response = await client.send_request(
-                    "tools/call", {"name": "nonexistent_tool"}
-                )
+                response = await client.send_request("tools/call", {"name": "nonexistent_tool"})
 
                 # Should not reach here - should get an error response
                 pytest.fail(f"Expected error for non-existent tool, got: {response}")
@@ -562,9 +514,7 @@ class TestMCPProtocolErrorHandling:
 class TestMCPProtocolCompleteWorkflow:
     """Test complete workflow combining all MCP tools via protocol."""
 
-    async def test_complete_bundle_analysis_workflow(
-        self, temp_bundle_dir, test_bundle_path
-    ):
+    async def test_complete_bundle_analysis_workflow(self, temp_bundle_dir, test_bundle_path):
         """
         Test complete bundle analysis workflow via MCP protocol.
 
@@ -611,9 +561,7 @@ class TestMCPProtocolCompleteWorkflow:
             assert len(grep_result) > 0
 
             # Step 6: Try kubectl command
-            kubectl_result = await client.call_tool(
-                "kubectl", {"command": "version --client"}
-            )
+            kubectl_result = await client.call_tool("kubectl", {"command": "version --client"})
             assert len(kubectl_result) > 0
 
             # All steps completed successfully via MCP protocol

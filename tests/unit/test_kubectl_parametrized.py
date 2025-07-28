@@ -78,18 +78,14 @@ def test_kubectl_command_args_validation_parametrized(
     """
     if expected_valid:
         # Should succeed
-        args = KubectlCommandArgs(
-            command=command, timeout=timeout, json_output=json_output
-        )
+        args = KubectlCommandArgs(command=command, timeout=timeout, json_output=json_output)
         assert args.command == command
         assert args.timeout == timeout
         assert args.json_output == json_output
     else:
         # Should raise ValidationError
         with pytest.raises(ValidationError):
-            KubectlCommandArgs(
-                command=command, timeout=timeout, json_output=json_output
-            )
+            KubectlCommandArgs(command=command, timeout=timeout, json_output=json_output)
 
 
 @pytest.mark.asyncio
@@ -124,9 +120,7 @@ def test_kubectl_command_args_validation_parametrized(
         "version",
     ],
 )
-async def test_kubectl_command_execution_parameters(
-    command, expected_args, add_json, test_factory
-):
+async def test_kubectl_command_execution_parameters(command, expected_args, add_json, test_factory):
     """
     Test that the kubectl executor handles different command formats correctly.
 
@@ -157,9 +151,7 @@ async def test_kubectl_command_execution_parameters(
         expected_args.extend(["-o", "json"])
 
     # Mock the create_subprocess_exec function
-    with patch(
-        "asyncio.create_subprocess_exec", return_value=mock_process
-    ) as mock_exec:
+    with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
         # Execute the command
         result = await executor._run_kubectl_command(command, bundle, 30, True)
 
@@ -379,9 +371,7 @@ async def test_kubectl_response_parsing(test_assertions, test_factory):
         assert is_json == case["expected_is_json"], f"Case {i}: JSON detection failed"
 
         # Assert the output was processed to the right type
-        assert isinstance(
-            processed, case["expected_type"]
-        ), f"Case {i}: Wrong output type"
+        assert isinstance(processed, case["expected_type"]), f"Case {i}: Wrong output type"
 
         # For JSON outputs, verify structure
         if case["expected_is_json"]:

@@ -121,9 +121,7 @@ def test_list_files_args_validation_parametrized(path, recursive, expected_valid
         "invalid-negative-end",
     ],
 )
-def test_read_file_args_validation_parametrized(
-    path, start_line, end_line, expected_valid
-):
+def test_read_file_args_validation_parametrized(path, start_line, end_line, expected_valid):
     """
     Test ReadFileArgs validation with parameterized test cases.
 

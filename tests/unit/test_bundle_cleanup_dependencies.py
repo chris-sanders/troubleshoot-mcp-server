@@ -70,9 +70,7 @@ async def test_bundle_cleanup_functional_dependency_validation():
             print("✅ No missing dependencies detected in cleanup process")
 
             # Verify cleanup actually did something
-            assert (
-                bundle_manager.active_bundle is None
-            ), "Bundle should be cleared after cleanup"
+            assert bundle_manager.active_bundle is None, "Bundle should be cleared after cleanup"
 
         except FileNotFoundError as e:
             # This is what we expect to see if dependencies are missing in container
@@ -218,9 +216,7 @@ def test_container_environment_simulation():
         print(
             f"✅ Confirmed {len(unavailable_commands)} commands unavailable: {unavailable_commands}"
         )
-        print(
-            "✅ This environment would have broken the original ps/pkill subprocess calls"
-        )
+        print("✅ This environment would have broken the original ps/pkill subprocess calls")
         print("✅ The psutil fix ensures cleanup works even without external commands")
 
     finally:
