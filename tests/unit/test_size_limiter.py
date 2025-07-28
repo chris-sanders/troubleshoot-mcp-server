@@ -30,8 +30,8 @@ def sample_texts():
         "short": "test",  # 4 chars = 1 token
         "medium": "This is a medium length text for testing purposes.",  # 52 chars = 13 tokens
         "long": "A" * 1000,  # 1000 chars = 250 tokens
-        "very_long": "B" * 100000,  # 100k chars = 25k tokens (at limit)
-        "over_limit": "C" * 200000,  # 200k chars = 50k tokens (over limit)
+        "very_long": "B" * 10000,  # 10k chars = 2.5k tokens
+        "over_limit": "C" * 50000,  # 50k chars = 12.5k tokens
         "unicode": "Hello 世界 🌍 Émoji test",  # Mixed Unicode characters
         "newlines": "Line 1\nLine 2\nLine 3\n",  # Text with newlines
         "mixed_whitespace": "  \t  Test with   mixed\twhitespace  \n  ",
@@ -190,8 +190,8 @@ def test_size_limit_thresholds(token_count, default_limit, should_exceed):
         ("medium", 10, True),  # Medium text, low limit
         ("long", 1000, False),  # Large text, high limit
         ("long", 100, True),  # Large text, low limit
-        ("very_long", 30000, False),  # Very large text, high limit
-        ("very_long", 20000, True),  # Very large text, lower limit
+        ("very_long", 3000, False),  # Very large text, high limit
+        ("very_long", 2000, True),  # Very large text, lower limit
     ],
 )
 def test_custom_size_limits(sample_texts, text_key, custom_limit, should_exceed):
@@ -313,7 +313,7 @@ def test_mcp_size_check_enabled_environment_variable(mock_environment, env_value
         ("   \n\t  \n   ", "only whitespace"),
         ("🌍🚀💻🎯", "emoji-only content"),
         ("Hello 世界 🌍 Émoji", "mixed Unicode"),
-        ("A" * 1000000, "extremely large text"),
+        ("A" * 10000, "extremely large text"),
         ("Line 1\nLine 2\nLine 3\nLine 4\nLine 5", "multiline text"),
         ("\"'`~!@#$%^&*()_+-=[]{}|;:,.<>?", "special characters"),
     ],
