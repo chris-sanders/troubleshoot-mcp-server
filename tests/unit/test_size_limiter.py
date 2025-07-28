@@ -147,11 +147,11 @@ def test_size_limiter_complete_workflow():
     large_text = "X" * 100004  # Large text that exceeds default limit (25001 tokens)
     
     # Small text should pass
-    assert size_limiter.check_size(small_text) == True
+    assert size_limiter.check_size(small_text)
     assert size_limiter.estimate_tokens(small_text) == 1
     
     # Large text should fail
-    assert size_limiter.check_size(large_text) == False
+    assert not size_limiter.check_size(large_text)
     assert size_limiter.estimate_tokens(large_text) == 25001
 
 
@@ -166,7 +166,7 @@ def test_size_limiter_with_disabled_checking(mock_environment):
     
     # Even very large content should pass when disabled
     large_text = "X" * 100000
-    assert size_limiter.check_size(large_text) == True
+    assert size_limiter.check_size(large_text)
 
 
 def test_size_limiter_overflow_summary():
