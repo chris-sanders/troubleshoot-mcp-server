@@ -26,7 +26,9 @@ def test_cli_module_exists():
     try:
         from mcp_server_troubleshoot import cli
 
-        assert callable(getattr(cli, "main", None)), "CLI module does not have a main function"
+        assert callable(
+            getattr(cli, "main", None)
+        ), "CLI module does not have a main function"
     except ImportError:
         pytest.fail("Failed to import mcp_server_troubleshoot.cli module")
 
@@ -36,7 +38,9 @@ def test_bundle_module_exists():
     try:
         from mcp_server_troubleshoot import bundle
 
-        assert hasattr(bundle, "BundleManager"), "Bundle module does not have BundleManager class"
+        assert hasattr(
+            bundle, "BundleManager"
+        ), "Bundle module does not have BundleManager class"
     except ImportError:
         pytest.fail("Failed to import mcp_server_troubleshoot.bundle module")
 
@@ -46,7 +50,9 @@ def test_files_module_exists():
     try:
         from mcp_server_troubleshoot import files
 
-        assert hasattr(files, "FileExplorer"), "Files module does not have FileExplorer class"
+        assert hasattr(
+            files, "FileExplorer"
+        ), "Files module does not have FileExplorer class"
     except ImportError:
         pytest.fail("Failed to import mcp_server_troubleshoot.files module")
 
@@ -56,9 +62,9 @@ def test_kubectl_module_exists():
     try:
         from mcp_server_troubleshoot import kubectl
 
-        assert hasattr(kubectl, "KubectlExecutor"), (
-            "Kubectl module does not have KubectlExecutor class"
-        )
+        assert hasattr(
+            kubectl, "KubectlExecutor"
+        ), "Kubectl module does not have KubectlExecutor class"
     except ImportError:
         pytest.fail("Failed to import mcp_server_troubleshoot.kubectl module")
 
@@ -84,12 +90,12 @@ def test_configuration_loading():
             "log_level": "INFO",
         }
         # Test we can load configuration functions
-        assert hasattr(config, "get_recommended_client_config"), (
-            "Config module missing get_recommended_client_config"
-        )
-        assert hasattr(config, "load_config_from_path"), (
-            "Config module missing load_config_from_path"
-        )
+        assert hasattr(
+            config, "get_recommended_client_config"
+        ), "Config module missing get_recommended_client_config"
+        assert hasattr(
+            config, "load_config_from_path"
+        ), "Config module missing load_config_from_path"
 
         # Verify the test config values are as expected
         bundle_storage = test_config["bundle_storage"]
@@ -123,9 +129,9 @@ def test_version_command():
         check=False,
     )
     assert result.returncode == 0, f"Version command failed with: {result.stderr}"
-    assert "version" in result.stdout.lower() or "version" in result.stderr.lower(), (
-        "Version information not found in output"
-    )
+    assert (
+        "version" in result.stdout.lower() or "version" in result.stderr.lower()
+    ), "Version information not found in output"
 
 
 @pytest.mark.asyncio

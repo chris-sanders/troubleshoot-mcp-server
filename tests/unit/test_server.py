@@ -83,11 +83,15 @@ async def test_initialize_bundle_tool(tmp_path: Path) -> None:
         patch.object(
             bundle_manager, "_check_sbctl_available", new_callable=AsyncMock
         ) as mock_sbctl,
-        patch.object(bundle_manager, "initialize_bundle", new_callable=AsyncMock) as mock_init,
+        patch.object(
+            bundle_manager, "initialize_bundle", new_callable=AsyncMock
+        ) as mock_init,
         patch.object(
             bundle_manager, "check_api_server_available", new_callable=AsyncMock
         ) as mock_api,
-        patch.object(bundle_manager, "get_diagnostic_info", new_callable=AsyncMock) as mock_diag,
+        patch.object(
+            bundle_manager, "get_diagnostic_info", new_callable=AsyncMock
+        ) as mock_diag,
         patch("mcp_server_troubleshoot.server.get_bundle_manager") as mock_get_manager,
     ):
         # Set up mocks for external dependencies only
@@ -100,7 +104,9 @@ async def test_initialize_bundle_tool(tmp_path: Path) -> None:
         # Create InitializeBundleArgs instance
         from mcp_server_troubleshoot.bundle import InitializeBundleArgs
 
-        args = InitializeBundleArgs(source=str(temp_source_file), force=False, verbosity="verbose")
+        args = InitializeBundleArgs(
+            source=str(temp_source_file), force=False, verbosity="verbose"
+        )
 
         # Call the tool function directly
         response = await initialize_bundle(args)
@@ -164,9 +170,15 @@ async def test_kubectl_tool(tmp_path: Path) -> None:
             patch.object(
                 bundle_manager, "check_api_server_available", new_callable=AsyncMock
             ) as mock_api,
-            patch.object(kubectl_executor, "execute", new_callable=AsyncMock) as mock_execute,
-            patch("mcp_server_troubleshoot.server.get_bundle_manager") as mock_get_manager,
-            patch("mcp_server_troubleshoot.server.get_kubectl_executor") as mock_get_executor,
+            patch.object(
+                kubectl_executor, "execute", new_callable=AsyncMock
+            ) as mock_execute,
+            patch(
+                "mcp_server_troubleshoot.server.get_bundle_manager"
+            ) as mock_get_manager,
+            patch(
+                "mcp_server_troubleshoot.server.get_kubectl_executor"
+            ) as mock_get_executor,
         ):
             # Set up mocks for external dependencies only
             mock_api.return_value = True
@@ -231,7 +243,9 @@ async def test_kubectl_tool_host_only_bundle(tmp_path: Path) -> None:
 
         with (
             patch.object(bundle_manager, "get_active_bundle", return_value=mock_bundle),
-            patch("mcp_server_troubleshoot.server.get_bundle_manager") as mock_get_manager,
+            patch(
+                "mcp_server_troubleshoot.server.get_bundle_manager"
+            ) as mock_get_manager,
         ):
             mock_get_manager.return_value = bundle_manager
 
@@ -298,14 +312,18 @@ async def test_file_operations(tmp_path: Path) -> None:
 
         with (
             patch.object(bundle_manager, "get_active_bundle", return_value=mock_bundle),
-            patch("mcp_server_troubleshoot.server.get_file_explorer") as mock_get_explorer,
+            patch(
+                "mcp_server_troubleshoot.server.get_file_explorer"
+            ) as mock_get_explorer,
         ):
             mock_get_explorer.return_value = file_explorer
 
             # 1. Test list_files with real files
             from mcp_server_troubleshoot.files import ListFilesArgs
 
-            list_args = ListFilesArgs(path="test_data/dir1", recursive=False, verbosity="verbose")
+            list_args = ListFilesArgs(
+                path="test_data/dir1", recursive=False, verbosity="verbose"
+            )
             list_response = await list_files(list_args)
 
             # Verify the response contains real file information
@@ -318,7 +336,10 @@ async def test_file_operations(tmp_path: Path) -> None:
             from mcp_server_troubleshoot.files import ReadFileArgs
 
             read_args = ReadFileArgs(
-                path="test_data/dir1/file1.txt", start_line=0, end_line=2, verbosity="verbose"
+                path="test_data/dir1/file1.txt",
+                start_line=0,
+                end_line=2,
+                verbosity="verbose",
             )
             read_response = await read_file(read_args)
 

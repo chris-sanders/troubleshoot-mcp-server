@@ -95,7 +95,9 @@ class ContainerMCPClient:
             raise RuntimeError("Container stdout not available")
 
         try:
-            response_bytes = await asyncio.wait_for(self.process.stdout.readline(), timeout=60.0)
+            response_bytes = await asyncio.wait_for(
+                self.process.stdout.readline(), timeout=60.0
+            )
             response_line = response_bytes.decode().strip()
             logger.debug(f"Received: {response_line}")
 
@@ -121,7 +123,9 @@ class ContainerMCPClient:
 
     async def call_tool(self, tool_name: str, arguments: dict) -> dict:
         """Call an MCP tool in the container."""
-        return await self.send_request("tools/call", {"name": tool_name, "arguments": arguments})
+        return await self.send_request(
+            "tools/call", {"name": tool_name, "arguments": arguments}
+        )
 
     async def stop(self) -> None:
         """Stop the container."""
@@ -153,7 +157,9 @@ def container_image_available():
     """Check if container image exists."""
     try:
         result = subprocess.run(
-            [CONTAINER_RUNTIME, "image", "exists", CONTAINER_IMAGE], capture_output=True, timeout=10
+            [CONTAINER_RUNTIME, "image", "exists", CONTAINER_IMAGE],
+            capture_output=True,
+            timeout=10,
         )
         if result.returncode != 0:
             pytest.skip(
@@ -338,13 +344,17 @@ class TestContainerBundleValidation:
 
             # Step 1: Initialize bundle
             bundle_path = f"/data/bundles/{test_bundle_in_dir.name}"
-            init_response = await client.call_tool("initialize_bundle", {"source": bundle_path})
+            init_response = await client.call_tool(
+                "initialize_bundle", {"source": bundle_path}
+            )
 
             assert "result" in init_response
             logger.info("✅ Bundle initialized in container")
 
             # Step 2: List files
-            files_response = await client.call_tool("list_files", {"path": "/", "recursive": False})
+            files_response = await client.call_tool(
+                "list_files", {"path": "/", "recursive": False}
+            )
 
             assert "result" in files_response
             files_content = files_response["result"]["content"][0]["text"]
@@ -354,7 +364,12 @@ class TestContainerBundleValidation:
             # Step 3: Test grep (should work even if no matches)
             grep_response = await client.call_tool(
                 "grep_files",
-                {"pattern": "kube", "path": "/", "recursive": True, "case_sensitive": False},
+                {
+                    "pattern": "kube",
+                    "path": "/",
+                    "recursive": True,
+                    "case_sensitive": False,
+                },
             )
 
             assert "result" in grep_response
@@ -410,7 +425,12 @@ class TestContainerBuildValidation:
 
             # Verify the image was created
             check_result = subprocess.run(
-                [CONTAINER_RUNTIME, "image", "exists", "troubleshoot-mcp-server:test-build"],
+                [
+                    CONTAINER_RUNTIME,
+                    "image",
+                    "exists",
+                    "troubleshoot-mcp-server:test-build",
+                ],
                 capture_output=True,
                 timeout=10,
             )

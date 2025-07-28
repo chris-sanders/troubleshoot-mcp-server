@@ -38,7 +38,10 @@ async def debug_sbctl():
             # Test 1: Check if sbctl can read the bundle
             print("\n=== Test 1: Running sbctl with --help ===")
             process = await asyncio.create_subprocess_exec(
-                "sbctl", "--help", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                "sbctl",
+                "--help",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
             stdout, stderr = await process.communicate()
             print(f"sbctl --help exit code: {process.returncode}")
@@ -52,7 +55,10 @@ async def debug_sbctl():
             # Set up environment
             env = os.environ.copy()
             env.update(
-                {"SBCTL_TOKEN": "test-token-12345", "KUBECONFIG": str(temp_dir_path / "kubeconfig")}
+                {
+                    "SBCTL_TOKEN": "test-token-12345",
+                    "KUBECONFIG": str(temp_dir_path / "kubeconfig"),
+                }
             )
 
             cmd = [
@@ -66,7 +72,10 @@ async def debug_sbctl():
 
             # Start the process with timeout
             process = await asyncio.create_subprocess_exec(
-                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=env
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env,
             )
 
             print(f"Process started with PID: {process.pid}")
@@ -104,7 +113,9 @@ async def debug_sbctl():
             # Try to read any output
             try:
                 if process.stdout:
-                    stdout_data = await asyncio.wait_for(process.stdout.read(), timeout=1.0)
+                    stdout_data = await asyncio.wait_for(
+                        process.stdout.read(), timeout=1.0
+                    )
                     if stdout_data:
                         print(f"STDOUT: {stdout_data.decode()}")
             except asyncio.TimeoutError:
@@ -112,7 +123,9 @@ async def debug_sbctl():
 
             try:
                 if process.stderr:
-                    stderr_data = await asyncio.wait_for(process.stderr.read(), timeout=1.0)
+                    stderr_data = await asyncio.wait_for(
+                        process.stderr.read(), timeout=1.0
+                    )
                     if stderr_data:
                         print(f"STDERR: {stderr_data.decode()}")
             except asyncio.TimeoutError:
@@ -120,7 +133,9 @@ async def debug_sbctl():
 
             # Check what files were created
             files_created = list(temp_dir_path.glob("*"))
-            print(f"\nFiles created in temp directory: {[f.name for f in files_created]}")
+            print(
+                f"\nFiles created in temp directory: {[f.name for f in files_created]}"
+            )
 
             # Check if kubeconfig was created
             kubeconfig_path = temp_dir_path / "kubeconfig"
@@ -129,7 +144,9 @@ async def debug_sbctl():
                 try:
                     with open(kubeconfig_path, "r") as f:
                         content = f.read()
-                    print(f"Kubeconfig content ({len(content)} chars):\n{content[:500]}...")
+                    print(
+                        f"Kubeconfig content ({len(content)} chars):\n{content[:500]}..."
+                    )
                 except Exception as e:
                     print(f"Error reading kubeconfig: {e}")
             else:

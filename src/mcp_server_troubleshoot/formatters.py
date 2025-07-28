@@ -67,7 +67,9 @@ class ResponseFormatter:
             if api_server_available:
                 return json.dumps({"bundle_id": metadata.id, "status": "ready"})
             else:
-                return json.dumps({"bundle_id": metadata.id, "status": "api_unavailable"})
+                return json.dumps(
+                    {"bundle_id": metadata.id, "status": "api_unavailable"}
+                )
 
         elif self.verbosity == VerbosityLevel.STANDARD:
             result = {
@@ -132,9 +134,9 @@ class ResponseFormatter:
                 # Format modification time
                 import datetime
 
-                modified_time_str = datetime.datetime.fromtimestamp(bundle.modified_time).strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                )
+                modified_time_str = datetime.datetime.fromtimestamp(
+                    bundle.modified_time
+                ).strftime("%Y-%m-%d %H:%M:%S")
 
                 bundle_entry = {
                     "name": bundle.name,
@@ -153,15 +155,21 @@ class ResponseFormatter:
                 bundle_list.append(bundle_entry)
 
             response_obj = {"bundles": bundle_list, "total": len(bundle_list)}
-            response = f"```json\n{json.dumps(response_obj, separators=(',', ':'))}\n```\n\n"
+            response = (
+                f"```json\n{json.dumps(response_obj, separators=(',', ':'))}\n```\n\n"
+            )
 
             # Add usage instructions
-            example_bundle = next((b for b in bundles if b.valid), bundles[0] if bundles else None)
+            example_bundle = next(
+                (b for b in bundles if b.valid), bundles[0] if bundles else None
+            )
             if example_bundle:
                 response += "## Usage Instructions\n\n"
                 response += "To use one of these bundles, initialize it with the `initialize_bundle` tool using the `source` value:\n\n"
                 response += (
-                    '```json\n{\n  "source": "' + example_bundle.relative_path + '"\n}\n```\n\n'
+                    '```json\n{\n  "source": "'
+                    + example_bundle.relative_path
+                    + '"\n}\n```\n\n'
                 )
                 response += "After initializing a bundle, you can explore its contents using the file exploration tools (`list_files`, `read_file`, `grep_files`) and run kubectl commands with the `kubectl` tool."
 
@@ -172,7 +180,10 @@ class ResponseFormatter:
 
         if self.verbosity == VerbosityLevel.MINIMAL:
             return json.dumps(
-                [entry.name + ("/" if entry.type == "dir" else "") for entry in result.entries]
+                [
+                    entry.name + ("/" if entry.type == "dir" else "")
+                    for entry in result.entries
+                ]
             )
 
         elif self.verbosity == VerbosityLevel.STANDARD:
@@ -236,7 +247,9 @@ class ResponseFormatter:
                 response = f"Read {file_type} file {result.path} (lines {result.start_line + 1}-{result.end_line + 1} of {result.total_lines}):\n"
                 response += f"```\n{content_with_numbers}```"
             else:
-                response = f"Read {file_type} file {result.path} (binary data shown as hex):\n"
+                response = (
+                    f"Read {file_type} file {result.path} (binary data shown as hex):\n"
+                )
                 response += f"```\n{result.content}\n```"
 
             return response
@@ -299,7 +312,9 @@ class ResponseFormatter:
 
         else:  # VERBOSE or DEBUG
             # Current full format
-            pattern_type = "case-sensitive" if result.case_sensitive else "case-insensitive"
+            pattern_type = (
+                "case-sensitive" if result.case_sensitive else "case-insensitive"
+            )
             path_desc = result.path + (
                 f" (matching {result.glob_pattern})" if result.glob_pattern else ""
             )
@@ -351,9 +366,13 @@ class ResponseFormatter:
 
         elif self.verbosity == VerbosityLevel.STANDARD:
             if result.is_json:
-                return json.dumps({"output": result.output, "exit_code": result.exit_code})
+                return json.dumps(
+                    {"output": result.output, "exit_code": result.exit_code}
+                )
             else:
-                return json.dumps({"output": result.stdout, "exit_code": result.exit_code})
+                return json.dumps(
+                    {"output": result.stdout, "exit_code": result.exit_code}
+                )
 
         else:  # VERBOSE or DEBUG
             # Current full format
@@ -362,7 +381,9 @@ class ResponseFormatter:
                 response = f"kubectl command executed successfully:\n```json\n{output_str}\n```"
             else:
                 output_str = result.stdout
-                response = f"kubectl command executed successfully:\n```\n{output_str}\n```"
+                response = (
+                    f"kubectl command executed successfully:\n```\n{output_str}\n```"
+                )
 
             metadata = {
                 "command": result.command,
@@ -378,7 +399,9 @@ class ResponseFormatter:
 
             return response
 
-    def format_error(self, error_message: str, diagnostics: Optional[Dict[str, Any]] = None) -> str:
+    def format_error(
+        self, error_message: str, diagnostics: Optional[Dict[str, Any]] = None
+    ) -> str:
         """Format error messages based on verbosity level."""
 
         if self.verbosity == VerbosityLevel.MINIMAL:
@@ -393,6 +416,125 @@ class ResponseFormatter:
             if diagnostics and self.verbosity == VerbosityLevel.DEBUG:
                 response += f"\n\nDiagnostic information:\n```json\n{json.dumps(diagnostics, separators=(',', ':'))}\n```"
             return response
+
+    def format_overflow_message(
+        self, tool_name: str, estimated_tokens: int, content: str
+    ) -> str:
+        """
+        Format helpful overflow message with tool-specific guidance.
+
+        Args:
+            tool_name: Name of the MCP tool that generated the content
+            estimated_tokens: Estimated token count of the content
+            content: The original content that was too large
+
+        Returns:
+            Formatted overflow message with tool-specific suggestions and content preview
+        """
+        # Default token limit (can be made configurable)
+        token_limit = 25000
+
+        # Base overflow message
+        message = f"Content too large ({estimated_tokens:,} tokens, limit: {token_limit:,}).\n\n"
+
+        # Tool-specific suggestions
+        suggestions = self._get_tool_specific_suggestions(tool_name)
+        if suggestions:
+            message += "Suggestions to reduce output size:\n"
+            for i, suggestion in enumerate(suggestions, 1):
+                message += f"{i}. {suggestion}\n"
+            message += "\n"
+
+        # Add content preview based on verbosity level
+        preview = self._generate_content_preview(content)
+        if preview:
+            message += preview
+
+        return message
+
+    def _get_tool_specific_suggestions(self, tool_name: str) -> List[str]:
+        """Get tool-specific suggestions for reducing output size."""
+        suggestions_map = {
+            "list_files": [
+                "Use non-recursive listing: list_files(recursive=false)",
+                'Target specific directories: list_files(path="specific/subdirectory")',
+                'Use minimal verbosity: list_files(verbosity="minimal")',
+            ],
+            "read_file": [
+                "Read specific line ranges: read_file(start_line=1, end_line=100)",
+                "Read smaller chunks: read_file(start_line=1, end_line=50)",
+                "Target specific sections of the file",
+            ],
+            "grep_files": [
+                "Limit results per file: grep_files(max_results=50, max_files=5)",
+                'Use specific file patterns: grep_files(glob_pattern="*.yaml")',
+                'Target specific directories: grep_files(path="specific/subdirectory")',
+                'Use minimal verbosity: grep_files(verbosity="minimal")',
+            ],
+            "kubectl": [
+                "Query specific resources: kubectl get pods --selector=app=myapp",
+                "Use different output formats: kubectl get pods -o name",
+                "Target specific namespaces: kubectl get pods -n specific-namespace",
+                "Limit results: kubectl get pods --limit=50",
+            ],
+            "initialize_bundle": [
+                'Use minimal verbosity: initialize_bundle(verbosity="minimal")'
+            ],
+            "list_bundles": [
+                'Use minimal verbosity: list_bundles(verbosity="minimal")'
+            ],
+        }
+
+        return suggestions_map.get(
+            tool_name,
+            [
+                'Use minimal verbosity if supported: tool_name(verbosity="minimal")',
+                "Apply filtering parameters to reduce data scope",
+                "Target more specific data subsets",
+            ],
+        )
+
+    def _generate_content_preview(self, content: str) -> str:
+        """Generate a content preview based on verbosity level."""
+        if self.verbosity == VerbosityLevel.MINIMAL:
+            # Very brief preview for minimal mode
+            preview_chars = 100
+            preview_text = content[:preview_chars]
+            if len(content) > preview_chars:
+                preview_text += "..."
+            return f"First {preview_chars} characters:\n{preview_text}\n"
+
+        elif self.verbosity == VerbosityLevel.STANDARD:
+            # Moderate preview for standard mode
+            preview_chars = 200
+            preview_text = content[:preview_chars]
+            if len(content) > preview_chars:
+                preview_text += "..."
+            return f"Showing first {preview_chars} characters:\n{preview_text}\n"
+
+        else:  # VERBOSE or DEBUG
+            # More detailed preview with structure info
+            preview_chars = 500
+            preview_text = content[:preview_chars]
+            if len(content) > preview_chars:
+                preview_text += "..."
+
+            # Try to provide structural information
+            lines = content.split("\n")
+            total_lines = len(lines)
+
+            preview_msg = f"Showing first {preview_chars} characters (content has {total_lines:,} lines):\n"
+            preview_msg += "```\n" + preview_text + "\n```\n"
+
+            # Add helpful context about the content structure
+            if content.strip().startswith("{") or content.strip().startswith("["):
+                preview_msg += "\n*Note: Content appears to be JSON format*\n"
+            elif "```" in content:
+                preview_msg += (
+                    "\n*Note: Content contains code blocks or formatted sections*\n"
+                )
+
+            return preview_msg
 
     def _format_file_size(self, size_bytes: int) -> str:
         """Format file size in human-readable format."""

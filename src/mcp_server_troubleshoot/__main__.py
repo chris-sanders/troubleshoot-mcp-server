@@ -75,11 +75,19 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     Returns:
         Parsed arguments
     """
-    parser = argparse.ArgumentParser(description="MCP server for Kubernetes support bundles")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
-    parser.add_argument("--bundle-dir", type=str, help="Directory to store support bundles")
+    parser = argparse.ArgumentParser(
+        description="MCP server for Kubernetes support bundles"
+    )
     parser.add_argument(
-        "--show-config", action="store_true", help="Show recommended MCP client configuration"
+        "--verbose", "-v", action="store_true", help="Enable verbose logging"
+    )
+    parser.add_argument(
+        "--bundle-dir", type=str, help="Directory to store support bundles"
+    )
+    parser.add_argument(
+        "--show-config",
+        action="store_true",
+        help="Show recommended MCP client configuration",
     )
     return parser.parse_args(args)
 

@@ -135,7 +135,9 @@ class TestContainerShutdownReliability:
         )
 
         # Should exit cleanly without Python runtime errors
-        assert "Fatal Python error" not in stderr, f"Python runtime error detected: {stderr}"
+        assert (
+            "Fatal Python error" not in stderr
+        ), f"Python runtime error detected: {stderr}"
         assert "_enter_buffered_busy" not in stderr
         assert "could not acquire lock" not in stderr
 
@@ -227,7 +229,14 @@ class TestContainerShutdownReliability:
         requests = []
         for i in range(10):
             requests.append(
-                json.dumps({"jsonrpc": "2.0", "method": "tools/list", "params": {}, "id": i + 1})
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "method": "tools/list",
+                        "params": {},
+                        "id": i + 1,
+                    }
+                )
                 + "\n"
             )
 
@@ -282,7 +291,9 @@ class TestContainerShutdownReliability:
                 )
                 + "\n",
                 # List tools
-                json.dumps({"jsonrpc": "2.0", "method": "tools/list", "params": {}, "id": 2})
+                json.dumps(
+                    {"jsonrpc": "2.0", "method": "tools/list", "params": {}, "id": 2}
+                )
                 + "\n",
             ]
 

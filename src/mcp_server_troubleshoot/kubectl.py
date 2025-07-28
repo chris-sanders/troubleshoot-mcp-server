@@ -46,7 +46,8 @@ class KubectlCommandArgs(BaseModel):
     timeout: int = Field(30, description="Timeout in seconds for the command")
     json_output: bool = Field(False, description="Whether to format the output as JSON")
     verbosity: Optional[str] = Field(
-        None, description="Verbosity level for response formatting (minimal|standard|verbose|debug)"
+        None,
+        description="Verbosity level for response formatting (minimal|standard|verbose|debug)",
     )
 
     @field_validator("command")
@@ -81,7 +82,9 @@ class KubectlCommandArgs(BaseModel):
         ]
         for op in dangerous_operations:
             if re.search(rf"^\s*{op}\b", v):
-                raise ValueError(f"Kubectl command '{op}' is not allowed for safety reasons")
+                raise ValueError(
+                    f"Kubectl command '{op}' is not allowed for safety reasons"
+                )
 
         return v
 
@@ -97,7 +100,9 @@ class KubectlResult(BaseModel):
     stderr: str = Field(description="The standard error output of the command")
     output: Any = Field(description="The parsed output, if applicable")
     is_json: bool = Field(description="Whether the output is JSON")
-    duration_ms: int = Field(description="The duration of the command execution in milliseconds")
+    duration_ms: int = Field(
+        description="The duration of the command execution in milliseconds"
+    )
 
     @field_validator("exit_code")
     @classmethod
@@ -161,7 +166,9 @@ class KubectlExecutor:
             )
 
         # Construct the command
-        return await self._run_kubectl_command(command, active_bundle, timeout, json_output)
+        return await self._run_kubectl_command(
+            command, active_bundle, timeout, json_output
+        )
 
     async def _run_kubectl_command(
         self, command: str, bundle: BundleMetadata, timeout: int, json_output: bool
@@ -225,7 +232,9 @@ class KubectlExecutor:
             stderr_str = stderr.decode("utf-8")
 
             # Process the output
-            output, is_json = self._process_output(stdout_str, returncode == 0 and json_output)
+            output, is_json = self._process_output(
+                stdout_str, returncode == 0 and json_output
+            )
 
             # Create the result
             result = KubectlResult(
@@ -240,16 +249,22 @@ class KubectlExecutor:
 
             # Log the result
             if returncode == 0:
-                logger.info(f"kubectl command completed successfully in {duration_ms}ms")
+                logger.info(
+                    f"kubectl command completed successfully in {duration_ms}ms"
+                )
             else:
-                logger.error(f"kubectl command failed with exit code {returncode}: {stderr_str}")
+                logger.error(
+                    f"kubectl command failed with exit code {returncode}: {stderr_str}"
+                )
                 raise KubectlError("kubectl command failed", returncode, stderr_str)
 
             return result
 
         except (OSError, FileNotFoundError) as e:
             logger.exception(f"Error executing kubectl command: {str(e)}")
-            raise KubectlError("Failed to execute kubectl command", 1, f"Error: {str(e)}")
+            raise KubectlError(
+                "Failed to execute kubectl command", 1, f"Error: {str(e)}"
+            )
 
     def _process_output(self, output: str, try_json: bool) -> Tuple[Any, bool]:
         """

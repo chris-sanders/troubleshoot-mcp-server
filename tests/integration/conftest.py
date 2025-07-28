@@ -33,7 +33,9 @@ class TestAssertions:
 
     @staticmethod
     def assert_api_response_valid(
-        response: List[Any], expected_type: str = "text", contains: Optional[List[str]] = None
+        response: List[Any],
+        expected_type: str = "text",
+        contains: Optional[List[str]] = None,
     ) -> None:
         """
         Assert that an MCP API response is valid and contains expected content.
@@ -48,8 +50,12 @@ class TestAssertions:
         """
         assert isinstance(response, list), "Response should be a list"
         assert len(response) > 0, "Response should not be empty"
-        assert hasattr(response[0], "type"), "Response item should have 'type' attribute"
-        assert response[0].type == expected_type, f"Response type should be '{expected_type}'"
+        assert hasattr(
+            response[0], "type"
+        ), "Response item should have 'type' attribute"
+        assert (
+            response[0].type == expected_type
+        ), f"Response type should be '{expected_type}'"
 
         if contains and hasattr(response[0], "text"):
             for text in contains:
@@ -70,9 +76,9 @@ class TestAssertions:
         for attr, expected in expected_attrs.items():
             assert hasattr(obj, attr), f"Object should have attribute '{attr}'"
             actual = getattr(obj, attr)
-            assert actual == expected, (
-                f"Attribute '{attr}' value mismatch. Expected: {expected}, Got: {actual}"
-            )
+            assert (
+                actual == expected
+            ), f"Attribute '{attr}' value mismatch. Expected: {expected}, Got: {actual}"
 
     @staticmethod
     async def assert_asyncio_timeout(coro, timeout: float = 0.1) -> None:

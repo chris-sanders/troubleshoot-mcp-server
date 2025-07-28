@@ -123,12 +123,16 @@ if __name__ == "__main__":
 
         # The test "passes" if it reproduces the race condition
         # (which means the bug exists and needs to be fixed)
-        race_condition_found = any(indicator in stderr for indicator in race_condition_indicators)
+        race_condition_found = any(
+            indicator in stderr for indicator in race_condition_indicators
+        )
 
         # The test now verifies that the race condition is FIXED
         if race_condition_found:
             # If we see the race condition, the fix didn't work
-            pytest.fail(f"Race condition still present! Fix didn't work.\nstderr output:\n{stderr}")
+            pytest.fail(
+                f"Race condition still present! Fix didn't work.\nstderr output:\n{stderr}"
+            )
         else:
             # Good! No race condition detected
             print("No race condition detected - fix is working!")

@@ -72,11 +72,15 @@ def create_test_bundle_structure(base_dir: Path) -> Dict[str, Path]:
 
     # Create sample host files
     os_info = host_info / "os-info.txt"
-    os_info.write_text("Operating System: Linux\nKernel: 5.4.0\nDistribution: Ubuntu 20.04\n")
+    os_info.write_text(
+        "Operating System: Linux\nKernel: 5.4.0\nDistribution: Ubuntu 20.04\n"
+    )
     structure["os_info"] = os_info
 
     memory_info = host_info / "memory.txt"
-    memory_info.write_text("MemTotal: 8388608 kB\nMemFree: 4194304 kB\nMemAvailable: 6291456 kB\n")
+    memory_info.write_text(
+        "MemTotal: 8388608 kB\nMemFree: 4194304 kB\nMemAvailable: 6291456 kB\n"
+    )
     structure["memory_info"] = memory_info
 
     # Create logs directory
@@ -140,7 +144,9 @@ def create_host_only_bundle_structure(base_dir: Path) -> Dict[str, Path]:
 
     # Create comprehensive host files
     os_info = host_info / "os-info.txt"
-    os_info.write_text("Operating System: Linux\nKernel: 5.4.0\nDistribution: Ubuntu 20.04\n")
+    os_info.write_text(
+        "Operating System: Linux\nKernel: 5.4.0\nDistribution: Ubuntu 20.04\n"
+    )
     structure["os_info"] = os_info
 
     processes = host_info / "processes.txt"
@@ -199,7 +205,10 @@ def create_minimal_kubeconfig(
             }
         ],
         "contexts": [
-            {"name": "test-context", "context": {"cluster": "test-cluster", "user": "test-user"}}
+            {
+                "name": "test-context",
+                "context": {"cluster": "test-cluster", "user": "test-user"},
+            }
         ],
         "current-context": "test-context",
         "users": [{"name": "test-user", "user": {"token": "test-token-12345"}}],

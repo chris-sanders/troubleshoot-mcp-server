@@ -80,7 +80,10 @@ if __name__ == "__main__":
 
 
 def run_server_with_signal(
-    script_content: str, signal_to_send: int, delay_before_signal: float = 0.5, timeout: float = 5.0
+    script_content: str,
+    signal_to_send: int,
+    delay_before_signal: float = 0.5,
+    timeout: float = 5.0,
 ) -> Tuple[int, str, str]:
     """
     Run a server script and send it a signal.
@@ -148,7 +151,9 @@ class TestSignalHandling:
         # Check what happened
         if return_code == -1:
             print(f"Process timed out. stderr:\n{stderr}")
-            pytest.fail("Process timed out, likely the signal handler did not properly exit")
+            pytest.fail(
+                "Process timed out, likely the signal handler did not properly exit"
+            )
 
         # Should exit cleanly with code 0 or -15 (SIGTERM on Linux)
         assert return_code in (
@@ -255,7 +260,10 @@ if __name__ == "__main__":
             stdout, stderr = process.communicate(timeout=5)
 
             # Should handle gracefully - return code of 0 or -15 (SIGTERM) is acceptable
-            assert process.returncode in (0, -15), f"Unexpected return code: {process.returncode}"
+            assert process.returncode in (
+                0,
+                -15,
+            ), f"Unexpected return code: {process.returncode}"
             assert "Fatal Python error" not in stderr
             # On CI, the process might exit too quickly to log anything
             if stderr:
@@ -316,9 +324,9 @@ if __name__ == "__main__":
             )
 
             # Should not crash with Python runtime error
-            assert "Fatal Python error" not in stderr, (
-                f"Race condition detected on iteration {i + 1}"
-            )
+            assert (
+                "Fatal Python error" not in stderr
+            ), f"Race condition detected on iteration {i + 1}"
             assert "_enter_buffered_busy" not in stderr
 
     def test_signal_with_resource_cleanup(self):

@@ -41,7 +41,9 @@ async def test_subprocess_transport_cleanup_triggers_error():
     # Look for Python 3.13 compatibility checks
     has_python313_check = "3.13" in source or "version_info" in source
     has_transport_cleanup = "_closing" in source or "transport" in source.lower()
-    has_pipe_transport_fix = "UnixReadPipeTransport" in source or "pipe_transport" in source
+    has_pipe_transport_fix = (
+        "UnixReadPipeTransport" in source or "pipe_transport" in source
+    )
 
     # Current subprocess_utils should NOT have these fixes yet (for TDD)
     if has_python313_check and has_transport_cleanup and has_pipe_transport_fix:
@@ -66,14 +68,18 @@ async def test_subprocess_transport_cleanup_triggers_error():
 
     try:
         # Use the current subprocess_utils extensively
-        from mcp_server_troubleshoot.subprocess_utils import subprocess_exec_with_cleanup
+        from mcp_server_troubleshoot.subprocess_utils import (
+            subprocess_exec_with_cleanup,
+        )
 
         # Create many subprocess operations to stress test the transport handling
         for i in range(25):  # Large number to stress the system
             returncode, stdout, stderr = await subprocess_exec_with_cleanup(
                 "echo", f"transport_stress_test_{i}", timeout=5.0
             )
-            assert returncode == 0, f"subprocess_exec_with_cleanup failed at iteration {i}"
+            assert (
+                returncode == 0
+            ), f"subprocess_exec_with_cleanup failed at iteration {i}"
 
         # Force garbage collection aggressively
         for _ in range(15):
@@ -143,7 +149,9 @@ async def test_subprocess_utils_transport_cleanup_with_python313():
             returncode, stdout, stderr = await subprocess_exec_with_cleanup(
                 "echo", f"subprocess_utils_test_{i}", timeout=5.0
             )
-            assert returncode == 0, f"subprocess_exec_with_cleanup failed: {stderr.decode()}"
+            assert (
+                returncode == 0
+            ), f"subprocess_exec_with_cleanup failed: {stderr.decode()}"
 
         # Force garbage collection to trigger transport cleanup
         for _ in range(10):
@@ -262,7 +270,9 @@ async def test_force_unix_pipe_transport_missing_closing():
             print("✅ Transport cleanup fixes appear to be handling the issue")
             # Test passes - even if some transports are live, no errors occurred
         else:
-            print("✅ TDD SUCCESS: No _closing attribute errors and no leaked transports!")
+            print(
+                "✅ TDD SUCCESS: No _closing attribute errors and no leaked transports!"
+            )
             print("✅ Python 3.13 transport cleanup fixes are working correctly")
             print("✅ Transport lifecycle is properly managed")
             # Test passes - perfect cleanup with no issues

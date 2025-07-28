@@ -39,7 +39,9 @@ class TestAssertions:
 
     @staticmethod
     def assert_api_response_valid(
-        response: List[Any], expected_type: str = "text", contains: Optional[List[str]] = None
+        response: List[Any],
+        expected_type: str = "text",
+        contains: Optional[List[str]] = None,
     ) -> None:
         """
         Assert that an MCP API response is valid and contains expected content.
@@ -54,8 +56,12 @@ class TestAssertions:
         """
         assert isinstance(response, list), "Response should be a list"
         assert len(response) > 0, "Response should not be empty"
-        assert hasattr(response[0], "type"), "Response item should have 'type' attribute"
-        assert response[0].type == expected_type, f"Response type should be '{expected_type}'"
+        assert hasattr(
+            response[0], "type"
+        ), "Response item should have 'type' attribute"
+        assert (
+            response[0].type == expected_type
+        ), f"Response type should be '{expected_type}'"
 
         if contains and hasattr(response[0], "text"):
             for text in contains:
@@ -76,9 +82,9 @@ class TestAssertions:
         for attr, expected in expected_attrs.items():
             assert hasattr(obj, attr), f"Object should have attribute '{attr}'"
             actual = getattr(obj, attr)
-            assert actual == expected, (
-                f"Attribute '{attr}' value mismatch. Expected: {expected}, Got: {actual}"
-            )
+            assert (
+                actual == expected
+            ), f"Attribute '{attr}' value mismatch. Expected: {expected}, Got: {actual}"
 
     @staticmethod
     async def assert_asyncio_timeout(coro, timeout: float = 0.1) -> None:
@@ -277,7 +283,9 @@ def error_setup(tmp_path):
     # Create a mock process that fails
     error_process = AsyncMock()
     error_process.returncode = 1
-    error_process.communicate = AsyncMock(return_value=(b"", b"Command failed with an error"))
+    error_process.communicate = AsyncMock(
+        return_value=(b"", b"Command failed with an error")
+    )
 
     # Create a mock asyncio client session with errors
     error_session = AsyncMock()

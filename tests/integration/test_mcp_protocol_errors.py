@@ -136,11 +136,19 @@ class TestMCPProtocolRobustness:
                         error_msg = str(response).lower()
                         assert any(
                             keyword in error_msg
-                            for keyword in ["error", "timeout", "readuntil", "coroutine", "waiting"]
+                            for keyword in [
+                                "error",
+                                "timeout",
+                                "readuntil",
+                                "coroutine",
+                                "waiting",
+                            ]
                         )
 
                 # Either some succeed or all fail gracefully
-                assert valid_responses >= 0  # This will always pass but documents the expectation
+                assert (
+                    valid_responses >= 0
+                )  # This will always pass but documents the expectation
 
             except Exception as e:
                 # Rapid requests may cause issues - this is acceptable for robustness testing

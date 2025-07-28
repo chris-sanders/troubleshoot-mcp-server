@@ -50,7 +50,9 @@ def _safe_transport_cleanup(transport: Any) -> None:
                     is_closing = transport.is_closing()
                     logger.debug(f"Transport is_closing status: {is_closing}")
                 else:
-                    logger.debug("Transport doesn't have is_closing method, assuming closed")
+                    logger.debug(
+                        "Transport doesn't have is_closing method, assuming closed"
+                    )
             except AttributeError as e:
                 # This is the specific error we're trying to avoid
                 logger.debug(
@@ -113,7 +115,9 @@ async def _safe_transport_wait_close(
 
 
 @asynccontextmanager
-async def pipe_transport_reader(pipe: Any) -> AsyncGenerator[asyncio.StreamReader, None]:
+async def pipe_transport_reader(
+    pipe: Any,
+) -> AsyncGenerator[asyncio.StreamReader, None]:
     """
     Async context manager for managing pipe transport with proper cleanup.
 
@@ -147,7 +151,9 @@ async def pipe_transport_reader(pipe: Any) -> AsyncGenerator[asyncio.StreamReade
             _safe_transport_cleanup(transport)
 
             # Wait for transport to close safely
-            await _safe_transport_wait_close(transport, timeout_per_check=0.1, max_checks=10)
+            await _safe_transport_wait_close(
+                transport, timeout_per_check=0.1, max_checks=10
+            )
 
 
 async def subprocess_exec_with_cleanup(
@@ -189,7 +195,9 @@ async def subprocess_exec_with_cleanup(
         process = await asyncio.create_subprocess_exec(*args, **subprocess_kwargs)
 
         if timeout is not None:
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(), timeout=timeout
+            )
         else:
             stdout, stderr = await process.communicate()
 
@@ -268,7 +276,9 @@ async def subprocess_shell_with_cleanup(
         process = await asyncio.create_subprocess_shell(command, **subprocess_kwargs)
 
         if timeout is not None:
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(), timeout=timeout
+            )
         else:
             stdout, stderr = await process.communicate()
 

@@ -58,7 +58,9 @@ def setup_logging(verbose: bool = False, mcp_mode: bool = False) -> None:
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for the MCP server."""
-    parser = argparse.ArgumentParser(description="MCP server for Kubernetes support bundles")
+    parser = argparse.ArgumentParser(
+        description="MCP server for Kubernetes support bundles"
+    )
     parser.add_argument("--bundle-dir", type=Path, help="Directory to store bundles")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     parser.add_argument(

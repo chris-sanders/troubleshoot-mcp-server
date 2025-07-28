@@ -76,7 +76,11 @@ class CurlDependencyDetector:
 
     def record_subprocess_call(self, *args, **kwargs) -> None:
         """Record a subprocess call for analysis."""
-        call_info = {"args": args, "kwargs": kwargs, "command": args[0] if args else None}
+        call_info = {
+            "args": args,
+            "kwargs": kwargs,
+            "command": args[0] if args else None,
+        }
         self.subprocess_calls.append(call_info)
 
     def record_curl_error(self, error: Exception) -> None:
@@ -191,9 +195,9 @@ async def test_curl_dependency_cascading_failure_to_kubectl(
             ):
                 # Test that API server check fails due to curl dependency
                 api_available = await bundle_manager.check_api_server_available()
-                assert api_available is False, (
-                    "API server should be unavailable when curl is missing"
-                )
+                assert (
+                    api_available is False
+                ), "API server should be unavailable when curl is missing"
 
                 # This demonstrates the cascading failure:
                 # 1. curl is missing -> check_api_server_available() returns False
@@ -209,9 +213,9 @@ async def test_curl_dependency_cascading_failure_to_kubectl(
 
                 # Verify this by checking that the diagnostic info shows the problem
                 diagnostics = await bundle_manager.get_diagnostic_info()
-                assert diagnostics["api_server_available"] is False, (
-                    "Diagnostics should show API server as unavailable due to curl dependency"
-                )
+                assert (
+                    diagnostics["api_server_available"] is False
+                ), "Diagnostics should show API server as unavailable due to curl dependency"
 
 
 @pytest.mark.asyncio
@@ -266,14 +270,15 @@ async def test_curl_dependency_with_timeout_handling(
             )
 
             with patch(
-                "asyncio.create_subprocess_exec", side_effect=mock_subprocess_immediate_failure
+                "asyncio.create_subprocess_exec",
+                side_effect=mock_subprocess_immediate_failure,
             ):
                 # The curl dependency failure should occur immediately, before any timeout
                 result = await bundle_manager.check_api_server_available()
 
-                assert result is False, (
-                    "Should fail immediately due to missing curl, before any timeout"
-                )
+                assert (
+                    result is False
+                ), "Should fail immediately due to missing curl, before any timeout"
 
 
 @pytest.mark.asyncio
@@ -335,11 +340,14 @@ async def test_curl_dependency_environment_simulation(
                 )
 
                 with patch(
-                    "asyncio.create_subprocess_exec", side_effect=mock_subprocess_env_specific
+                    "asyncio.create_subprocess_exec",
+                    side_effect=mock_subprocess_env_specific,
                 ):
                     result = await bundle_manager.check_api_server_available()
 
-                    assert result is False, f"Should fail in {env['name']} environment without curl"
+                    assert (
+                        result is False
+                    ), f"Should fail in {env['name']} environment without curl"
 
 
 @pytest.mark.asyncio

@@ -186,7 +186,9 @@ async def test_subprocess_transport_cleanup_single_operation(
 
 
 @pytest.mark.asyncio
-async def test_subprocess_transport_cleanup_multiple_operations(clean_asyncio, transport_detector):
+async def test_subprocess_transport_cleanup_multiple_operations(
+    clean_asyncio, transport_detector
+):
     """
     Test transport cleanup with multiple rapid subprocess operations.
 
@@ -216,7 +218,9 @@ async def test_subprocess_transport_cleanup_multiple_operations(clean_asyncio, t
 
 
 @pytest.mark.asyncio
-async def test_concurrent_subprocess_transport_cleanup(clean_asyncio, transport_detector):
+async def test_concurrent_subprocess_transport_cleanup(
+    clean_asyncio, transport_detector
+):
     """
     Test transport cleanup with concurrent subprocess operations.
 
@@ -226,7 +230,9 @@ async def test_concurrent_subprocess_transport_cleanup(clean_asyncio, transport_
     # Create multiple concurrent subprocess operations
     tasks = []
     for i in range(3):
-        task = asyncio.create_task(create_subprocess_and_wait(["echo", f"concurrent_{i}"]))
+        task = asyncio.create_task(
+            create_subprocess_and_wait(["echo", f"concurrent_{i}"])
+        )
         tasks.append(task)
 
     # Wait for all tasks to complete
@@ -334,7 +340,9 @@ async def test_subprocess_pattern_like_curl(clean_asyncio, transport_detector):
 
 
 @pytest.mark.asyncio
-async def test_transport_cleanup_with_process_termination(clean_asyncio, transport_detector):
+async def test_transport_cleanup_with_process_termination(
+    clean_asyncio, transport_detector
+):
     """
     Test transport cleanup when processes are forcibly terminated.
 
@@ -383,7 +391,9 @@ async def test_event_loop_with_many_transports(clean_asyncio, transport_detector
     # Create many subprocess operations to stress test transport cleanup
     tasks = []
     for i in range(8):  # Reasonable number to avoid overwhelming the system
-        task = asyncio.create_task(create_subprocess_and_wait(["echo", f"stress_test_{i}"]))
+        task = asyncio.create_task(
+            create_subprocess_and_wait(["echo", f"stress_test_{i}"])
+        )
         tasks.append(task)
 
     # Wait for all to complete
@@ -483,7 +493,9 @@ async def test_force_transport_cleanup_issue():
         if captured_warnings:
             print(f"\nCaptured {len(captured_warnings)} warnings:")
             for w in captured_warnings:
-                print(f"  {w['category']}: {w['message']} ({w['filename']}:{w['lineno']})")
+                print(
+                    f"  {w['category']}: {w['message']} ({w['filename']}:{w['lineno']})"
+                )
 
         if transport_warnings:
             print(f"\nFound {len(transport_warnings)} transport-related warnings:")
@@ -531,7 +543,8 @@ async def test_aggressive_subprocess_cleanup_stress():
     def capture_warnings(message, category, filename, lineno, file=None, line=None):
         msg_str = str(message)
         if any(
-            keyword in msg_str.lower() for keyword in ["transport", "unclosed", "_closing", "pipe"]
+            keyword in msg_str.lower()
+            for keyword in ["transport", "unclosed", "_closing", "pipe"]
         ):
             captured_issues.append(f"{category.__name__}: {msg_str}")
 
@@ -619,7 +632,9 @@ async def test_simulate_unix_read_pipe_transport_missing_closing_attribute():
 
     def mock_transport_repr_error():
         """Simulate the _closing attribute missing error during __repr__"""
-        raise AttributeError("'_UnixReadPipeTransport' object has no attribute '_closing'")
+        raise AttributeError(
+            "'_UnixReadPipeTransport' object has no attribute '_closing'"
+        )
 
     try:
         # Remove warning filters to see all warnings

@@ -37,7 +37,12 @@ async def debug_mcp_server():
 
         # Set up environment
         env = os.environ.copy()
-        env.update({"SBCTL_TOKEN": "test-token-12345", "MCP_BUNDLE_STORAGE": str(temp_bundle_dir)})
+        env.update(
+            {
+                "SBCTL_TOKEN": "test-token-12345",
+                "MCP_BUNDLE_STORAGE": str(temp_bundle_dir),
+            }
+        )
 
         print("\\n=== Starting MCP Server Manually ===")
 
@@ -110,7 +115,9 @@ async def send_request_debug(process, request, timeout=5.0):
     # Try to get response
     try:
         if process.stdout:
-            response_bytes = await asyncio.wait_for(process.stdout.readline(), timeout=timeout)
+            response_bytes = await asyncio.wait_for(
+                process.stdout.readline(), timeout=timeout
+            )
             response_line = response_bytes.decode().strip()
             print(f"Response: {response_line[:200]}...")
 

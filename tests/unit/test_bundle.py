@@ -82,7 +82,9 @@ async def test_bundle_manager_initialize_bundle_url():
             manager._wait_for_initialization = AsyncMock()
 
             # Test initializing from a URL
-            result = await manager.initialize_bundle("https://example.com/bundle.tar.gz")
+            result = await manager.initialize_bundle(
+                "https://example.com/bundle.tar.gz"
+            )
 
             # Verify the result
             assert isinstance(result, BundleMetadata)
@@ -91,7 +93,9 @@ async def test_bundle_manager_initialize_bundle_url():
             assert result.initialized is True
 
             # Verify the mocks were called
-            manager._download_bundle.assert_awaited_once_with("https://example.com/bundle.tar.gz")
+            manager._download_bundle.assert_awaited_once_with(
+                "https://example.com/bundle.tar.gz"
+            )
             manager._initialize_with_sbctl.assert_awaited_once()
 
 
@@ -160,7 +164,9 @@ async def test_bundle_manager_initialize_bundle_nonexistent():
 
 REPLICATED_URL = "https://vendor.replicated.com/troubleshoot/analyze/2025-04-22@16:51"
 REPLICATED_SLUG = "2025-04-22@16:51"
-REPLICATED_API_URL = f"https://api.replicated.com/vendor/v3/supportbundle/{REPLICATED_SLUG}"
+REPLICATED_API_URL = (
+    f"https://api.replicated.com/vendor/v3/supportbundle/{REPLICATED_SLUG}"
+)
 SIGNED_URL = "https://signed.example.com/download?token=abc"
 
 
@@ -228,7 +234,9 @@ def mock_aiohttp_download():
     mock_aio_session.__aexit__ = AsyncMock(return_value=None)
 
     # Patch aiohttp.ClientSession to return our mock session
-    with patch("aiohttp.ClientSession", return_value=mock_aio_session) as mock_constructor:
+    with patch(
+        "aiohttp.ClientSession", return_value=mock_aio_session
+    ) as mock_constructor:
         # Yield the constructor, the session instance, and the response instance
         # This gives tests more flexibility for assertions
         yield mock_constructor, mock_aio_session, mock_aio_response
@@ -240,7 +248,9 @@ async def test_bundle_manager_download_replicated_url_success_sbctl_token(
 ):
     """Test downloading from Replicated URL with SBCTL_TOKEN successfully."""
     mock_httpx_constructor, mock_httpx_response = mock_httpx_client
-    mock_aiohttp_constructor, mock_aio_session, mock_aio_response = mock_aiohttp_download
+    mock_aiohttp_constructor, mock_aio_session, mock_aio_response = (
+        mock_aiohttp_download
+    )
 
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
@@ -255,10 +265,15 @@ async def test_bundle_manager_download_replicated_url_success_sbctl_token(
             _, kwargs = mock_httpx_constructor.call_args
             assert isinstance(kwargs.get("timeout"), httpx.Timeout)
 
-            mock_get_call = mock_httpx_constructor.return_value.__aenter__.return_value.get
+            mock_get_call = (
+                mock_httpx_constructor.return_value.__aenter__.return_value.get
+            )
             mock_get_call.assert_awaited_once_with(
                 REPLICATED_API_URL,
-                headers={"Authorization": "sbctl_token_value", "Content-Type": "application/json"},
+                headers={
+                    "Authorization": "sbctl_token_value",
+                    "Content-Type": "application/json",
+                },
             )
 
             # Verify aiohttp call for actual download
@@ -270,7 +285,9 @@ async def test_bundle_manager_download_replicated_url_success_sbctl_token(
             assert download_path.exists()
             # Assert new filename format
             # Replace both '@' and ':' for the assertion to match sanitization
-            safe_slug_for_assertion = REPLICATED_SLUG.replace("@", "_").replace(":", "_")
+            safe_slug_for_assertion = REPLICATED_SLUG.replace("@", "_").replace(
+                ":", "_"
+            )
             expected_filename_part = f"replicated_bundle_{safe_slug_for_assertion}"
             assert download_path.name.startswith(expected_filename_part)
             assert download_path.read_bytes() == b"chunk1chunk2"
@@ -282,18 +299,24 @@ async def test_bundle_manager_download_replicated_url_success_replicated_token(
 ):
     """Test downloading from Replicated URL with REPLICATED_TOKEN successfully."""
     mock_httpx_constructor, mock_httpx_response = mock_httpx_client
-    mock_aiohttp_constructor, mock_aio_session, mock_aio_response = mock_aiohttp_download
+    mock_aiohttp_constructor, mock_aio_session, mock_aio_response = (
+        mock_aiohttp_download
+    )
 
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
         manager = BundleManager(bundle_dir)
 
         # Only REPLICATED is set
-        with patch.dict(os.environ, {"REPLICATED": "replicated_token_value"}, clear=True):
+        with patch.dict(
+            os.environ, {"REPLICATED": "replicated_token_value"}, clear=True
+        ):
             await manager._download_bundle(REPLICATED_URL)
 
             # Verify httpx call used REPLICATED token
-            mock_get_call = mock_httpx_constructor.return_value.__aenter__.return_value.get
+            mock_get_call = (
+                mock_httpx_constructor.return_value.__aenter__.return_value.get
+            )
             mock_get_call.assert_awaited_once_with(
                 REPLICATED_API_URL,
                 headers={
@@ -312,7 +335,9 @@ async def test_bundle_manager_download_replicated_url_token_precedence(
     """Test SBCTL_TOKEN takes precedence over REPLICATED_TOKEN."""
     mock_httpx_constructor, _ = mock_httpx_client
     # Unpack all three values from the fixture
-    mock_aiohttp_constructor, mock_aio_session, mock_aio_response = mock_aiohttp_download
+    mock_aiohttp_constructor, mock_aio_session, mock_aio_response = (
+        mock_aiohttp_download
+    )
 
     with tempfile.TemporaryDirectory() as temp_dir:
         bundle_dir = Path(temp_dir)
@@ -322,17 +347,25 @@ async def test_bundle_manager_download_replicated_url_token_precedence(
         with patch.dict(
             os.environ,
             # === START MODIFICATION ===
-            {"SBCTL_TOKEN": "sbctl_token_value", "REPLICATED": "replicated_token_value"},
+            {
+                "SBCTL_TOKEN": "sbctl_token_value",
+                "REPLICATED": "replicated_token_value",
+            },
             # === END MODIFICATION ===
             clear=True,
         ):
             await manager._download_bundle(REPLICATED_URL)
 
             # Verify httpx call used SBCTL_TOKEN
-            mock_get_call = mock_httpx_constructor.return_value.__aenter__.return_value.get
+            mock_get_call = (
+                mock_httpx_constructor.return_value.__aenter__.return_value.get
+            )
             mock_get_call.assert_awaited_once_with(
                 REPLICATED_API_URL,
-                headers={"Authorization": "sbctl_token_value", "Content-Type": "application/json"},
+                headers={
+                    "Authorization": "sbctl_token_value",
+                    "Content-Type": "application/json",
+                },
             )
 
 
@@ -349,7 +382,9 @@ async def test_bundle_manager_download_replicated_url_missing_token():
                 await manager._download_bundle(REPLICATED_URL)
             # === START MODIFICATION ===
             # Update assertion to match the exact error message and correct ENV name
-            expected_error_part = "SBCTL_TOKEN or REPLICATED environment variable not set"
+            expected_error_part = (
+                "SBCTL_TOKEN or REPLICATED environment variable not set"
+            )
             assert expected_error_part in str(excinfo.value)
             assert "Cannot download from Replicated Vendor Portal" in str(excinfo.value)
             # === END MODIFICATION ===
@@ -364,7 +399,9 @@ async def test_bundle_manager_download_replicated_url_api_401(mock_httpx_client)
     mock_response.status_code = 401
     mock_response.text = "Unauthorized"
     # Ensure json() raises an error if called on non-200 status
-    mock_response.json.side_effect = json.JSONDecodeError("Mock JSON decode error", "", 0)
+    mock_response.json.side_effect = json.JSONDecodeError(
+        "Mock JSON decode error", "", 0
+    )
     # === END MODIFICATION ===
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -378,7 +415,9 @@ async def test_bundle_manager_download_replicated_url_api_401(mock_httpx_client)
                 await manager._download_bundle(REPLICATED_URL)
                 # === END MODIFICATION ===
             # The error should propagate from _get_replicated_signed_url
-            assert "Failed to authenticate with Replicated API (status 401)" in str(excinfo.value)
+            assert "Failed to authenticate with Replicated API (status 401)" in str(
+                excinfo.value
+            )
 
 
 @pytest.mark.asyncio
@@ -388,7 +427,9 @@ async def test_bundle_manager_download_replicated_url_api_404(mock_httpx_client)
     # === START MODIFICATION ===
     mock_response.status_code = 404
     mock_response.text = "Not Found"
-    mock_response.json.side_effect = json.JSONDecodeError("Mock JSON decode error", "", 0)
+    mock_response.json.side_effect = json.JSONDecodeError(
+        "Mock JSON decode error", "", 0
+    )
     # === END MODIFICATION ===
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -401,18 +442,24 @@ async def test_bundle_manager_download_replicated_url_api_404(mock_httpx_client)
                 # Call _download_bundle instead of _get_replicated_signed_url
                 await manager._download_bundle(REPLICATED_URL)
                 # === END MODIFICATION ===
-            assert "Support bundle not found on Replicated Vendor Portal" in str(excinfo.value)
+            assert "Support bundle not found on Replicated Vendor Portal" in str(
+                excinfo.value
+            )
             assert f"slug: {REPLICATED_SLUG}" in str(excinfo.value)
 
 
 @pytest.mark.asyncio
-async def test_bundle_manager_download_replicated_url_api_other_error(mock_httpx_client):
+async def test_bundle_manager_download_replicated_url_api_other_error(
+    mock_httpx_client,
+):
     """Test error handling for other Replicated API errors."""
     mock_httpx_constructor, mock_response = mock_httpx_client
     # === START MODIFICATION ===
     mock_response.status_code = 500
     mock_response.text = "Internal Server Error"
-    mock_response.json.side_effect = json.JSONDecodeError("Mock JSON decode error", "", 0)
+    mock_response.json.side_effect = json.JSONDecodeError(
+        "Mock JSON decode error", "", 0
+    )
     # === END MODIFICATION ===
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -425,12 +472,18 @@ async def test_bundle_manager_download_replicated_url_api_other_error(mock_httpx
                 # Call _download_bundle instead of _get_replicated_signed_url
                 await manager._download_bundle(REPLICATED_URL)
                 # === END MODIFICATION ===
-            assert "Failed to get signed URL from Replicated API (status 500)" in str(excinfo.value)
-            assert "Internal Server Error" in str(excinfo.value)  # Check response text included
+            assert "Failed to get signed URL from Replicated API (status 500)" in str(
+                excinfo.value
+            )
+            assert "Internal Server Error" in str(
+                excinfo.value
+            )  # Check response text included
 
 
 @pytest.mark.asyncio
-async def test_bundle_manager_download_replicated_url_missing_signed_uri(mock_httpx_client):
+async def test_bundle_manager_download_replicated_url_missing_signed_uri(
+    mock_httpx_client,
+):
     """Test error handling when 'signedUri' is missing from API response."""
     mock_httpx_constructor, mock_response = mock_httpx_client
     # Configure for success status but missing key in the nested JSON
@@ -452,7 +505,9 @@ async def test_bundle_manager_download_replicated_url_missing_signed_uri(mock_ht
                 # Call _download_bundle instead of _get_replicated_signed_url
                 await manager._download_bundle(REPLICATED_URL)
                 # === END MODIFICATION ===
-            assert "Could not find 'signedUri' in Replicated API response" in str(excinfo.value)
+            assert "Could not find 'signedUri' in Replicated API response" in str(
+                excinfo.value
+            )
 
 
 @pytest.mark.asyncio
@@ -474,14 +529,18 @@ async def test_bundle_manager_download_replicated_url_network_error():
 
                 # Assert that the correct error (raised by the except httpx.RequestError block) is caught
                 assert "Network error requesting signed URL" in str(excinfo.value)
-                assert "Network timeout" in str(excinfo.value)  # Check original error is included
+                assert "Network timeout" in str(
+                    excinfo.value
+                )  # Check original error is included
     # === END MODIFICATION ===
 
 
 @pytest.mark.asyncio
 async def test_bundle_manager_download_non_replicated_url(mock_aiohttp_download):
     """Test that non-Replicated URLs are downloaded directly without API calls."""
-    mock_aiohttp_constructor, mock_aio_session, mock_aio_response = mock_aiohttp_download
+    mock_aiohttp_constructor, mock_aio_session, mock_aio_response = (
+        mock_aiohttp_download
+    )
     non_replicated_url = "https://normal.example.com/bundle.tar.gz"
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -511,10 +570,14 @@ async def test_bundle_manager_download_non_replicated_url(mock_aiohttp_download)
 
 
 @pytest.mark.asyncio
-async def test_bundle_manager_download_bundle(mock_aiohttp_download):  # Use fixture as argument
+async def test_bundle_manager_download_bundle(
+    mock_aiohttp_download,
+):  # Use fixture as argument
     """Test that the bundle manager can download a non-Replicated bundle."""
     # Unpack the fixture results
-    mock_aiohttp_constructor, mock_aio_session, mock_aio_response = mock_aiohttp_download
+    mock_aiohttp_constructor, mock_aio_session, mock_aio_response = (
+        mock_aiohttp_download
+    )
     non_replicated_url = "https://example.com/bundle.tar.gz"
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -857,7 +920,9 @@ async def test_bundle_manager_server_shutdown_cleanup():
         manager._cleanup_active_bundle = AsyncMock()
 
         # Mock subprocess.run to avoid actual process operations
-        with patch("subprocess.run", return_value=MagicMock(returncode=0, stdout="", stderr="")):
+        with patch(
+            "subprocess.run", return_value=MagicMock(returncode=0, stdout="", stderr="")
+        ):
             # Call cleanup
             await manager.cleanup()
 
@@ -876,7 +941,9 @@ async def test_bundle_manager_server_shutdown_cleanup():
             mock_pkill_result.returncode = 0
 
             # Mock subprocess to return our mock objects
-            with patch("subprocess.run", side_effect=[mock_ps_result, mock_pkill_result]):
+            with patch(
+                "subprocess.run", side_effect=[mock_ps_result, mock_pkill_result]
+            ):
                 # Test with orphaned processes
                 await manager.cleanup()
 
@@ -939,8 +1006,12 @@ async def test_bundle_manager_host_only_bundle_detection():
                     assert args[1] == "serve"
                     assert args[2] == "--support-bundle-location"
                     # Verify bundle path is in the arguments
-                    bundle_arg_found = any(str(local_bundle_path) in str(arg) for arg in args)
-                    assert bundle_arg_found, f"Bundle path not found in subprocess args: {args}"
+                    bundle_arg_found = any(
+                        str(local_bundle_path) in str(arg) for arg in args
+                    )
+                    assert (
+                        bundle_arg_found
+                    ), f"Bundle path not found in subprocess args: {args}"
 
 
 # Note: We test regular bundles in the existing tests that already work properly

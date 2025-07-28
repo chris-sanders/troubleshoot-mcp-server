@@ -1,8 +1,9 @@
 # Task: Implement Output Size Limits for MCP Server Responses
 
 ## Metadata
-**Status**: ready
+**Status**: active
 **Created**: 2025-07-28
+**Started**: 2025-07-28
 **Priority**: high
 **Complexity**: medium
 **Estimated effort**: 5 phases

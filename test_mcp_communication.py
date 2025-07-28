@@ -15,7 +15,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 # Set up minimal logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 
 async def test_mcp_communication():
@@ -65,7 +67,9 @@ async def test_mcp_communication():
         # Try to read response with timeout
         try:
             if process.stdout:
-                response_bytes = await asyncio.wait_for(process.stdout.readline(), timeout=5.0)
+                response_bytes = await asyncio.wait_for(
+                    process.stdout.readline(), timeout=5.0
+                )
                 response_line = response_bytes.decode().strip()
                 print(f"Response: {response_line}")
 
@@ -85,7 +89,9 @@ async def test_mcp_communication():
             # Check stderr for errors
             if process.stderr:
                 try:
-                    stderr_data = await asyncio.wait_for(process.stderr.read(4096), timeout=1.0)
+                    stderr_data = await asyncio.wait_for(
+                        process.stderr.read(4096), timeout=1.0
+                    )
                     if stderr_data:
                         stderr_text = stderr_data.decode()
                         print(f"STDERR: {stderr_text}")

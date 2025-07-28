@@ -144,7 +144,9 @@ async def test_kubectl_executor_execute_success():
 
     # Verify the result
     assert result == mock_result
-    executor._run_kubectl_command.assert_awaited_once_with("get pods", bundle, 30, False)
+    executor._run_kubectl_command.assert_awaited_once_with(
+        "get pods", bundle, 30, False
+    )
 
 
 @pytest.mark.asyncio
@@ -170,7 +172,9 @@ async def test_kubectl_executor_run_kubectl_command():
     executor = KubectlExecutor(bundle_manager)
 
     # Mock create_subprocess_exec
-    with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+    with patch(
+        "asyncio.create_subprocess_exec", return_value=mock_process
+    ) as mock_exec:
         # Execute a command
         result = await executor._run_kubectl_command("get pods", bundle, 30, True)
 
@@ -221,7 +225,9 @@ async def test_kubectl_executor_run_kubectl_command_no_json():
     executor = KubectlExecutor(bundle_manager)
 
     # Mock create_subprocess_exec
-    with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+    with patch(
+        "asyncio.create_subprocess_exec", return_value=mock_process
+    ) as mock_exec:
         # Execute a command
         result = await executor._run_kubectl_command("get pods", bundle, 30, False)
 
@@ -263,15 +269,21 @@ async def test_kubectl_executor_run_kubectl_command_explicit_format():
     # Mock subprocess
     mock_process = AsyncMock()
     mock_process.returncode = 0
-    mock_process.communicate = AsyncMock(return_value=(b"name: pod1\nstatus: Running", b""))
+    mock_process.communicate = AsyncMock(
+        return_value=(b"name: pod1\nstatus: Running", b"")
+    )
 
     # Create the executor
     executor = KubectlExecutor(bundle_manager)
 
     # Mock create_subprocess_exec
-    with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+    with patch(
+        "asyncio.create_subprocess_exec", return_value=mock_process
+    ) as mock_exec:
         # Execute a command with explicit format
-        result = await executor._run_kubectl_command("get pods -o yaml", bundle, 30, True)
+        result = await executor._run_kubectl_command(
+            "get pods -o yaml", bundle, 30, True
+        )
 
         # Verify the result
         assert result.command == "get pods -o yaml"
@@ -309,7 +321,9 @@ async def test_kubectl_executor_run_kubectl_command_error():
     # Mock subprocess
     mock_process = AsyncMock()
     mock_process.returncode = 1
-    mock_process.communicate = AsyncMock(return_value=(b"", b'Error: resource "pods" not found'))
+    mock_process.communicate = AsyncMock(
+        return_value=(b"", b'Error: resource "pods" not found')
+    )
 
     # Create the executor
     executor = KubectlExecutor(bundle_manager)
@@ -365,7 +379,9 @@ async def test_kubectl_executor_run_kubectl_command_timeout():
     ):
         # Execute a command with a short timeout
         with pytest.raises(KubectlError) as excinfo:
-            await executor._run_kubectl_command("get pods", bundle, 0.1, True)  # 0.1 second timeout
+            await executor._run_kubectl_command(
+                "get pods", bundle, 0.1, True
+            )  # 0.1 second timeout
 
         # Verify the error
         assert "kubectl command timed out" in str(excinfo.value)
@@ -430,7 +446,9 @@ async def test_kubectl_default_cli_format():
     executor = KubectlExecutor(bundle_manager)
 
     # Mock create_subprocess_exec
-    with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+    with patch(
+        "asyncio.create_subprocess_exec", return_value=mock_process
+    ) as mock_exec:
         # Execute with default json_output=False
         result = await executor._run_kubectl_command("get pods", bundle, 30, False)
 
@@ -471,7 +489,9 @@ async def test_kubectl_explicit_json_request():
     executor = KubectlExecutor(bundle_manager)
 
     # Mock create_subprocess_exec
-    with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+    with patch(
+        "asyncio.create_subprocess_exec", return_value=mock_process
+    ) as mock_exec:
         # Execute with explicit json_output=True
         result = await executor._run_kubectl_command("get pods", bundle, 30, True)
 
@@ -512,9 +532,13 @@ async def test_kubectl_user_format_preserved():
     executor = KubectlExecutor(bundle_manager)
 
     # Mock create_subprocess_exec
-    with patch("asyncio.create_subprocess_exec", return_value=mock_process) as mock_exec:
+    with patch(
+        "asyncio.create_subprocess_exec", return_value=mock_process
+    ) as mock_exec:
         # Execute with user-specified YAML format
-        result = await executor._run_kubectl_command("get pods -o yaml", bundle, 30, False)
+        result = await executor._run_kubectl_command(
+            "get pods -o yaml", bundle, 30, False
+        )
 
         # Verify user format is preserved
         assert result.command == "get pods -o yaml"  # No modification
@@ -560,11 +584,15 @@ async def test_kubectl_executor_defaults_to_table_format():
     result = await executor.execute("get pods")
 
     # Verify the result is NOT JSON
-    assert result.is_json is False, "Default kubectl execution should NOT return JSON format"
+    assert (
+        result.is_json is False
+    ), "Default kubectl execution should NOT return JSON format"
     assert result == mock_result
 
     # Verify _run_kubectl_command was called with json_output=False (the new default)
-    executor._run_kubectl_command.assert_awaited_once_with("get pods", bundle, 30, False)
+    executor._run_kubectl_command.assert_awaited_once_with(
+        "get pods", bundle, 30, False
+    )
 
 
 def test_compact_json_formatting():
