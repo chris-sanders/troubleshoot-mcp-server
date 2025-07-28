@@ -63,9 +63,9 @@ def test_container_has_required_tools_isolated(container_image: str):
                 f"This indicates the tool is not properly packaged. "
                 f"returncode: {result.returncode}, stdout: {result.stdout}, stderr: {result.stderr}"
             )
-            assert (
-                "Usage:" in result.stdout or "usage:" in result.stdout
-            ), f"sbctl --help output doesn't contain expected usage text: {result.stdout}"
+            assert "Usage:" in result.stdout or "usage:" in result.stdout, (
+                f"sbctl --help output doesn't contain expected usage text: {result.stdout}"
+            )
 
         elif tool_name == "kubectl":
             # Test kubectl exists and works
@@ -93,9 +93,9 @@ def test_container_has_required_tools_isolated(container_image: str):
                 f"This indicates the tool is not properly packaged. "
                 f"returncode: {result.returncode}, stdout: {result.stdout}, stderr: {result.stderr}"
             )
-            assert (
-                "Client Version:" in result.stdout
-            ), f"kubectl version output doesn't contain expected version text: {result.stdout}"
+            assert "Client Version:" in result.stdout, (
+                f"kubectl version output doesn't contain expected version text: {result.stdout}"
+            )
 
         elif tool_name == "python3":
             # Test python3 exists and works
@@ -122,9 +122,9 @@ def test_container_has_required_tools_isolated(container_image: str):
                 f"This indicates the tool is not properly packaged. "
                 f"returncode: {result.returncode}, stdout: {result.stdout}, stderr: {result.stderr}"
             )
-            assert (
-                "Python" in result.stdout
-            ), f"python3 --version output doesn't contain expected version text: {result.stdout}"
+            assert "Python" in result.stdout, (
+                f"python3 --version output doesn't contain expected version text: {result.stdout}"
+            )
 
 
 def test_container_bundle_initialization_isolated(
@@ -260,7 +260,7 @@ def test_production_container_mcp_protocol():
         pytest.skip(f"Container runtime {runtime} not available")
 
     # Container tests now run in CI to catch deployment issues
-    
+
     # Check if the required container image exists
     try:
         result = subprocess.run(
@@ -268,7 +268,9 @@ def test_production_container_mcp_protocol():
             capture_output=True,
         )
         if result.returncode != 0:
-            pytest.skip("Container image troubleshoot-mcp-server:latest not available - build first with: MELANGE_TEST_BUILD=true ./scripts/build.sh")
+            pytest.skip(
+                "Container image troubleshoot-mcp-server:latest not available - build first with: MELANGE_TEST_BUILD=true ./scripts/build.sh"
+            )
     except FileNotFoundError:
         pytest.skip(f"Container runtime {runtime} not found")
 
