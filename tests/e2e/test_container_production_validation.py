@@ -260,6 +260,17 @@ def test_production_container_mcp_protocol():
         pytest.skip(f"Container runtime {runtime} not available")
 
     # Container tests now run in CI to catch deployment issues
+    
+    # Check if the required container image exists
+    try:
+        result = subprocess.run(
+            [runtime, "image", "exists", "troubleshoot-mcp-server:latest"],
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            pytest.skip("Container image troubleshoot-mcp-server:latest not available - build first with: MELANGE_TEST_BUILD=true ./scripts/build.sh")
+    except FileNotFoundError:
+        pytest.skip(f"Container runtime {runtime} not found")
 
     container_name = f"mcp-protocol-test-{uuid.uuid4().hex[:8]}"
 
