@@ -124,11 +124,11 @@ def test_edge_cases(text, description):
     Test SizeLimiter with edge cases and unusual input.
     """
     size_limiter = SizeLimiter()
-    
+
     # Should not raise any exceptions
     tokens = size_limiter.estimate_tokens(text)
     result = size_limiter.check_size(text)
-    
+
     # Basic sanity checks
     assert isinstance(tokens, int), f"Token count should be integer for {description}"
     assert tokens >= 0, f"Token count should be non-negative for {description}"
@@ -141,15 +141,15 @@ def test_size_limiter_complete_workflow():
     Test complete SizeLimiter workflow from initialization to size checking.
     """
     size_limiter = SizeLimiter()
-    
+
     # Test basic functionality
     small_text = "test"
     large_text = "X" * 100004  # Large text that exceeds default limit (25001 tokens)
-    
+
     # Small text should pass
     assert size_limiter.check_size(small_text)
     assert size_limiter.estimate_tokens(small_text) == 1
-    
+
     # Large text should fail
     assert not size_limiter.check_size(large_text)
     assert size_limiter.estimate_tokens(large_text) == 25001
@@ -160,10 +160,10 @@ def test_size_limiter_with_disabled_checking(mock_environment):
     Test SizeLimiter behavior when size checking is disabled.
     """
     os.environ["MCP_SIZE_CHECK_ENABLED"] = "false"
-    
+
     size_limiter = SizeLimiter()
     assert not size_limiter.enabled
-    
+
     # Even very large content should pass when disabled
     large_text = "X" * 100000
     assert size_limiter.check_size(large_text)
@@ -175,9 +175,9 @@ def test_size_limiter_overflow_summary():
     """
     size_limiter = SizeLimiter()
     large_text = "A" * 1000
-    
+
     summary = size_limiter.get_overflow_summary(large_text, max_preview_chars=100)
-    
+
     assert "Content size limit exceeded" in summary
     assert "250" in summary  # Token count
     assert "25000" in summary  # Token limit
@@ -191,7 +191,7 @@ def test_size_limiter_initialization_with_custom_limit():
     # Test with custom limit
     custom_limiter = SizeLimiter(token_limit=5000)
     assert custom_limiter.token_limit == 5000
-    
+
     # Test with default limit
     default_limiter = SizeLimiter()
     assert default_limiter.token_limit == 25000
@@ -202,11 +202,11 @@ def test_size_limiter_factory_function():
     Test the get_size_limiter factory function.
     """
     from mcp_server_troubleshoot.size_limiter import get_size_limiter
-    
+
     # Test with custom limit
     limiter = get_size_limiter(token_limit=10000)
     assert limiter.token_limit == 10000
-    
+
     # Test with default
     default_limiter = get_size_limiter()
     assert default_limiter.token_limit == 25000
