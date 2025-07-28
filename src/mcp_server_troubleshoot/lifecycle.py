@@ -56,7 +56,9 @@ def create_temp_directory() -> str:
     return temp_dir
 
 
-async def periodic_bundle_cleanup(bundle_manager: BundleManager, interval: int = 3600) -> None:
+async def periodic_bundle_cleanup(
+    bundle_manager: BundleManager, interval: int = 3600
+) -> None:
     """Periodically clean up old bundles."""
     logger.info(f"Starting periodic bundle cleanup (interval: {interval}s)")
     try:
@@ -92,7 +94,9 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     bundle_dir_str = os.environ.get("MCP_BUNDLE_STORAGE")
     bundle_dir = Path(bundle_dir_str) if bundle_dir_str else None
 
-    enable_periodic_cleanup = os.environ.get("ENABLE_PERIODIC_CLEANUP", "false").lower() in (
+    enable_periodic_cleanup = os.environ.get(
+        "ENABLE_PERIODIC_CLEANUP", "false"
+    ).lower() in (
         "true",
         "1",
         "yes",
@@ -116,7 +120,9 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 
     # Start periodic cleanup task if configured
     if enable_periodic_cleanup:
-        logger.info(f"Enabling periodic bundle cleanup every {cleanup_interval} seconds")
+        logger.info(
+            f"Enabling periodic bundle cleanup every {cleanup_interval} seconds"
+        )
         background_tasks["bundle_cleanup"] = asyncio.create_task(
             periodic_bundle_cleanup(bundle_manager, cleanup_interval)
         )
@@ -157,7 +163,9 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
                 try:
                     await asyncio.wait_for(asyncio.shield(task), timeout=5.0)
                 except (asyncio.CancelledError, asyncio.TimeoutError):
-                    logger.warning(f"Task {name} did not complete gracefully within timeout")
+                    logger.warning(
+                        f"Task {name} did not complete gracefully within timeout"
+                    )
 
         # Clean up bundle manager resources
         try:

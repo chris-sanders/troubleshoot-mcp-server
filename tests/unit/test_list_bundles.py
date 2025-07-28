@@ -79,7 +79,9 @@ async def test_list_available_bundles_valid_bundle(temp_bundle_dir, mock_valid_b
 
 
 @pytest.mark.asyncio
-async def test_list_available_bundles_invalid_bundle(temp_bundle_dir, mock_invalid_bundle):
+async def test_list_available_bundles_invalid_bundle(
+    temp_bundle_dir, mock_invalid_bundle
+):
     """Test listing bundles with an invalid bundle."""
     bundle_manager = BundleManager(temp_bundle_dir)
 
@@ -154,7 +156,9 @@ async def test_bundle_validity_checker(
     assert message is not None
 
     # Non-existing file
-    valid, message = bundle_manager._check_bundle_validity(Path("/non/existing/file.tar.gz"))
+    valid, message = bundle_manager._check_bundle_validity(
+        Path("/non/existing/file.tar.gz")
+    )
     assert valid is False
     assert message is not None
 
@@ -187,7 +191,9 @@ async def test_relative_path_initialization(temp_bundle_dir, mock_valid_bundle):
 
     # Instead of monkeypatching internal methods, we'll mock at a higher level
     # This focuses on the behavior (initializing a bundle) rather than implementation
-    with patch.object(bundle_manager, "_initialize_with_sbctl", autospec=False) as mock_init:
+    with patch.object(
+        bundle_manager, "_initialize_with_sbctl", autospec=False
+    ) as mock_init:
         # Set up the mock to create the kubeconfig file and return its path
         async def side_effect(bundle_path, output_dir):
             logger.info(f"Creating mock kubeconfig in {output_dir}")
@@ -236,7 +242,9 @@ async def test_bundle_path_resolution_behavior(temp_bundle_dir, mock_valid_bundl
     bundle_manager = BundleManager(temp_bundle_dir)
 
     # Create patch for _initialize_with_sbctl to avoid actual initialization
-    with patch.object(bundle_manager, "_initialize_with_sbctl", autospec=False) as mock_init:
+    with patch.object(
+        bundle_manager, "_initialize_with_sbctl", autospec=False
+    ) as mock_init:
         # Set up the mock to return a valid kubeconfig path
         async def side_effect(bundle_path, output_dir):
             os.makedirs(output_dir, exist_ok=True)

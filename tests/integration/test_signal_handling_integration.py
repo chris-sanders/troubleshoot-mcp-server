@@ -151,7 +151,9 @@ class TestSignalHandling:
         # Check what happened
         if return_code == -1:
             print(f"Process timed out. stderr:\n{stderr}")
-            pytest.fail("Process timed out, likely the signal handler did not properly exit")
+            pytest.fail(
+                "Process timed out, likely the signal handler did not properly exit"
+            )
 
         # Should exit cleanly with code 0 or -15 (SIGTERM on Linux)
         assert return_code in (
@@ -322,9 +324,9 @@ if __name__ == "__main__":
             )
 
             # Should not crash with Python runtime error
-            assert "Fatal Python error" not in stderr, (
-                f"Race condition detected on iteration {i + 1}"
-            )
+            assert (
+                "Fatal Python error" not in stderr
+            ), f"Race condition detected on iteration {i + 1}"
             assert "_enter_buffered_busy" not in stderr
 
     def test_signal_with_resource_cleanup(self):

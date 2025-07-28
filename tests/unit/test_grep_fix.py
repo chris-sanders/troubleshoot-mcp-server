@@ -30,7 +30,9 @@ async def test_grep_files_with_kubeconfig(tmp_path: Path):
 
     # Create a kubeconfig file
     kubeconfig_path = bundle_dir / "kubeconfig"
-    kubeconfig_path.write_text("apiVersion: v1\nkind: Config\nclusters:\n- name: test-cluster\n")
+    kubeconfig_path.write_text(
+        "apiVersion: v1\nkind: Config\nclusters:\n- name: test-cluster\n"
+    )
     print(f"Created kubeconfig file at: {kubeconfig_path}")
 
     # Create a directory with a few test files
@@ -39,7 +41,9 @@ async def test_grep_files_with_kubeconfig(tmp_path: Path):
 
     # Create a file with 'kubeconfig' in its contents
     ref_file = test_dir / "config-reference.txt"
-    ref_file.write_text("This file refers to a kubeconfig file.\nThe kubeconfig path is important.")
+    ref_file.write_text(
+        "This file refers to a kubeconfig file.\nThe kubeconfig path is important."
+    )
     print(f"Created reference file at: {ref_file}")
 
     # Create a nested kubeconfig file
@@ -65,7 +69,9 @@ async def test_grep_files_with_kubeconfig(tmp_path: Path):
     explorer = FileExplorer(bundle_manager)
 
     # Test searching for "kubeconfig" (case insensitive)
-    result = await explorer.grep_files("kubeconfig", "", recursive=True, case_sensitive=False)
+    result = await explorer.grep_files(
+        "kubeconfig", "", recursive=True, case_sensitive=False
+    )
 
     # Print the results
     print("\nSearch results for 'kubeconfig':")

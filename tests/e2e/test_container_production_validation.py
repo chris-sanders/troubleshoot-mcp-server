@@ -63,9 +63,9 @@ def test_container_has_required_tools_isolated(container_image: str):
                 f"This indicates the tool is not properly packaged. "
                 f"returncode: {result.returncode}, stdout: {result.stdout}, stderr: {result.stderr}"
             )
-            assert "Usage:" in result.stdout or "usage:" in result.stdout, (
-                f"sbctl --help output doesn't contain expected usage text: {result.stdout}"
-            )
+            assert (
+                "Usage:" in result.stdout or "usage:" in result.stdout
+            ), f"sbctl --help output doesn't contain expected usage text: {result.stdout}"
 
         elif tool_name == "kubectl":
             # Test kubectl exists and works
@@ -93,9 +93,9 @@ def test_container_has_required_tools_isolated(container_image: str):
                 f"This indicates the tool is not properly packaged. "
                 f"returncode: {result.returncode}, stdout: {result.stdout}, stderr: {result.stderr}"
             )
-            assert "Client Version:" in result.stdout, (
-                f"kubectl version output doesn't contain expected version text: {result.stdout}"
-            )
+            assert (
+                "Client Version:" in result.stdout
+            ), f"kubectl version output doesn't contain expected version text: {result.stdout}"
 
         elif tool_name == "python3":
             # Test python3 exists and works
@@ -122,9 +122,9 @@ def test_container_has_required_tools_isolated(container_image: str):
                 f"This indicates the tool is not properly packaged. "
                 f"returncode: {result.returncode}, stdout: {result.stdout}, stderr: {result.stderr}"
             )
-            assert "Python" in result.stdout, (
-                f"python3 --version output doesn't contain expected version text: {result.stdout}"
-            )
+            assert (
+                "Python" in result.stdout
+            ), f"python3 --version output doesn't contain expected version text: {result.stdout}"
 
 
 def test_container_bundle_initialization_isolated(
@@ -330,4 +330,6 @@ def test_production_container_mcp_protocol():
             assert "jsonrpc" in response, f"Invalid MCP response format: {response}"
             assert response.get("id") == "test-1", f"Response ID mismatch: {response}"
         except json.JSONDecodeError as e:
-            pytest.fail(f"Container returned invalid JSON response: {result.stdout}, error: {e}")
+            pytest.fail(
+                f"Container returned invalid JSON response: {result.stdout}, error: {e}"
+            )

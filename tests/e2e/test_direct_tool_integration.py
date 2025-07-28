@@ -101,8 +101,12 @@ class TestDirectToolIntegration:
 
         try:
             result_data = json.loads(result_text)
-            assert "bundle_id" in result_data, f"Response should contain bundle_id: {result_text}"
-            assert "status" in result_data, f"Response should contain status: {result_text}"
+            assert (
+                "bundle_id" in result_data
+            ), f"Response should contain bundle_id: {result_text}"
+            assert (
+                "status" in result_data
+            ), f"Response should contain status: {result_text}"
         except json.JSONDecodeError:
             # If not JSON, check for success indicators in text
             assert any(
@@ -124,16 +128,21 @@ class TestDirectToolIntegration:
 
         # The bundle should be listed since it exists in the storage directory
         # If not found, it might be a valid case where the bundle isn't recognized
-        if bundle_name not in bundles_text and "No support bundles found" in bundles_text:
+        if (
+            bundle_name not in bundles_text
+            and "No support bundles found" in bundles_text
+        ):
             # This is acceptable - bundle might need to be in a specific format
-            print("Bundle not automatically detected, this is expected for test bundles")
-            assert "support bundles" in bundles_text.lower(), (
-                f"Should mention bundles: {bundles_text}"
+            print(
+                "Bundle not automatically detected, this is expected for test bundles"
             )
+            assert (
+                "support bundles" in bundles_text.lower()
+            ), f"Should mention bundles: {bundles_text}"
         else:
-            assert bundle_name in bundles_text, (
-                f"Bundle {bundle_name} should appear in list: {bundles_text}"
-            )
+            assert (
+                bundle_name in bundles_text
+            ), f"Bundle {bundle_name} should appear in list: {bundles_text}"
 
     @pytest.mark.asyncio
     async def test_file_operations_direct(self, test_bundle_copy):
@@ -150,7 +159,9 @@ class TestDirectToolIntegration:
         files_text = list_content[0].text
 
         # Should have some files in the bundle
-        assert len(files_text.strip()) > 0, f"File listing should not be empty: {files_text}"
+        assert (
+            len(files_text.strip()) > 0
+        ), f"File listing should not be empty: {files_text}"
 
         # Look for a file to read (try common bundle file patterns)
         import json
@@ -167,12 +178,14 @@ class TestDirectToolIntegration:
                         if file_path:
                             read_args = ReadFileArgs(path=file_path)
                             read_content = await read_file(read_args)
-                            assert len(read_content) > 0, f"Should be able to read file {file_path}"
+                            assert (
+                                len(read_content) > 0
+                            ), f"Should be able to read file {file_path}"
         except json.JSONDecodeError:
             # If not JSON, just verify we got some text output
-            assert "file" in files_text.lower() or "directory" in files_text.lower(), (
-                f"File listing should mention files or directories: {files_text}"
-            )
+            assert (
+                "file" in files_text.lower() or "directory" in files_text.lower()
+            ), f"File listing should mention files or directories: {files_text}"
 
     @pytest.mark.asyncio
     async def test_grep_functionality_direct(self, test_bundle_copy):
@@ -205,10 +218,14 @@ class TestDirectToolIntegration:
         await initialize_bundle(init_args)
 
         # Test kubectl version command (should work even with limited cluster)
-        kubectl_args = KubectlCommandArgs(command="version --client", timeout=10, json_output=False)
+        kubectl_args = KubectlCommandArgs(
+            command="version --client", timeout=10, json_output=False
+        )
 
         try:
-            kubectl_content = await asyncio.wait_for(kubectl(kubectl_args), timeout=15.0)
+            kubectl_content = await asyncio.wait_for(
+                kubectl(kubectl_args), timeout=15.0
+            )
             assert len(kubectl_content) > 0, "Should have kubectl output"
 
             kubectl_text = kubectl_content[0].text

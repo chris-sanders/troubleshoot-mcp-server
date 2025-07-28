@@ -42,7 +42,9 @@ async def test_periodic_bundle_cleanup():
     mock_bundle_manager = AsyncMock()
 
     # Create a task with a short interval
-    task = asyncio.create_task(periodic_bundle_cleanup(mock_bundle_manager, interval=0.1))
+    task = asyncio.create_task(
+        periodic_bundle_cleanup(mock_bundle_manager, interval=0.1)
+    )
 
     # Let it run for a short time
     await asyncio.sleep(0.3)
@@ -66,7 +68,9 @@ async def test_lifecycle_context_normal_exit():
     mock_server.use_stdio = True
 
     # Set environment variables for the test
-    with patch.dict(os.environ, {"ENABLE_PERIODIC_CLEANUP": "true", "CLEANUP_INTERVAL": "60"}):
+    with patch.dict(
+        os.environ, {"ENABLE_PERIODIC_CLEANUP": "true", "CLEANUP_INTERVAL": "60"}
+    ):
         # Enter the context manager
         async with app_lifespan(mock_server) as context:
             # Verify resources were initialized

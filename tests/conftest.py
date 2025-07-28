@@ -88,7 +88,9 @@ def clean_asyncio():
         # Only log specific understood errors to avoid silent failures
         import logging
 
-        logging.getLogger("tests").debug(f"Controlled exception during event loop cleanup: {e}")
+        logging.getLogger("tests").debug(
+            f"Controlled exception during event loop cleanup: {e}"
+        )
 
     # Create a new event loop for the next test
     asyncio.set_event_loop(asyncio.new_event_loop())
@@ -225,7 +227,9 @@ def container_image(request):
     # Skip container builds in CI due to melange/apko limitations
     # Container builds are validated in the publish workflow
     if os.environ.get("CI") == "true":
-        pytest.skip("Container image builds are skipped in CI - run locally with 'pytest -m slow'")
+        pytest.skip(
+            "Container image builds are skipped in CI - run locally with 'pytest -m slow'"
+        )
 
     # Get project root directory
     project_root = Path(__file__).parents[1]
@@ -251,14 +255,22 @@ def container_image(request):
 
     # Explicitly clean up any running containers
     containers_result = subprocess.run(
-        ["podman", "ps", "-q", "--filter", "ancestor=troubleshoot-mcp-server-dev:latest"],
+        [
+            "podman",
+            "ps",
+            "-q",
+            "--filter",
+            "ancestor=troubleshoot-mcp-server-dev:latest",
+        ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
         timeout=10,
         check=False,
     )
-    containers = containers_result.stdout.strip().split("\n") if containers_result.stdout else []
+    containers = (
+        containers_result.stdout.strip().split("\n") if containers_result.stdout else []
+    )
 
     for container_id in containers:
         if container_id:

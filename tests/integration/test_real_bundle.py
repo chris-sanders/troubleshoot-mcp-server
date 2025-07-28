@@ -74,17 +74,23 @@ def test_sbctl_help_behavior(test_support_bundle):
     # Verify sbctl is available (basic behavior)
     # Log which sbctl is being used for debugging
     result = subprocess.run(["which", "sbctl"], capture_output=True, text=True)
-    assert result.returncode == 0, "sbctl command should be available (which sbctl failed)"
+    assert (
+        result.returncode == 0
+    ), "sbctl command should be available (which sbctl failed)"
     print(f"Using sbctl at: {result.stdout.strip()}")
 
     # Also check if executable permission is set
     sbctl_path = result.stdout.strip()
     if sbctl_path:
-        perm_result = subprocess.run(["ls", "-la", sbctl_path], capture_output=True, text=True)
+        perm_result = subprocess.run(
+            ["ls", "-la", sbctl_path], capture_output=True, text=True
+        )
         print(f"sbctl permissions: {perm_result.stdout.strip()}")
 
     # Check help output behavior
-    help_result = subprocess.run(["sbctl", "--help"], capture_output=True, text=True, timeout=5)
+    help_result = subprocess.run(
+        ["sbctl", "--help"], capture_output=True, text=True, timeout=5
+    )
 
     # Verify the command ran successfully
     assert help_result.returncode == 0, "sbctl help command should succeed"
@@ -121,13 +127,15 @@ def test_sbctl_help_behavior(test_support_bundle):
         )
 
         # Verify help for serve is available
-        assert serve_help_result.returncode == 0, "sbctl serve help command should succeed"
+        assert (
+            serve_help_result.returncode == 0
+        ), "sbctl serve help command should succeed"
 
         # Verify serve help contains expected options
         serve_help_output = serve_help_result.stdout
-        assert "--support-bundle-location" in serve_help_output, (
-            "Serve command should document bundle location option"
-        )
+        assert (
+            "--support-bundle-location" in serve_help_output
+        ), "Serve command should document bundle location option"
 
 
 @pytest.mark.asyncio
@@ -146,7 +154,9 @@ async def test_bundle_lifecycle(bundle_manager_fixture):
     manager, real_bundle_path = bundle_manager_fixture
 
     # Act: Initialize the bundle
-    result = await asyncio.wait_for(manager.initialize_bundle(str(real_bundle_path)), timeout=30.0)
+    result = await asyncio.wait_for(
+        manager.initialize_bundle(str(real_bundle_path)), timeout=30.0
+    )
 
     # Assert: Verify functional behavior (not implementation details)
     assert result.initialized, "Bundle should be marked as initialized"
@@ -156,7 +166,9 @@ async def test_bundle_lifecycle(bundle_manager_fixture):
     # Verify the bundle can be retrieved by the public API
     active_bundle = manager.get_active_bundle()
     assert active_bundle is not None, "Active bundle should be available"
-    assert active_bundle.id == result.id, "Active bundle should match initialized bundle"
+    assert (
+        active_bundle.id == result.id
+    ), "Active bundle should match initialized bundle"
 
     # Verify API server functionality (behavior, not implementation)
     await manager.check_api_server_available()
@@ -165,9 +177,9 @@ async def test_bundle_lifecycle(bundle_manager_fixture):
 
     # Test that re-initialization without force returns the same bundle
     second_result = await manager.initialize_bundle(str(real_bundle_path), force=False)
-    assert second_result.id == result.id, (
-        "Re-initialization without force should return the same bundle"
-    )
+    assert (
+        second_result.id == result.id
+    ), "Re-initialization without force should return the same bundle"
 
     # Test that force re-initialization creates a new bundle
     force_result = await manager.initialize_bundle(str(real_bundle_path), force=True)
@@ -214,14 +226,18 @@ async def test_bundle_initialization_workflow(bundle_manager_fixture, test_asser
             dir_contents = await explorer.list_files(first_dir, False)
 
             # Verify behavior - can list contents of subdirectory
-            assert dir_contents is not None, "Should be able to list subdirectory contents"
-            assert isinstance(dir_contents.entries, list), "Directory contents should be a list"
+            assert (
+                dir_contents is not None
+            ), "Should be able to list subdirectory contents"
+            assert isinstance(
+                dir_contents.entries, list
+            ), "Directory contents should be a list"
 
             # TEST 3: Recursive listing behavior
             recursive_list = await explorer.list_files(first_dir, True)
-            assert recursive_list.total_files + recursive_list.total_dirs > 0, (
-                "Recursive listing should find files/dirs"
-            )
+            assert (
+                recursive_list.total_files + recursive_list.total_dirs > 0
+            ), "Recursive listing should find files/dirs"
 
             # TEST 4: File reading behavior
             # Find a file to read (we don't care which, just that we can read one)
@@ -233,14 +249,18 @@ async def test_bundle_initialization_workflow(bundle_manager_fixture, test_asser
 
                 # Verify behavior - can read file contents
                 assert file_content is not None, "Should be able to read file contents"
-                assert file_content.content is not None, "File content should not be None"
+                assert (
+                    file_content.content is not None
+                ), "File content should not be None"
 
                 # Check metadata (behavior we depend on)
-                assert file_content.path == first_file, "File content should have correct path"
+                assert (
+                    file_content.path == first_file
+                ), "File content should have correct path"
                 # Note: We're checking for path existence, not name which might not be in all versions
-                assert hasattr(file_content, "content"), (
-                    "File content should have content attribute"
-                )
+                assert hasattr(
+                    file_content, "content"
+                ), "File content should have content attribute"
 
 
 @pytest.mark.asyncio
@@ -273,17 +293,21 @@ async def test_bundle_manager_performance(bundle_manager_fixture):
 
     # Verify expected initialization behavior
     assert result.initialized, "Bundle should be marked as initialized"
-    assert result.kubeconfig_path.exists(), "Initialization should create a kubeconfig file"
-    assert duration < 45.0, (
-        f"Initialization should complete in reasonable time (took {duration:.2f}s)"
-    )
+    assert (
+        result.kubeconfig_path.exists()
+    ), "Initialization should create a kubeconfig file"
+    assert (
+        duration < 45.0
+    ), f"Initialization should complete in reasonable time (took {duration:.2f}s)"
 
     # BEHAVIOR TEST 2: Verify kubeconfig has valid structure
     with open(result.kubeconfig_path, "r") as f:
         kubeconfig_content = f.read()
 
     # Check for essential kubeconfig fields that users and code depend on
-    assert "clusters" in kubeconfig_content, "Kubeconfig should contain clusters section"
+    assert (
+        "clusters" in kubeconfig_content
+    ), "Kubeconfig should contain clusters section"
     assert "apiVersion" in kubeconfig_content, "Kubeconfig should contain API version"
 
     # BEHAVIOR TEST 3: The API server connection is attempted (we don't assert success
@@ -294,18 +318,28 @@ async def test_bundle_manager_performance(bundle_manager_fixture):
     # This tests the observable behavior that getting the active bundle works
     active_bundle = manager.get_active_bundle()
     assert active_bundle is not None, "Manager should have an active bundle"
-    assert active_bundle.id == result.id, "Active bundle should match initialized bundle"
+    assert (
+        active_bundle.id == result.id
+    ), "Active bundle should match initialized bundle"
 
     # BEHAVIOR TEST 5: Test diagnostic info is available - behavior users depend on
     diagnostics = await manager.get_diagnostic_info()
-    assert isinstance(diagnostics, dict), "Diagnostic info should be available as a dictionary"
-    assert "api_server_available" in diagnostics, "Diagnostics should report API server status"
-    assert "bundle_initialized" in diagnostics, "Diagnostics should report bundle status"
+    assert isinstance(
+        diagnostics, dict
+    ), "Diagnostic info should be available as a dictionary"
+    assert (
+        "api_server_available" in diagnostics
+    ), "Diagnostics should report API server status"
+    assert (
+        "bundle_initialized" in diagnostics
+    ), "Diagnostics should report bundle status"
 
     # Verify sbctl process was created successfully
     try:
         # Use ps to check for sbctl processes associated with this bundle
-        ps_result = subprocess.run(["ps", "-ef"], capture_output=True, text=True, timeout=5)
+        ps_result = subprocess.run(
+            ["ps", "-ef"], capture_output=True, text=True, timeout=5
+        )
 
         # There should be a sbctl process running for this bundle
         # We're checking behavior (process exists) not implementation (specific process args)

@@ -183,7 +183,9 @@ async def initialize_bundle(args: InitializeBundleArgs) -> List[TextContent]:
         diagnostics = await bundle_manager.get_diagnostic_info()
 
         # Format response using the formatter
-        response = formatter.format_bundle_initialization(result, api_server_available, diagnostics)
+        response = formatter.format_bundle_initialization(
+            result, api_server_available, diagnostics
+        )
         return check_response_size(response, "initialize_bundle", formatter)
 
     except BundleManagerError as e:
@@ -314,7 +316,9 @@ async def kubectl(args: KubectlCommandArgs) -> List[TextContent]:
             return check_response_size(formatted_error, "kubectl", formatter)
 
         # Execute the kubectl command
-        result = await get_kubectl_executor().execute(args.command, args.timeout, args.json_output)
+        result = await get_kubectl_executor().execute(
+            args.command, args.timeout, args.json_output
+        )
 
         # Format response using the formatter
         response = formatter.format_kubectl_result(result)
@@ -330,7 +334,10 @@ async def kubectl(args: KubectlCommandArgs) -> List[TextContent]:
             diagnostics = await bundle_manager.get_diagnostic_info()
 
             # Check if this is a connection issue
-            if "connection refused" in str(e).lower() or "could not connect" in str(e).lower():
+            if (
+                "connection refused" in str(e).lower()
+                or "could not connect" in str(e).lower()
+            ):
                 error_message += (
                     " This appears to be a connection issue with the Kubernetes API server. "
                     "The API server may not be running properly. "
@@ -443,7 +450,9 @@ async def read_file(args: ReadFileArgs) -> List[TextContent]:
     formatter = get_formatter(args.verbosity)
 
     try:
-        result = await get_file_explorer().read_file(args.path, args.start_line, args.end_line)
+        result = await get_file_explorer().read_file(
+            args.path, args.start_line, args.end_line
+        )
         response = formatter.format_file_content(result)
         return check_response_size(response, "read_file", formatter)
 

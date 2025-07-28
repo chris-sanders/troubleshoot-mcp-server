@@ -33,7 +33,9 @@ async def test_subprocess_exec_with_cleanup_basic_command():
 async def test_subprocess_exec_with_cleanup_timeout_handling():
     """Test that subprocess_exec_with_cleanup properly handles timeouts."""
     with pytest.raises(asyncio.TimeoutError):
-        await subprocess_exec_with_cleanup("sleep", "10", timeout=0.1)  # Very short timeout
+        await subprocess_exec_with_cleanup(
+            "sleep", "10", timeout=0.1
+        )  # Very short timeout
 
     # If we get here, the timeout was handled properly and cleanup occurred
 
@@ -80,7 +82,9 @@ async def test_subprocess_utilities_no_transport_warnings():
             await asyncio.sleep(0.01)
 
         # Verify no transport warnings occurred
-        assert len(warnings_captured) == 0, f"Transport warnings detected: {warnings_captured}"
+        assert (
+            len(warnings_captured) == 0
+        ), f"Transport warnings detected: {warnings_captured}"
 
     finally:
         # Restore original warning handler
@@ -106,7 +110,9 @@ async def test_multiple_subprocess_operations_no_transport_leaks():
                 "echo", f"test-{i}", timeout=5.0
             )
             assert returncode == 0, f"Command {i} should succeed"
-            assert stdout == f"test-{i}\n".encode(), f"Should get expected output for {i}"
+            assert (
+                stdout == f"test-{i}\n".encode()
+            ), f"Should get expected output for {i}"
 
         # Force garbage collection to trigger any transport issues
         for _ in range(5):
@@ -114,7 +120,9 @@ async def test_multiple_subprocess_operations_no_transport_leaks():
             await asyncio.sleep(0.01)
 
         # Verify no transport warnings occurred
-        assert len(warnings_captured) == 0, f"Transport warnings detected: {warnings_captured}"
+        assert (
+            len(warnings_captured) == 0
+        ), f"Transport warnings detected: {warnings_captured}"
 
     finally:
         warnings.showwarning = original_showwarning
@@ -192,7 +200,9 @@ async def test_transport_cleanup_functional():
             await asyncio.sleep(0.01)
 
         # Verify no transport cleanup warnings
-        assert len(warnings_captured) == 0, f"Transport warnings detected: {warnings_captured}"
+        assert (
+            len(warnings_captured) == 0
+        ), f"Transport warnings detected: {warnings_captured}"
 
     finally:
         warnings.showwarning = original_showwarning

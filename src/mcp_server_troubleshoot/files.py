@@ -101,7 +101,9 @@ class ReadFileArgs(BaseModel):
     """
 
     path: str = Field(description="The path to the file within the bundle")
-    start_line: int = Field(0, description="The line number to start reading from (0-indexed)")
+    start_line: int = Field(
+        0, description="The line number to start reading from (0-indexed)"
+    )
     end_line: Optional[int] = Field(
         None, description="The line number to end reading at (0-indexed, inclusive)"
     )
@@ -155,10 +157,16 @@ class GrepFilesArgs(BaseModel):
     pattern: str = Field(description="The pattern to search for")
     path: str = Field(description="The path within the bundle to search")
     recursive: bool = Field(True, description="Whether to search recursively")
-    glob_pattern: Optional[str] = Field(None, description="The glob pattern to match files against")
-    case_sensitive: bool = Field(False, description="Whether the search is case-sensitive")
+    glob_pattern: Optional[str] = Field(
+        None, description="The glob pattern to match files against"
+    )
+    case_sensitive: bool = Field(
+        False, description="Whether the search is case-sensitive"
+    )
     max_results: int = Field(1000, description="Maximum number of results to return")
-    max_results_per_file: int = Field(5, description="Maximum number of results to return per file")
+    max_results_per_file: int = Field(
+        5, description="Maximum number of results to return per file"
+    )
     max_files: int = Field(10, description="Maximum number of files to search/return")
     verbosity: Optional[str] = Field(
         None,
@@ -222,14 +230,20 @@ class FileInfo(BaseModel):
     """
 
     name: str = Field(description="The name of the file or directory")
-    path: str = Field(description="The path of the file or directory relative to the bundle root")
+    path: str = Field(
+        description="The path of the file or directory relative to the bundle root"
+    )
     type: str = Field(description="The type of the entry ('file' or 'dir')")
     size: int = Field(description="The size of the file in bytes (0 for directories)")
-    access_time: float = Field(description="The time of most recent access (seconds since epoch)")
+    access_time: float = Field(
+        description="The time of most recent access (seconds since epoch)"
+    )
     modify_time: float = Field(
         description="The time of most recent content modification (seconds since epoch)"
     )
-    is_binary: bool = Field(description="Whether the file appears to be binary (for files)")
+    is_binary: bool = Field(
+        description="Whether the file appears to be binary (for files)"
+    )
 
 
 class FileListResult(BaseModel):
@@ -251,7 +265,9 @@ class FileContentResult(BaseModel):
 
     path: str = Field(description="The path of the file that was read")
     content: str = Field(description="The content of the file")
-    start_line: int = Field(description="The line number that was started from (0-indexed)")
+    start_line: int = Field(
+        description="The line number that was started from (0-indexed)"
+    )
     end_line: int = Field(description="The line number that was ended at (0-indexed)")
     total_lines: int = Field(description="The total number of lines in the file")
     binary: bool = Field(description="Whether the file appears to be binary")
@@ -276,12 +292,16 @@ class GrepResult(BaseModel):
 
     pattern: str = Field(description="The pattern that was searched for")
     path: str = Field(description="The path that was searched")
-    glob_pattern: Optional[str] = Field(description="The glob pattern that was used, if any")
+    glob_pattern: Optional[str] = Field(
+        description="The glob pattern that was used, if any"
+    )
     matches: List[GrepMatch] = Field(description="The matches found")
     total_matches: int = Field(description="The total number of matches found")
     files_searched: int = Field(description="The number of files that were searched")
     case_sensitive: bool = Field(description="Whether the search was case-sensitive")
-    truncated: bool = Field(description="Whether the results were truncated due to max_results")
+    truncated: bool = Field(
+        description="Whether the results were truncated due to max_results"
+    )
     files_truncated: bool = Field(
         default=False,
         description="Whether the file list was truncated due to max_files",
@@ -332,7 +352,9 @@ class FileExplorer:
             if support_bundle_dirs:
                 support_bundle_dir = support_bundle_dirs[0]  # Use the first one found
                 if support_bundle_dir.exists() and support_bundle_dir.is_dir():
-                    logger.debug(f"Using extracted bundle subdirectory: {support_bundle_dir}")
+                    logger.debug(
+                        f"Using extracted bundle subdirectory: {support_bundle_dir}"
+                    )
                     return support_bundle_dir
 
             # If no support-bundle-* directory, check if the extracted directory itself has files
@@ -551,7 +573,9 @@ class FileExplorer:
                 # For binary files, just read the whole file
                 if is_binary:
                     if start_line > 0 or end_line is not None:
-                        logger.warning("Line range filtering not supported for binary files")
+                        logger.warning(
+                            "Line range filtering not supported for binary files"
+                        )
                     content = f.read()
                     if isinstance(content, bytes):
                         # For binary, return a hex dump

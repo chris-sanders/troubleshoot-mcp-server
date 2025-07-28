@@ -35,11 +35,15 @@ DEFAULT_INITIALIZATION_TIMEOUT = 120  # 2 minutes
 
 # Feature flags - can be enabled/disabled via environment variables
 DEFAULT_CLEANUP_ORPHANED = True  # Clean up orphaned sbctl processes
-DEFAULT_ALLOW_ALTERNATIVE_KUBECONFIG = True  # Allow finding kubeconfig in alternative locations
+DEFAULT_ALLOW_ALTERNATIVE_KUBECONFIG = (
+    True  # Allow finding kubeconfig in alternative locations
+)
 
 # Override with environment variables if provided
 MAX_DOWNLOAD_SIZE = int(os.environ.get("MAX_DOWNLOAD_SIZE", DEFAULT_DOWNLOAD_SIZE))
-MAX_DOWNLOAD_TIMEOUT = int(os.environ.get("MAX_DOWNLOAD_TIMEOUT", DEFAULT_DOWNLOAD_TIMEOUT))
+MAX_DOWNLOAD_TIMEOUT = int(
+    os.environ.get("MAX_DOWNLOAD_TIMEOUT", DEFAULT_DOWNLOAD_TIMEOUT)
+)
 MAX_INITIALIZATION_TIMEOUT = int(
     os.environ.get("MAX_INITIALIZATION_TIMEOUT", DEFAULT_INITIALIZATION_TIMEOUT)
 )
@@ -80,7 +84,9 @@ logger.debug(f"Using MAX_DOWNLOAD_SIZE: {MAX_DOWNLOAD_SIZE / 1024 / 1024:.1f} MB
 logger.debug(f"Using MAX_DOWNLOAD_TIMEOUT: {MAX_DOWNLOAD_TIMEOUT} seconds")
 logger.debug(f"Using MAX_INITIALIZATION_TIMEOUT: {MAX_INITIALIZATION_TIMEOUT} seconds")
 logger.debug(f"Feature flags - Cleanup orphaned processes: {CLEANUP_ORPHANED}")
-logger.debug(f"Feature flags - Allow alternative kubeconfig: {ALLOW_ALTERNATIVE_KUBECONFIG}")
+logger.debug(
+    f"Feature flags - Allow alternative kubeconfig: {ALLOW_ALTERNATIVE_KUBECONFIG}"
+)
 
 # Constants for Replicated Vendor Portal integration
 REPLICATED_VENDOR_URL_PATTERN = re.compile(
@@ -99,7 +105,9 @@ class BundleMetadata(BaseModel):
     source: str = Field(description="The source of the bundle (URL or local path)")
     path: Path = Field(description="The path to the extracted bundle")
     kubeconfig_path: Path = Field(description="The path to the kubeconfig file")
-    initialized: bool = Field(description="Whether the bundle has been initialized with sbctl")
+    initialized: bool = Field(
+        description="Whether the bundle has been initialized with sbctl"
+    )
     host_only_bundle: bool = Field(
         False,
         description="Whether this bundle contains only host resources (no cluster resources)",
@@ -202,13 +210,17 @@ class BundleFileInfo(BaseModel):
     """
 
     path: str = Field(description="The full path to the bundle file")
-    relative_path: str = Field(description="The relative path without bundle directory prefix")
+    relative_path: str = Field(
+        description="The relative path without bundle directory prefix"
+    )
     name: str = Field(description="The name of the bundle file")
     size_bytes: int = Field(description="The size of the bundle file in bytes")
     modified_time: float = Field(
         description="The modification time of the bundle file (seconds since epoch)"
     )
-    valid: bool = Field(description="Whether the bundle appears to be a valid support bundle")
+    valid: bool = Field(
+        description="Whether the bundle appears to be a valid support bundle"
+    )
     validation_message: Optional[str] = Field(
         None, description="Message explaining why the bundle is invalid, if applicable"
     )
@@ -238,7 +250,9 @@ class BundleManager:
         self._host_only_bundle: bool = False
         self._termination_requested: bool = False
 
-    async def initialize_bundle(self, source: str, force: bool = False) -> BundleMetadata:
+    async def initialize_bundle(
+        self, source: str, force: bool = False
+    ) -> BundleMetadata:
         """
         Initialize a support bundle from a source.
 
@@ -281,14 +295,19 @@ class BundleManager:
                                 include_invalid=True
                             )
                             for bundle in available_bundles:
-                                if bundle.relative_path == source or bundle.name == source:
+                                if (
+                                    bundle.relative_path == source
+                                    or bundle.name == source
+                                ):
                                     logger.info(
                                         f"Found matching bundle by relative path: {bundle.path}"
                                     )
                                     bundle_path = Path(bundle.path)
                                     break
                         except Exception as e:
-                            logger.warning(f"Error searching for bundle by relative path: {e}")
+                            logger.warning(
+                                f"Error searching for bundle by relative path: {e}"
+                            )
 
                 # If we still can't find it, raise an error
                 if not bundle_path.exists():
@@ -304,7 +323,9 @@ class BundleManager:
             bundle_output_dir.mkdir(parents=True, exist_ok=True)
 
             # Initialize the bundle with sbctl
-            kubeconfig_path = await self._initialize_with_sbctl(bundle_path, bundle_output_dir)
+            kubeconfig_path = await self._initialize_with_sbctl(
+                bundle_path, bundle_output_dir
+            )
 
             # Handle case where no kubeconfig was created (host-only bundle)
             if self._host_only_bundle:
@@ -346,7 +367,9 @@ class BundleManager:
                         with tarfile.open(bundle_path, "r:gz") as tar:
                             # First list the files to get a count
                             members = tar.getmembers()
-                            logger.info(f"Support bundle contains {len(members)} entries")
+                            logger.info(
+                                f"Support bundle contains {len(members)} entries"
+                            )
 
                             # Extract all files
                             from pathlib import PurePath
@@ -361,7 +384,9 @@ class BundleManager:
 
                             # Extract with the sanitized member list
                             # Use filter='data' to only extract file data without modifying metadata
-                            tar.extractall(path=extract_dir, members=safe_members, filter="data")
+                            tar.extractall(
+                                path=extract_dir, members=safe_members, filter="data"
+                            )
 
                         # List extracted files and verify extraction was successful
                         file_count = 0
@@ -442,7 +467,9 @@ class BundleManager:
 
             # Process the response status and content
             if response.status_code == 401:
-                logger.error(f"Replicated API returned 401 Unauthorized for slug {slug}")
+                logger.error(
+                    f"Replicated API returned 401 Unauthorized for slug {slug}"
+                )
                 raise BundleDownloadError(
                     f"Failed to authenticate with Replicated API (status {response.status_code}). "
                     "Check SBCTL_TOKEN/REPLICATED_TOKEN."
@@ -469,7 +496,9 @@ class BundleManager:
                 logger.exception(
                     f"Error decoding JSON response from Replicated API (status 200): {json_e}"
                 )
-                raise BundleDownloadError(f"Invalid JSON response from Replicated API: {json_e}")
+                raise BundleDownloadError(
+                    f"Invalid JSON response from Replicated API: {json_e}"
+                )
 
             # Add validation: Ensure response_data is a dictionary
             if not isinstance(response_data, dict):
@@ -500,7 +529,9 @@ class BundleManager:
                 logger.error(
                     f"Missing 'signedUri' in Replicated API response bundle object for slug {slug}. Bundle data: {bundle_data}"
                 )
-                raise BundleDownloadError("Could not find 'signedUri' in Replicated API response.")
+                raise BundleDownloadError(
+                    "Could not find 'signedUri' in Replicated API response."
+                )
 
             logger.info("Successfully retrieved signed URL from Replicated API.")
             # Ensure we're returning a string type
@@ -513,12 +544,18 @@ class BundleManager:
                 # Re-raise specific BundleDownloadErrors we've already identified
                 raise e
             elif isinstance(e, httpx.Timeout):
-                logger.exception(f"Timeout requesting signed URL from Replicated API: {e}")
+                logger.exception(
+                    f"Timeout requesting signed URL from Replicated API: {e}"
+                )
                 raise BundleDownloadError(f"Timeout requesting signed URL: {e}") from e
             elif isinstance(e, httpx.RequestError):
                 # This should now correctly catch the RequestError raised by the mock
-                logger.exception(f"Network error requesting signed URL from Replicated API: {e}")
-                raise BundleDownloadError(f"Network error requesting signed URL: {e}") from e
+                logger.exception(
+                    f"Network error requesting signed URL from Replicated API: {e}"
+                )
+                raise BundleDownloadError(
+                    f"Network error requesting signed URL: {e}"
+                ) from e
             else:
                 # Catch any other unexpected errors during the entire process and wrap them
                 distinct_error_msg = f"UNEXPECTED EXCEPTION in _get_replicated_signed_url: {type(e).__name__}: {str(e)}"
@@ -559,7 +596,9 @@ class BundleManager:
                 # Catch any other unexpected errors during signed URL retrieval
                 logger.exception(f"Unexpected error getting signed URL for {url}: {e}")
                 # Raise specific error and exit
-                raise BundleDownloadError(f"Failed to get signed URL for {url}: {str(e)}")
+                raise BundleDownloadError(
+                    f"Failed to get signed URL for {url}: {str(e)}"
+                )
         # Log the download start *after* potential signed URL retrieval
         logger.info(f"Starting download from: {actual_download_url[:80]}...")
 
@@ -591,7 +630,9 @@ class BundleManager:
             # Headers for the actual download
             download_headers = {}
             # Add auth token ONLY for non-Replicated URLs (signed URLs have auth embedded)
-            if actual_download_url == original_url:  # Check if we are using the original URL
+            if (
+                actual_download_url == original_url
+            ):  # Check if we are using the original URL
                 token = os.environ.get("SBCTL_TOKEN")
                 if token:
                     download_headers["Authorization"] = f"Bearer {token}"
@@ -607,7 +648,9 @@ class BundleManager:
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 # === START MODIFICATION ===
                 # Explicitly await the get call first
-                response_ctx_mgr = session.get(actual_download_url, headers=download_headers)
+                response_ctx_mgr = session.get(
+                    actual_download_url, headers=download_headers
+                )
                 # Now use the awaited response object in the async with
                 async with await response_ctx_mgr as response:
                     # === END MODIFICATION ===
@@ -654,13 +697,19 @@ class BundleManager:
             return download_path
         except Exception as e:
             # Use original_url in error messages for clarity
-            logger.exception(f"Error downloading bundle originally from {original_url}: {str(e)}")
+            logger.exception(
+                f"Error downloading bundle originally from {original_url}: {str(e)}"
+            )
             if download_path.exists():
-                download_path.unlink(missing_ok=True)  # Use missing_ok=True for robustness
+                download_path.unlink(
+                    missing_ok=True
+                )  # Use missing_ok=True for robustness
             # Re-raise BundleDownloadError if it's already that type
             if isinstance(e, BundleDownloadError):
                 raise
-            raise BundleDownloadError(f"Failed to download bundle from {original_url}: {str(e)}")
+            raise BundleDownloadError(
+                f"Failed to download bundle from {original_url}: {str(e)}"
+            )
 
     async def _initialize_with_sbctl(self, bundle_path: Path, output_dir: Path) -> Path:
         """
@@ -746,7 +795,9 @@ class BundleManager:
                 logger.info(f"sbctl output: {all_output}")
 
                 if "No cluster resources found in bundle" in all_output:
-                    logger.info("Bundle contains no cluster resources, marking as host-only bundle")
+                    logger.info(
+                        "Bundle contains no cluster resources, marking as host-only bundle"
+                    )
                     self._host_only_bundle = True
                     return kubeconfig_path  # Return dummy path, file won't exist but that's OK
 
@@ -779,7 +830,9 @@ class BundleManager:
                                 )
                                 if not line:  # EOF
                                     break
-                                line_text = line.decode("utf-8", errors="replace").strip()
+                                line_text = line.decode(
+                                    "utf-8", errors="replace"
+                                ).strip()
                                 if line_text:
                                     stdout_lines.append(line_text)
                                     logger.debug(f"sbctl stdout line: {line_text}")
@@ -792,13 +845,17 @@ class BundleManager:
                                             r"export KUBECONFIG=([^\s]+)", line_text
                                         )
                                         if kubeconfig_matches:
-                                            announced_kubeconfig = Path(kubeconfig_matches[0])
+                                            announced_kubeconfig = Path(
+                                                kubeconfig_matches[0]
+                                            )
                                             logger.info(
                                                 f"sbctl announced kubeconfig at: {announced_kubeconfig}"
                                             )
 
                                             # Wait a brief moment for the file to be created
-                                            for wait_attempt in range(10):  # Wait up to 5 seconds
+                                            for wait_attempt in range(
+                                                10
+                                            ):  # Wait up to 5 seconds
                                                 await asyncio.sleep(0.5)
                                                 if announced_kubeconfig.exists():
                                                     logger.info(
@@ -824,13 +881,17 @@ class BundleManager:
                                 break
 
                         if stdout_lines:
-                            logger.debug(f"sbctl initial stdout: {' | '.join(stdout_lines)}")
+                            logger.debug(
+                                f"sbctl initial stdout: {' | '.join(stdout_lines)}"
+                            )
 
                 except Exception as read_err:
                     logger.debug(f"Error reading initial stdout: {read_err}")
 
                 # Continue with normal initialization
-                logger.debug("sbctl process continuing, proceeding with normal initialization")
+                logger.debug(
+                    "sbctl process continuing, proceeding with normal initialization"
+                )
 
             # Wait for initialization to complete
             await self._wait_for_initialization(kubeconfig_path)
@@ -902,7 +963,11 @@ class BundleManager:
         alternative_kubeconfig_paths = []
 
         # Attempt to read process output for diagnostic purposes
-        if self.sbctl_process and self.sbctl_process.stdout and self.sbctl_process.stderr:
+        if (
+            self.sbctl_process
+            and self.sbctl_process.stdout
+            and self.sbctl_process.stderr
+        ):
             stdout_data = b""
             stderr_data = b""
 
@@ -944,15 +1009,21 @@ class BundleManager:
                         # Extract the kubeconfig path
                         import re
 
-                        kubeconfig_matches = re.findall(r"export KUBECONFIG=([^\s]+)", stdout_text)
+                        kubeconfig_matches = re.findall(
+                            r"export KUBECONFIG=([^\s]+)", stdout_text
+                        )
                         if kubeconfig_matches:
                             alt_kubeconfig = Path(kubeconfig_matches[0])
-                            logger.info(f"Found kubeconfig path in stdout: {alt_kubeconfig}")
+                            logger.info(
+                                f"Found kubeconfig path in stdout: {alt_kubeconfig}"
+                            )
                             alternative_kubeconfig_paths.append(alt_kubeconfig)
 
                             # Since we found the kubeconfig path immediately, use it
                             if alt_kubeconfig.exists():
-                                logger.info(f"Using kubeconfig from stdout: {alt_kubeconfig}")
+                                logger.info(
+                                    f"Using kubeconfig from stdout: {alt_kubeconfig}"
+                                )
                                 try:
                                     safe_copy_file(alt_kubeconfig, kubeconfig_path)
                                     logger.info(
@@ -1017,10 +1088,14 @@ class BundleManager:
                     try:
                         if self.sbctl_process.stdout:
                             stdout_data = await self.sbctl_process.stdout.read()
-                            process_output += stdout_data.decode("utf-8", errors="replace")
+                            process_output += stdout_data.decode(
+                                "utf-8", errors="replace"
+                            )
                         if self.sbctl_process.stderr:
                             stderr_data = await self.sbctl_process.stderr.read()
-                            process_output += stderr_data.decode("utf-8", errors="replace")
+                            process_output += stderr_data.decode(
+                                "utf-8", errors="replace"
+                            )
                     except Exception:
                         pass
 
@@ -1050,7 +1125,9 @@ class BundleManager:
             if not kubeconfig_found and ALLOW_ALTERNATIVE_KUBECONFIG:
                 for alt_path in alternative_kubeconfig_paths:
                     if alt_path.exists():
-                        logger.info(f"Kubeconfig found at alternative location: {alt_path}")
+                        logger.info(
+                            f"Kubeconfig found at alternative location: {alt_path}"
+                        )
                         kubeconfig_found = True
                         kubeconfig_found_time = asyncio.get_event_loop().time()
                         found_kubeconfig_path = alt_path
@@ -1059,7 +1136,9 @@ class BundleManager:
                         try:
                             with open(alt_path, "r") as f:
                                 kubeconfig_content = f.read()
-                            logger.debug(f"Alternative kubeconfig content:\n{kubeconfig_content}")
+                            logger.debug(
+                                f"Alternative kubeconfig content:\n{kubeconfig_content}"
+                            )
 
                             # Try to copy to expected location
                             try:
@@ -1070,7 +1149,9 @@ class BundleManager:
                             except Exception as copy_err:
                                 logger.warning(f"Failed to copy kubeconfig: {copy_err}")
                         except Exception as e:
-                            logger.warning(f"Failed to read alternative kubeconfig content: {e}")
+                            logger.warning(
+                                f"Failed to read alternative kubeconfig content: {e}"
+                            )
 
                         break
 
@@ -1125,7 +1206,9 @@ class BundleManager:
                         time_since_kubeconfig = (
                             asyncio.get_event_loop().time() - kubeconfig_found_time
                         )
-                        if time_since_kubeconfig > (timeout * api_server_wait_percentage):
+                        if time_since_kubeconfig > (
+                            timeout * api_server_wait_percentage
+                        ):
                             logger.warning(
                                 f"API server not responding after {time_since_kubeconfig:.1f}s "
                                 f"({api_server_wait_percentage * 100:.0f}% of timeout). Proceeding anyway."
@@ -1157,7 +1240,9 @@ class BundleManager:
                                 stdout_data = await asyncio.wait_for(
                                     self.sbctl_process.stdout.read(), timeout=1.0
                                 )
-                                process_output += stdout_data.decode("utf-8", errors="replace")
+                                process_output += stdout_data.decode(
+                                    "utf-8", errors="replace"
+                                )
                             except (asyncio.TimeoutError, Exception):
                                 pass
                         if self.sbctl_process.stderr:
@@ -1165,7 +1250,9 @@ class BundleManager:
                                 stderr_data = await asyncio.wait_for(
                                     self.sbctl_process.stderr.read(), timeout=1.0
                                 )
-                                process_output += stderr_data.decode("utf-8", errors="replace")
+                                process_output += stderr_data.decode(
+                                    "utf-8", errors="replace"
+                                )
                             except (asyncio.TimeoutError, Exception):
                                 pass
 
@@ -1192,7 +1279,9 @@ class BundleManager:
 
                 # Check if this was an intentional termination (SIGTERM/-15)
                 if self.sbctl_process.returncode == -15 and self._termination_requested:
-                    logger.debug("sbctl process was intentionally terminated during cleanup")
+                    logger.debug(
+                        "sbctl process was intentionally terminated during cleanup"
+                    )
                     return  # Exit gracefully without raising an error
 
                 error_message = f"sbctl process exited with code {self.sbctl_process.returncode} before initialization completed"
@@ -1265,7 +1354,9 @@ class BundleManager:
                     await asyncio.wait_for(self.sbctl_process.wait(), timeout=3.0)
                     logger.debug("sbctl process terminated gracefully")
                 except (asyncio.TimeoutError, ProcessLookupError) as e:
-                    logger.warning(f"Failed to terminate sbctl process gracefully: {str(e)}")
+                    logger.warning(
+                        f"Failed to terminate sbctl process gracefully: {str(e)}"
+                    )
                     if self.sbctl_process:
                         try:
                             logger.debug("Killing sbctl process...")
@@ -1298,14 +1389,18 @@ class BundleManager:
                                 # Check if process is gone
                                 os.kill(pid, 0)
                                 # If we get here, process still exists, try SIGKILL
-                                logger.debug(f"Process {pid} still exists, sending SIGKILL")
+                                logger.debug(
+                                    f"Process {pid} still exists, sending SIGKILL"
+                                )
                                 os.kill(pid, signal.SIGKILL)
                             except ProcessLookupError:
                                 logger.debug(f"Process {pid} terminated successfully")
                         except ProcessLookupError:
                             logger.debug(f"Process {pid} not found")
                         except PermissionError:
-                            logger.warning(f"Permission error trying to kill process {pid}")
+                            logger.warning(
+                                f"Permission error trying to kill process {pid}"
+                            )
 
                         # Remove the PID file
                         try:
@@ -1338,7 +1433,10 @@ class BundleManager:
                                         proc.info["name"]
                                         and "sbctl" in proc.info["name"]
                                         and proc.info["cmdline"]
-                                        and any(bundle_path in arg for arg in proc.info["cmdline"])
+                                        and any(
+                                            bundle_path in arg
+                                            for arg in proc.info["cmdline"]
+                                        )
                                     ):
                                         pid = proc.info["pid"]
                                         logger.debug(
@@ -1346,7 +1444,9 @@ class BundleManager:
                                         )
                                         try:
                                             os.kill(pid, signal.SIGTERM)
-                                            logger.debug(f"Sent SIGTERM to process {pid}")
+                                            logger.debug(
+                                                f"Sent SIGTERM to process {pid}"
+                                            )
                                             await asyncio.sleep(0.5)
 
                                             # Check if terminated
@@ -1365,7 +1465,9 @@ class BundleManager:
                                             ProcessLookupError,
                                             PermissionError,
                                         ) as e:
-                                            logger.debug(f"Error terminating process {pid}: {e}")
+                                            logger.debug(
+                                                f"Error terminating process {pid}: {e}"
+                                            )
                                 except (
                                     psutil.NoSuchProcess,
                                     psutil.AccessDenied,
@@ -1374,7 +1476,9 @@ class BundleManager:
                                     # Process disappeared or access denied - skip it
                                     continue
                         except Exception as e:
-                            logger.warning(f"Error cleaning up orphaned sbctl processes: {e}")
+                            logger.warning(
+                                f"Error cleaning up orphaned sbctl processes: {e}"
+                            )
 
                     # As a fallback, try to clean up any sbctl processes related to serve
                     try:
@@ -1387,7 +1491,9 @@ class BundleManager:
                                     proc.info["name"]
                                     and "sbctl" in proc.info["name"]
                                     and proc.info["cmdline"]
-                                    and any("serve" in arg for arg in proc.info["cmdline"])
+                                    and any(
+                                        "serve" in arg for arg in proc.info["cmdline"]
+                                    )
                                 ):
                                     try:
                                         proc.terminate()
@@ -1413,12 +1519,16 @@ class BundleManager:
                         else:
                             logger.debug("No sbctl serve processes found to terminate")
                     except Exception as e:
-                        logger.warning(f"Error using psutil to terminate sbctl processes: {e}")
+                        logger.warning(
+                            f"Error using psutil to terminate sbctl processes: {e}"
+                        )
 
                 except Exception as e:
                     logger.warning(f"Error during extended cleanup: {e}")
             else:
-                logger.debug("Skipping orphaned process cleanup (disabled by configuration)")
+                logger.debug(
+                    "Skipping orphaned process cleanup (disabled by configuration)"
+                )
 
     async def _cleanup_active_bundle(self) -> None:
         """
@@ -1456,7 +1566,9 @@ class BundleManager:
                         files = glob.glob(f"{bundle_path}/**", recursive=True)
                         logger.info(f"Found {len(files)} items in bundle directory")
                     except Exception as list_err:
-                        logger.warning(f"Error getting bundle directory details: {list_err}")
+                        logger.warning(
+                            f"Error getting bundle directory details: {list_err}"
+                        )
 
                     # Create a list of paths we should not delete (containing parent directories)
                     protected_paths = [
@@ -1472,7 +1584,9 @@ class BundleManager:
                             try:
                                 import shutil
 
-                                logger.info(f"Starting shutil.rmtree on bundle path: {bundle_path}")
+                                logger.info(
+                                    f"Starting shutil.rmtree on bundle path: {bundle_path}"
+                                )
                                 shutil.rmtree(bundle_path)
                                 logger.info(
                                     "shutil.rmtree completed, checking if path still exists"
@@ -1487,7 +1601,9 @@ class BundleManager:
                                         f"Successfully removed bundle directory: {bundle_path}"
                                     )
                             except PermissionError as e:
-                                logger.error(f"Permission error removing bundle directory: {e}")
+                                logger.error(
+                                    f"Permission error removing bundle directory: {e}"
+                                )
                                 logger.error(
                                     f"Error details: {str(e)}, file: {getattr(e, 'filename', 'unknown')}"
                                 )
@@ -1506,7 +1622,9 @@ class BundleManager:
                                 f"Bundle path {bundle_path} is a protected path, not removing"
                             )
                         if not bundle_path.exists():
-                            logger.warning(f"Bundle path {bundle_path} no longer exists")
+                            logger.warning(
+                                f"Bundle path {bundle_path} no longer exists"
+                            )
                 else:
                     if not self.active_bundle.path:
                         logger.warning("Active bundle path is None")
@@ -1553,7 +1671,9 @@ class BundleManager:
             sanitized = "bundle"
 
         # Add randomness to ensure uniqueness
-        random_suffix = os.urandom(8).hex()  # Increased from 4 to 8 bytes for more entropy
+        random_suffix = os.urandom(
+            8
+        ).hex()  # Increased from 4 to 8 bytes for more entropy
 
         return f"{sanitized}_{random_suffix}"
 
@@ -1600,7 +1720,9 @@ class BundleManager:
             # Try to find kubeconfig in current directory (where sbctl might create it)
             current_dir_kubeconfig = Path.cwd() / "kubeconfig"
             if current_dir_kubeconfig.exists():
-                logger.info(f"Found kubeconfig in current directory: {current_dir_kubeconfig}")
+                logger.info(
+                    f"Found kubeconfig in current directory: {current_dir_kubeconfig}"
+                )
                 kubeconfig_path = current_dir_kubeconfig
 
         # Try to parse kubeconfig if found
@@ -1610,7 +1732,9 @@ class BundleManager:
                 with open(kubeconfig_path, "r") as f:
                     kubeconfig_content = f.read()
 
-                logger.debug(f"Kubeconfig content (first 200 chars): {kubeconfig_content[:200]}...")
+                logger.debug(
+                    f"Kubeconfig content (first 200 chars): {kubeconfig_content[:200]}..."
+                )
 
                 # Try parsing as JSON first, then try YAML or manual parsing as fallback
                 config = {}
@@ -1638,8 +1762,12 @@ class BundleManager:
                             )
                             if server_matches:
                                 server_url = server_matches[0].strip()
-                                config = {"clusters": [{"cluster": {"server": server_url}}]}
-                                logger.debug(f"Extracted server URL using regex: {server_url}")
+                                config = {
+                                    "clusters": [{"cluster": {"server": server_url}}]
+                                }
+                                logger.debug(
+                                    f"Extracted server URL using regex: {server_url}"
+                                )
                             else:
                                 logger.warning(
                                     "Could not extract server URL from kubeconfig with regex"
@@ -1679,7 +1807,9 @@ class BundleManager:
                             port = int(server_url.split(":")[-1])
                             logger.debug(f"Extracted API server port directly: {port}")
                         except (ValueError, IndexError) as e:
-                            logger.warning(f"Failed to extract port from server URL: {e}")
+                            logger.warning(
+                                f"Failed to extract port from server URL: {e}"
+                            )
             except (json.JSONDecodeError, KeyError, ValueError, IndexError) as e:
                 logger.warning(f"Failed to parse kubeconfig: {e}")
 
@@ -1699,9 +1829,13 @@ class BundleManager:
                 from .subprocess_utils import pipe_transport_reader
 
                 try:
-                    async with pipe_transport_reader(self.sbctl_process.stdout) as stdout_reader:
+                    async with pipe_transport_reader(
+                        self.sbctl_process.stdout
+                    ) as stdout_reader:
                         # Set a timeout for reading
-                        data = await asyncio.wait_for(stdout_reader.read(1024), timeout=0.5)
+                        data = await asyncio.wait_for(
+                            stdout_reader.read(1024), timeout=0.5
+                        )
                         if data:
                             output = data.decode("utf-8", errors="replace")
                             logger.debug(f"sbctl process output: {output}")
@@ -1721,7 +1855,9 @@ class BundleManager:
                                         parsed_url = urlparse(url)
                                         if parsed_url.port:
                                             port = parsed_url.port
-                                            logger.debug(f"Using port from sbctl output: {port}")
+                                            logger.debug(
+                                                f"Using port from sbctl output: {port}"
+                                            )
                                         if parsed_url.hostname:
                                             host = parsed_url.hostname
                                     except Exception:
@@ -1757,7 +1893,9 @@ class BundleManager:
 
                             # Get response body for debugging
                             try:
-                                body = await asyncio.wait_for(response.text(), timeout=1.0)
+                                body = await asyncio.wait_for(
+                                    response.text(), timeout=1.0
+                                )
                                 logger.debug(
                                     f"Response from {url} (first 200 chars): {body[:200]}..."
                                 )
@@ -1781,7 +1919,9 @@ class BundleManager:
             async with aiohttp.ClientSession(timeout=backup_timeout) as session:
                 for endpoint in endpoints:
                     url = f"http://{host}:{port}{endpoint}"
-                    logger.debug(f"Checking API server with backup aiohttp check: {url}")
+                    logger.debug(
+                        f"Checking API server with backup aiohttp check: {url}"
+                    )
 
                     try:
                         async with session.get(url) as response:
@@ -1837,7 +1977,8 @@ class BundleManager:
             "sbctl_process_running": self.sbctl_process is not None
             and self.sbctl_process.returncode is None,
             "api_server_available": await self.check_api_server_available(),
-            "bundle_initialized": self.active_bundle is not None and self.active_bundle.initialized,
+            "bundle_initialized": self.active_bundle is not None
+            and self.active_bundle.initialized,
             "system_info": await self._get_system_info(),
         }
 
@@ -1942,7 +2083,9 @@ class BundleManager:
 
             except Exception as e:
                 info["socket_port_check_exception"] = str(e)
-                logger.warning(f"Error during Python socket port check for port {port}: {e}")
+                logger.warning(
+                    f"Error during Python socket port check for port {port}: {e}"
+                )
                 # Fallback: assume port is not listening if we can't check
                 info[f"port_{port}_listening"] = False
                 info[f"port_{port}_details"] = f"Could not check port {port}: {e}"
@@ -1959,7 +2102,9 @@ class BundleManager:
                         try:
                             body = await asyncio.wait_for(response.text(), timeout=1.0)
                             if body:
-                                info[f"http_{port}_response_body"] = body[:200]  # Limit body size
+                                info[f"http_{port}_response_body"] = body[
+                                    :200
+                                ]  # Limit body size
                         except (asyncio.TimeoutError, UnicodeDecodeError):
                             pass
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
@@ -1972,7 +2117,9 @@ class BundleManager:
 
         return info
 
-    async def list_available_bundles(self, include_invalid: bool = False) -> List[BundleFileInfo]:
+    async def list_available_bundles(
+        self, include_invalid: bool = False
+    ) -> List[BundleFileInfo]:
         """
         List available support bundles in the bundle storage directory.
 
@@ -2015,12 +2162,16 @@ class BundleManager:
                 try:
                     valid, validation_message = self._check_bundle_validity(file_path)
                 except Exception as e:
-                    logger.warning(f"Error checking bundle validity for {file_path}: {str(e)}")
+                    logger.warning(
+                        f"Error checking bundle validity for {file_path}: {str(e)}"
+                    )
                     validation_message = f"Error checking validity: {str(e)}"
 
                 # Skip invalid bundles if requested
                 if not valid and not include_invalid:
-                    logger.debug(f"Skipping invalid bundle {file_path}: {validation_message}")
+                    logger.debug(
+                        f"Skipping invalid bundle {file_path}: {validation_message}"
+                    )
                     continue
 
                 # Create the bundle info
@@ -2048,9 +2199,15 @@ class BundleManager:
                                 path=str(file_path),
                                 relative_path=file_path.name,
                                 name=file_path.name,
-                                size_bytes=(file_path.stat().st_size if file_path.exists() else 0),
+                                size_bytes=(
+                                    file_path.stat().st_size
+                                    if file_path.exists()
+                                    else 0
+                                ),
                                 modified_time=(
-                                    file_path.stat().st_mtime if file_path.exists() else 0
+                                    file_path.stat().st_mtime
+                                    if file_path.exists()
+                                    else 0
                                 ),
                                 valid=False,
                                 validation_message=f"Error: {str(e)}",
@@ -2099,7 +2256,9 @@ class BundleManager:
         try:
             with tarfile.open(file_path, "r:gz") as tar:
                 # List first few entries to check structure without extracting
-                members = tar.getmembers()[:20]  # Just check the first 20 entries for efficiency
+                members = tar.getmembers()[
+                    :20
+                ]  # Just check the first 20 entries for efficiency
 
                 # Look for patterns that indicate a support bundle
                 has_cluster_resources = False
@@ -2178,7 +2337,9 @@ class BundleManager:
                             try:
                                 proc.terminate()
                                 terminated_count += 1
-                                logger.debug(f"Terminated sbctl process with PID {proc.pid}")
+                                logger.debug(
+                                    f"Terminated sbctl process with PID {proc.pid}"
+                                )
                             except (psutil.NoSuchProcess, psutil.AccessDenied):
                                 # Process already gone or access denied - skip it
                                 continue
@@ -2199,7 +2360,9 @@ class BundleManager:
             try:
                 logger.info(f"Removing temporary bundle directory: {self.bundle_dir}")
                 shutil.rmtree(self.bundle_dir)
-                logger.info(f"Successfully removed temporary bundle directory: {self.bundle_dir}")
+                logger.info(
+                    f"Successfully removed temporary bundle directory: {self.bundle_dir}"
+                )
             except Exception as e:
                 logger.error(f"Failed to remove temporary bundle directory: {str(e)}")
 

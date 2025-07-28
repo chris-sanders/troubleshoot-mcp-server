@@ -33,7 +33,9 @@ class TestAPIServerLifecycle:
     def test_bundle_path(self):
         """Path to test bundle fixture."""
         return (
-            Path(__file__).parent.parent / "fixtures" / "support-bundle-2025-04-11T14_05_31.tar.gz"
+            Path(__file__).parent.parent
+            / "fixtures"
+            / "support-bundle-2025-04-11T14_05_31.tar.gz"
         )
 
     @pytest.mark.asyncio
@@ -103,9 +105,9 @@ class TestAPIServerLifecycle:
             result = await kubectl_executor.execute("get namespaces", json_output=True)
 
             # Verify we got a successful response
-            assert result.exit_code == 0, (
-                f"kubectl command failed with exit code {result.exit_code}: {result.stderr}"
-            )
+            assert (
+                result.exit_code == 0
+            ), f"kubectl command failed with exit code {result.exit_code}: {result.stderr}"
 
             # Verify we got valid JSON output
             assert result.is_json, "Expected JSON output from kubectl get namespaces"
@@ -195,14 +197,19 @@ class TestAPIServerLifecycle:
         assert bundle_manager.sbctl_process is None
 
         # Verify bundle directory is cleaned up (if in temp directory)
-        if "/tmp" in str(initial_bundle_path) or "temp" in str(initial_bundle_path).lower():
+        if (
+            "/tmp" in str(initial_bundle_path)
+            or "temp" in str(initial_bundle_path).lower()
+        ):
             assert not initial_bundle_path.exists()
 
         # Verify process is terminated
         if initial_process_pid:
             try:
                 os.kill(initial_process_pid, 0)
-                pytest.fail(f"Process {initial_process_pid} should have been terminated")
+                pytest.fail(
+                    f"Process {initial_process_pid} should have been terminated"
+                )
             except OSError:
                 # Process is gone, which is expected
                 pass
@@ -212,7 +219,9 @@ class TestAPIServerLifecycle:
         pid_files = list(temp_dir.glob("**/mock_sbctl.pid"))
         # Filter to only our test files
         relevant_pid_files = [f for f in pid_files if "troubleshoot" in str(f.parent)]
-        assert len(relevant_pid_files) == 0, f"Found leftover PID files: {relevant_pid_files}"
+        assert (
+            len(relevant_pid_files) == 0
+        ), f"Found leftover PID files: {relevant_pid_files}"
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -235,12 +244,16 @@ class TestAPIServerLifecycle:
         # First initialization
         result1 = await bundle_manager.initialize_bundle(str(test_bundle_path))
         assert result1.initialized is True
-        first_pid = bundle_manager.sbctl_process.pid if bundle_manager.sbctl_process else None
+        first_pid = (
+            bundle_manager.sbctl_process.pid if bundle_manager.sbctl_process else None
+        )
 
         # Second initialization should clean up first
         result2 = await bundle_manager.initialize_bundle(str(test_bundle_path))
         assert result2.initialized is True
-        second_pid = bundle_manager.sbctl_process.pid if bundle_manager.sbctl_process else None
+        second_pid = (
+            bundle_manager.sbctl_process.pid if bundle_manager.sbctl_process else None
+        )
 
         # Verify new process is different (or at least that old one is gone)
         if first_pid and second_pid:
@@ -248,12 +261,16 @@ class TestAPIServerLifecycle:
                 # Different PIDs - verify first process is gone
                 try:
                     os.kill(first_pid, 0)
-                    pytest.fail(f"First process {first_pid} should have been terminated")
+                    pytest.fail(
+                        f"First process {first_pid} should have been terminated"
+                    )
                 except OSError:
                     # Expected - process should be gone
                     pass
 
-    async def _collect_diagnostics(self, bundle_manager: BundleManager) -> Dict[str, Any]:
+    async def _collect_diagnostics(
+        self, bundle_manager: BundleManager
+    ) -> Dict[str, Any]:
         """Collect diagnostic information from the running system."""
         diagnostics = {}
 
@@ -328,7 +345,8 @@ class TestAPIServerLifecycle:
             "diagnostic_collected_at": time.time(),
             "bundle_initialized_at": (
                 bundle_manager.active_bundle.path.stat().st_mtime
-                if bundle_manager.active_bundle and bundle_manager.active_bundle.path.exists()
+                if bundle_manager.active_bundle
+                and bundle_manager.active_bundle.path.exists()
                 else None
             ),
         }

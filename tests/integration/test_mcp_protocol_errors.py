@@ -146,7 +146,9 @@ class TestMCPProtocolRobustness:
                         )
 
                 # Either some succeed or all fail gracefully
-                assert valid_responses >= 0  # This will always pass but documents the expectation
+                assert (
+                    valid_responses >= 0
+                )  # This will always pass but documents the expectation
 
             except Exception as e:
                 # Rapid requests may cause issues - this is acceptable for robustness testing
