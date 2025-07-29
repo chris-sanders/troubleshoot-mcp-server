@@ -393,6 +393,8 @@ class TestContainerBuildValidation:
         env = os.environ.copy()
         env["MELANGE_TEST_BUILD"] = "true"
         env["IMAGE_TAG"] = "test-build"
+        # Force single-arch build for testing to avoid CI multi-arch complexity
+        env["CI"] = "false"
 
         try:
             result = subprocess.run(
