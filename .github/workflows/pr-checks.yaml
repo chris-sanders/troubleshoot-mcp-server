@@ -306,15 +306,22 @@ jobs:
           if [ -f coverage-unit.xml ] && [ -f coverage-integration.xml ]; then
             echo "Combining coverage from unit and integration tests"
             
-            # Combine the coverage databases
+            # Try to combine the coverage databases for true combined reporting
             if [ -f .coverage.unit ] && [ -f .coverage.integration ]; then
-              echo "Combining coverage databases"
+              echo "Found coverage databases, combining them..."
+              # Combine the databases and generate combined report
               uv run coverage combine .coverage.unit .coverage.integration
-              uv run coverage xml -o coverage-combined.xml
-              cp coverage-combined.xml coverage.xml
+              if [ -f .coverage ]; then
+                echo "Successfully combined coverage databases"
+                uv run coverage xml -o coverage-combined.xml
+                cp coverage-combined.xml coverage.xml
+              else
+                echo "Coverage combine failed, falling back to XML merge"
+                cp coverage-unit.xml coverage.xml
+              fi
             else
-              echo "Coverage databases not found, using XML reports directly"
-              # Use unit coverage as primary since it typically has better coverage
+              echo "Coverage databases not found (files: $(ls -la .coverage* 2>/dev/null || echo 'none'))"
+              echo "Using unit test XML as primary coverage"
               cp coverage-unit.xml coverage.xml
             fi
           elif [ -f coverage-unit.xml ]; then
@@ -332,17 +339,46 @@ jobs:
           echo "## Combined Coverage Report" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           
-          # If we combined coverage, use coverage report, otherwise use XML parsing
+          # Try to generate a proper combined report
           if [ -f .coverage ] && uv run coverage report --precision=0 2>/dev/null; then
+            echo "True combined coverage across all test suites:" >> $GITHUB_STEP_SUMMARY
             uv run coverage report --precision=0 >> $GITHUB_STEP_SUMMARY
             combined_coverage=$(uv run coverage report --precision=0 | grep TOTAL | awk '{print $4}' | sed 's/%//')
           else
-            echo "Using unit test coverage as combined coverage" >> $GITHUB_STEP_SUMMARY
-            # Read the unit test coverage percentage from file
+            echo "Coverage breakdown by test suite:" >> $GITHUB_STEP_SUMMARY
+            
+            # Read individual coverage values
+            unit_cov_val="N/A"
+            integration_cov_val="N/A"
+            
             if [ -f unit_coverage.txt ]; then
-              combined_coverage=$(cat unit_coverage.txt)
+              unit_cov_val=$(cat unit_coverage.txt)
+              echo "Unit Tests: ${unit_cov_val}%" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            if [ -f integration_coverage.txt ]; then
+              integration_cov_val=$(cat integration_coverage.txt)
+              echo "Integration Tests: ${integration_cov_val}%" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            # Calculate estimated combined coverage (conservative approach)
+            # Use the higher of unit vs integration as the baseline since they may have overlapping coverage
+            if [ "$unit_cov_val" != "N/A" ] && [ "$integration_cov_val" != "N/A" ]; then
+              if [ "$unit_cov_val" -gt "$integration_cov_val" ]; then
+                combined_coverage=$unit_cov_val
+              else
+                combined_coverage=$integration_cov_val
+              fi
+              echo "Estimated Combined: ${combined_coverage}% (based on highest individual suite)" >> $GITHUB_STEP_SUMMARY
+            elif [ "$unit_cov_val" != "N/A" ]; then
+              combined_coverage=$unit_cov_val
+              echo "Using Unit Test coverage: ${combined_coverage}%" >> $GITHUB_STEP_SUMMARY
+            elif [ "$integration_cov_val" != "N/A" ]; then
+              combined_coverage=$integration_cov_val
+              echo "Using Integration Test coverage: ${combined_coverage}%" >> $GITHUB_STEP_SUMMARY
             else
               combined_coverage="60"  # fallback
+              echo "Fallback coverage estimate: ${combined_coverage}%" >> $GITHUB_STEP_SUMMARY
             fi
           fi
           
@@ -420,11 +456,17 @@ jobs:
           
           # Append coverage report to comment
           if [ -f .coverage ] && uv run coverage report --precision=0 2>/dev/null; then
+            echo "Detailed file-by-file coverage:" >> coverage_comment.md
+            echo "" >> coverage_comment.md
             uv run coverage report --precision=0 >> coverage_comment.md
           else
-            echo "Combined coverage data not available" >> coverage_comment.md
-            echo "Unit test coverage: ${unit_cov}%" >> coverage_comment.md
-            echo "Integration test coverage: ${integration_cov}%" >> coverage_comment.md
+            echo "Coverage Summary:" >> coverage_comment.md
+            echo "- Unit Tests: ${unit_cov}% (focused on isolated component testing)" >> coverage_comment.md
+            echo "- Integration Tests: ${integration_cov}% (focused on component interaction)" >> coverage_comment.md
+            echo "- Combined Estimate: ${combined_cov}% (conservative estimate based on highest suite)" >> coverage_comment.md
+            echo "" >> coverage_comment.md
+            echo "Note: True combined coverage requires running all test suites together." >> coverage_comment.md
+            echo "Individual suites may have overlapping coverage of the same code paths." >> coverage_comment.md
           fi
           echo '```' >> coverage_comment.md
           
