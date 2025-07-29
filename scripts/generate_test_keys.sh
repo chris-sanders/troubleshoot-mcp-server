@@ -13,12 +13,14 @@ PUBLIC_KEY="$PROJECT_ROOT/melange-test.rsa.pub"
 
 echo "Generating temporary melange signing keys for testing..."
 
-# Check if keys already exist
-if [[ -f "$PRIVATE_KEY" && -f "$PUBLIC_KEY" ]]; then
-    echo "Test keys already exist, skipping generation"
-    echo "Private key: $PRIVATE_KEY"
-    echo "Public key: $PUBLIC_KEY"
-    exit 0
+# Remove any existing keys to ensure fresh generation with correct format
+if [[ -f "$PRIVATE_KEY" ]]; then
+    echo "Removing existing private key to regenerate with correct format"
+    rm -f "$PRIVATE_KEY"
+fi
+if [[ -f "$PUBLIC_KEY" ]]; then
+    echo "Removing existing public key to regenerate with correct format"
+    rm -f "$PUBLIC_KEY"
 fi
 
 # Generate RSA key pair
@@ -28,7 +30,9 @@ if ! command -v openssl &> /dev/null; then
 fi
 
 # Generate private key in PKCS8 format (required by melange)
-openssl genpkey -algorithm RSA -out "$PRIVATE_KEY"
+# First generate a traditional RSA key, then convert to PKCS8
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 | \
+openssl pkcs8 -topk8 -nocrypt -out "$PRIVATE_KEY"
 
 # Generate public key
 openssl rsa -in "$PRIVATE_KEY" -pubout -out "$PUBLIC_KEY"
