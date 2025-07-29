@@ -432,8 +432,8 @@ jobs:
           - Combined: ≥55%
           EOF
           
-          # Post comment using GitHub CLI
-          gh pr comment --body-file coverage_comment.md
+          # Post comment using GitHub CLI - specify PR number explicitly  
+          gh pr comment ${{ github.event.number }} --body-file coverage_comment.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
