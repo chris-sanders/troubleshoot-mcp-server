@@ -70,6 +70,35 @@ jobs:
       - name: Run unit tests with coverage
         run: uv run pytest tests/unit/ --cov=src --cov-report=xml:coverage-unit.xml --cov-report=term -v
       
+      - name: Extract and display unit test coverage
+        run: |
+          # Extract coverage percentage
+          coverage_pct=$(uv run coverage report --precision=0 | grep TOTAL | awk '{print $4}' | sed 's/%//')
+          echo "UNIT_COVERAGE=${coverage_pct}" >> $GITHUB_ENV
+          
+          # Save coverage to file for other jobs
+          echo "$coverage_pct" > unit_coverage.txt
+          
+          # Add to GitHub Actions summary
+          echo "## Unit Test Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "Coverage: ${coverage_pct}%" >> $GITHUB_STEP_SUMMARY
+          
+          # Check coverage threshold (60% minimum for unit tests)
+          if [ "$coverage_pct" -lt 60 ]; then
+            echo "❌ Unit test coverage ${coverage_pct}% is below minimum threshold of 60%" >> $GITHUB_STEP_SUMMARY
+            echo "::error::Unit test coverage ${coverage_pct}% is below minimum threshold of 60%"
+            exit 1
+          else
+            echo "✅ Unit test coverage ${coverage_pct}% meets minimum threshold of 60%" >> $GITHUB_STEP_SUMMARY
+            echo "::notice::Unit test coverage: ${coverage_pct}%"
+          fi
+      
+      - name: Upload unit test coverage percentage
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-coverage-pct
+          path: unit_coverage.txt
+      
       - name: Upload unit test coverage to artifact
         uses: actions/upload-artifact@v4
         with:
@@ -155,6 +184,35 @@ jobs:
       - name: Run integration tests with coverage
         run: uv run pytest tests/integration/ --cov=src --cov-report=xml:coverage-integration.xml --cov-report=term -v
       
+      - name: Extract and display integration test coverage
+        run: |
+          # Extract coverage percentage
+          coverage_pct=$(uv run coverage report --precision=0 | grep TOTAL | awk '{print $4}' | sed 's/%//')
+          echo "INTEGRATION_COVERAGE=${coverage_pct}" >> $GITHUB_ENV
+          
+          # Save coverage to file for other jobs
+          echo "$coverage_pct" > integration_coverage.txt
+          
+          # Add to GitHub Actions summary
+          echo "## Integration Test Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "Coverage: ${coverage_pct}%" >> $GITHUB_STEP_SUMMARY
+          
+          # Check coverage threshold (45% minimum for integration tests - lower because they test fewer code paths)
+          if [ "$coverage_pct" -lt 45 ]; then
+            echo "❌ Integration test coverage ${coverage_pct}% is below minimum threshold of 45%" >> $GITHUB_STEP_SUMMARY
+            echo "::error::Integration test coverage ${coverage_pct}% is below minimum threshold of 45%"
+            exit 1
+          else
+            echo "✅ Integration test coverage ${coverage_pct}% meets minimum threshold of 45%" >> $GITHUB_STEP_SUMMARY
+            echo "::notice::Integration test coverage: ${coverage_pct}%"
+          fi
+      
+      - name: Upload integration test coverage percentage
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-coverage-pct
+          path: integration_coverage.txt
+      
       - name: Upload integration test coverage to artifact
         uses: actions/upload-artifact@v4
         with:
@@ -202,7 +260,21 @@ jobs:
           path: ./
         continue-on-error: true
       
-      - name: Combine coverage reports
+      - name: Download unit test coverage percentage
+        uses: actions/download-artifact@v4
+        with:
+          name: unit-coverage-pct
+          path: ./
+        continue-on-error: true
+      
+      - name: Download integration test coverage percentage
+        uses: actions/download-artifact@v4
+        with:
+          name: integration-coverage-pct
+          path: ./
+        continue-on-error: true
+      
+      - name: Combine coverage reports and generate summary
         run: |
           # Install coverage for combining reports
           uv pip install coverage
@@ -229,13 +301,103 @@ jobs:
             echo "No coverage files found"
             exit 1
           fi
+          
+          # Generate detailed coverage report
+          echo "## Combined Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          uv run coverage report --precision=0 >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          
+          # Extract combined coverage percentage
+          combined_coverage=$(uv run coverage report --precision=0 | grep TOTAL | awk '{print $4}' | sed 's/%//')
+          echo "COMBINED_COVERAGE=${combined_coverage}" >> $GITHUB_ENV
+          
+          # Check combined coverage threshold (55% minimum)
+          if [ "$combined_coverage" -lt 55 ]; then
+            echo "❌ Combined coverage ${combined_coverage}% is below minimum threshold of 55%" >> $GITHUB_STEP_SUMMARY
+            echo "::error::Combined coverage ${combined_coverage}% is below minimum threshold of 55%"
+            exit 1
+          else
+            echo "✅ Combined coverage ${combined_coverage}% meets minimum threshold of 55%" >> $GITHUB_STEP_SUMMARY
+            echo "::notice::Combined coverage: ${combined_coverage}%"
+          fi
       
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.xml
-          fail_ci_if_error: false
-          verbose: true
+      - name: Post coverage comment on PR
+        if: github.event_name == 'pull_request'
+        run: |
+          # Read coverage values from files
+          unit_cov="N/A"
+          integration_cov="N/A"
+          combined_cov="${COMBINED_COVERAGE:-N/A}"
+          
+          if [ -f unit_coverage.txt ]; then
+            unit_cov=$(cat unit_coverage.txt)
+          fi
+          
+          if [ -f integration_coverage.txt ]; then
+            integration_cov=$(cat integration_coverage.txt)
+          fi
+          
+          # Determine status icons
+          unit_status="N/A"
+          integration_status="N/A"
+          combined_status="N/A"
+          
+          if [ "$unit_cov" != "N/A" ]; then
+            if [ "$unit_cov" -ge 60 ]; then
+              unit_status="✅"
+            else
+              unit_status="❌"
+            fi
+          fi
+          
+          if [ "$integration_cov" != "N/A" ]; then
+            if [ "$integration_cov" -ge 45 ]; then
+              integration_status="✅"
+            else
+              integration_status="❌"
+            fi
+          fi
+          
+          if [ "$combined_cov" != "N/A" ]; then
+            if [ "$combined_cov" -ge 55 ]; then
+              combined_status="✅"
+            else
+              combined_status="❌"
+            fi
+          fi
+          
+          # Create coverage comment
+          cat > coverage_comment.md << EOF
+          ## 📊 Coverage Report
+          
+          | Test Suite | Coverage | Status |
+          |------------|----------|--------|
+          | Unit Tests | ${unit_cov}% | ${unit_status} |
+          | Integration Tests | ${integration_cov}% | ${integration_status} |
+          | **Combined** | **${combined_cov}%** | ${combined_status} |
+          
+          ### Coverage Details
+          \`\`\`
+          EOF
+          
+          # Append coverage report to comment
+          uv run coverage report --precision=0 >> coverage_comment.md
+          echo '```' >> coverage_comment.md
+          
+          # Add explanation
+          cat >> coverage_comment.md << 'EOF'
+          
+          **Thresholds:**
+          - Unit Tests: ≥60%
+          - Integration Tests: ≥45% 
+          - Combined: ≥55%
+          EOF
+          
+          # Post comment using GitHub CLI
+          gh pr comment --body-file coverage_comment.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   container-tests:
     name: Container Tests (Slow)
