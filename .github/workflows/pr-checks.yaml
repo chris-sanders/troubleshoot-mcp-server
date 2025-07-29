@@ -6,6 +6,11 @@ on:
   # Allow manual triggering for testing
   workflow_dispatch:
 
+# Required permissions for posting PR comments
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   lint:
     name: Lint and Type Check
