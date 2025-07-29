@@ -27,8 +27,8 @@ if ! command -v openssl &> /dev/null; then
     exit 1
 fi
 
-# Generate private key
-openssl genrsa -out "$PRIVATE_KEY" 2048
+# Generate private key in PKCS8 format (required by melange)
+openssl genpkey -algorithm RSA -out "$PRIVATE_KEY"
 
 # Generate public key
 openssl rsa -in "$PRIVATE_KEY" -pubout -out "$PUBLIC_KEY"
