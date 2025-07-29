@@ -1,9 +1,10 @@
 # Task: Standardize MCP Argument Schemas
 
-**Status**: backlog  
+**Status**: active  
 **Priority**: high  
-**Assignee**: TBD  
+**Assignee**: Claude  
 **Created**: 2025-07-29  
+**Started**: 2025-07-29  
 **Tags**: mcp, schema, compatibility, fastmcp
 
 ## Problem Statement
