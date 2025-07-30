@@ -28,7 +28,12 @@ CONTAINER_RUNTIME = "podman"  # Could be "docker" if preferred
 class ContainerMCPClient:
     """MCP client that communicates with containerized server."""
 
-    def __init__(self, bundle_dir: Path, image_name: str = CONTAINER_IMAGE, sbctl_token: str = "test-token-12345"):
+    def __init__(
+        self,
+        bundle_dir: Path,
+        image_name: str = CONTAINER_IMAGE,
+        sbctl_token: str = "test-token-12345",
+    ):
         self.bundle_dir = bundle_dir
         self.image_name = image_name
         self.sbctl_token = sbctl_token
