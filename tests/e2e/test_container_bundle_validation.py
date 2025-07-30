@@ -382,13 +382,7 @@ class TestContainerBuildValidation:
 
         This validates the entire build process from melange package to final image.
         """
-        # Skip complex melange container builds in CI due to container-in-container limitations
-        # Other container tests run successfully, but this full build test has persistent issues
-        if os.environ.get("CI") == "true":
-            pytest.skip(
-                "Full melange/apko container builds require complex container-in-container setup - "
-                "validated in publish workflow. Other container tests run successfully in CI."
-            )
+        # Container builds now work in CI - no longer container-in-container issue
 
         build_script = Path("scripts/build.sh")
         if not build_script.exists():
@@ -400,6 +394,9 @@ class TestContainerBuildValidation:
         env["IMAGE_TAG"] = "test-build"
         # Force single-arch build for testing to avoid CI multi-arch complexity
         env["CI"] = "false"
+        # Use unsigned builds for CI testing to avoid key format issues
+        if os.environ.get("CI") == "true":
+            env["MELANGE_UNSIGNED_BUILD"] = "true"
 
         try:
             result = subprocess.run(
