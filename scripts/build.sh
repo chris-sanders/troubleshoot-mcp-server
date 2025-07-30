@@ -20,10 +20,11 @@ SIGNING_KEY=""
 APKO_IGNORE_SIGNATURES=""
 
 if [[ "${CI:-false}" == "true" ]]; then
-    echo "🏗️  CI build: multi-arch, unsigned packages"
-    ARCH_FLAGS="--arch=amd64,arm64"
+    echo "🏗️  CI build: single-arch, unsigned packages"
+    ARCH_FLAGS="--arch=amd64"
     APKO_IGNORE_SIGNATURES="--ignore-signatures"
     # No signing key in CI - build unsigned packages
+    # Note: Multi-arch builds are validated in the publish workflow
 elif [[ "${MELANGE_TEST_BUILD:-false}" == "true" ]]; then
     echo "🧪 Local test build: single-arch, test keys"
     SIGNING_KEY="melange-test.rsa"
