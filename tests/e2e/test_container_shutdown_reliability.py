@@ -137,10 +137,12 @@ class TestContainerShutdownReliability:
         assert "could not acquire lock" not in stderr
 
         # Should see proper shutdown messages
-        assert ("Received signal SIGTERM" in stderr or 
-                "Initiating shutdown" in stderr or 
-                "Shutting down MCP Troubleshoot" in stderr or
-                "graceful shutdown" in stderr)
+        assert (
+            "Received signal SIGTERM" in stderr
+            or "Initiating shutdown" in stderr
+            or "Shutting down MCP Troubleshoot" in stderr
+            or "graceful shutdown" in stderr
+        )
 
         # Return code should indicate clean exit or signal termination
         assert return_code in (0, -15, 143), f"Unexpected return code: {return_code}"
@@ -306,9 +308,11 @@ class TestContainerShutdownReliability:
             assert "_enter_buffered_busy" not in stderr
 
             # Should see initialization and shutdown
-            assert ("MCP server for Kubernetes support bundles" in stderr or
-                    "Starting MCP Troubleshoot Server" in stderr or
-                    "Registered signal handlers" in stderr)
+            assert (
+                "MCP server for Kubernetes support bundles" in stderr
+                or "Starting MCP Troubleshoot Server" in stderr
+                or "Registered signal handlers" in stderr
+            )
             assert "signal" in stderr.lower() or "shutdown" in stderr.lower()
 
             # Check that responses were sent before shutdown

@@ -255,10 +255,10 @@ class TestContainerBundleValidation:
                     "clientInfo": {"name": "pytest-container-test", "version": "1.0.0"},
                 },
             )
-            
+
             # Wait for initialization to complete and send initialized notification
             assert "result" in init_response, f"Initialization failed: {init_response}"
-            
+
             # Send initialized notification to complete MCP handshake
             await client.send_notification("notifications/initialized", {})
 
@@ -311,7 +311,7 @@ class TestContainerBundleValidation:
                 },
             )
             assert "result" in init_response, f"Initialization failed: {init_response}"
-            
+
             # Send initialized notification to complete MCP handshake
             await client.send_notification("notifications/initialized", {})
 
@@ -361,7 +361,7 @@ class TestContainerBundleValidation:
                 },
             )
             assert "result" in init_response, f"Initialization failed: {init_response}"
-            
+
             # Send initialized notification to complete MCP handshake
             await client.send_notification("notifications/initialized", {})
 

@@ -142,7 +142,7 @@ def test_installed_tools(container_image: str, container_name: str) -> None:
     # Check for required tools by trying to run them directly with their expected paths
     tools_to_check = {
         "sbctl": ("/usr/bin/sbctl", ["--help"]),
-        "kubectl": ("/usr/bin/kubectl", ["version", "--client=true"]), 
+        "kubectl": ("/usr/bin/kubectl", ["version", "--client=true"]),
         "python3": ("/usr/bin/python3", ["--version"]),
     }
 
@@ -159,7 +159,8 @@ def test_installed_tools(container_image: str, container_name: str) -> None:
                 "",
                 container_image,
                 expected_path,
-            ] + test_args,
+            ]
+            + test_args,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -167,7 +168,9 @@ def test_installed_tools(container_image: str, container_name: str) -> None:
             timeout=30,
         )
 
-        assert result.returncode == 0, f"{tool} is not working in the container at {expected_path}. returncode: {result.returncode}, stderr: {result.stderr}, stdout: {result.stdout}"
+        assert result.returncode == 0, (
+            f"{tool} is not working in the container at {expected_path}. returncode: {result.returncode}, stderr: {result.stderr}, stdout: {result.stdout}"
+        )
         # Check that the tool produced some output
         combined_output = result.stdout + result.stderr
         assert combined_output.strip(), f"{tool} produced no output"
