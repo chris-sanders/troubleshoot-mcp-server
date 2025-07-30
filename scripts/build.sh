@@ -14,23 +14,20 @@ echo "Building with melange/apko..."
 # Determine build configuration based on environment
 echo "Building melange package..."
 
-# Default: single-arch production build
+# Default configuration
 ARCH_FLAGS="--arch=amd64"
 SIGNING_KEY=""
-MELANGE_FLAGS=""
 APKO_IGNORE_SIGNATURES=""
 
-# Configure based on build type
-if [[ "${MELANGE_TEST_BUILD:-false}" == "true" ]]; then
-    echo "🧪 Test build mode: using test keys and ignoring signatures"
+if [[ "${CI:-false}" == "true" ]]; then
+    echo "🏗️  CI build: multi-arch, unsigned packages"
+    ARCH_FLAGS="--arch=amd64,arm64"
+    APKO_IGNORE_SIGNATURES="--ignore-signatures"
+    # No signing key in CI - build unsigned packages
+elif [[ "${MELANGE_TEST_BUILD:-false}" == "true" ]]; then
+    echo "🧪 Local test build: single-arch, test keys"
     SIGNING_KEY="melange-test.rsa"
     APKO_IGNORE_SIGNATURES="--ignore-signatures"
-    
-    # Multi-arch only in true CI environment (not when CI=false is forced)
-    if [[ "${CI:-false}" == "true" ]]; then
-        echo "🏗️  CI detected: building multi-architecture"
-        ARCH_FLAGS="--arch=amd64,arm64"
-    fi
     
     # Generate test keys if they don't exist
     if [ ! -f "$SIGNING_KEY" ]; then
@@ -38,12 +35,8 @@ if [[ "${MELANGE_TEST_BUILD:-false}" == "true" ]]; then
         ./scripts/generate_test_keys.sh
     fi
 elif [ -f melange.rsa ]; then
-    echo "🔐 Production build: using production signing key"
+    echo "🔐 Production build: single-arch, production keys"
     SIGNING_KEY="melange.rsa"
-    # Multi-arch for production builds in CI
-    if [[ "${CI:-false}" == "true" ]]; then
-        ARCH_FLAGS="--arch=amd64,arm64"
-    fi
 else
     echo "❌ ERROR: No signing configuration available!"
     echo ""
@@ -60,16 +53,15 @@ fi
 
 if [[ -n "$SIGNING_KEY" ]]; then
     echo "Using signing key: $SIGNING_KEY"
-    if ! podman run --rm --privileged --cap-add=SYS_ADMIN -v "$PWD":/work cgr.dev/chainguard/melange build .melange.yaml ${ARCH_FLAGS} ${MELANGE_FLAGS} --signing-key="$SIGNING_KEY"; then
-        echo "Melange build failed!"
-        exit 1
-    fi
+    MELANGE_SIGNING_ARG="--signing-key=$SIGNING_KEY"
 else
-    echo "Building unsigned package"
-    if ! podman run --rm --privileged --cap-add=SYS_ADMIN -v "$PWD":/work cgr.dev/chainguard/melange build .melange.yaml ${ARCH_FLAGS} ${MELANGE_FLAGS}; then
-        echo "Melange build failed!"
-        exit 1
-    fi
+    echo "Building unsigned packages"
+    MELANGE_SIGNING_ARG=""
+fi
+
+if ! podman run --rm --privileged --cap-add=SYS_ADMIN -v "$PWD":/work cgr.dev/chainguard/melange build .melange.yaml ${ARCH_FLAGS} ${MELANGE_SIGNING_ARG}; then
+    echo "Melange build failed!"
+    exit 1
 fi
 
 echo "Building apko image..."
