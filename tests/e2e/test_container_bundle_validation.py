@@ -28,8 +28,9 @@ CONTAINER_RUNTIME = "podman"  # Could be "docker" if preferred
 class ContainerMCPClient:
     """MCP client that communicates with containerized server."""
 
-    def __init__(self, bundle_dir: Path, sbctl_token: str = "test-token-12345"):
+    def __init__(self, bundle_dir: Path, image_name: str = CONTAINER_IMAGE, sbctl_token: str = "test-token-12345"):
         self.bundle_dir = bundle_dir
+        self.image_name = image_name
         self.sbctl_token = sbctl_token
         self.process: Optional[asyncio.subprocess.Process] = None
         self.request_id = 0
@@ -48,7 +49,7 @@ class ContainerMCPClient:
             f"SBCTL_TOKEN={self.sbctl_token}",
             "--env",
             "MCP_BUNDLE_STORAGE=/data/bundles",
-            CONTAINER_IMAGE,
+            self.image_name,
         ]
 
         logger.info(f"Starting container: {' '.join(cmd)}")
@@ -149,21 +150,11 @@ def container_runtime_available():
 
 
 @pytest.fixture
-def container_image_available():
-    """Check if container image exists."""
-    try:
-        result = subprocess.run(
-            [CONTAINER_RUNTIME, "image", "exists", CONTAINER_IMAGE],
-            capture_output=True,
-            timeout=10,
-        )
-        if result.returncode != 0:
-            pytest.skip(
-                f"Container image {CONTAINER_IMAGE} not found. "
-                f"Build it first with: MELANGE_TEST_BUILD=true ./scripts/build.sh"
-            )
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        pytest.skip(f"Could not check for container image {CONTAINER_IMAGE}")
+def container_image_available(container_image):
+    """Ensure container image is available by using the container_image fixture."""
+    # The container_image fixture handles building the image if needed
+    # This fixture just confirms it's available
+    return container_image
 
 
 @pytest.fixture
@@ -192,7 +183,7 @@ class TestContainerBundleValidation:
         self, container_runtime_available, container_image_available, temp_bundle_dir
     ):
         """Test that the container starts and responds to basic requests."""
-        client = ContainerMCPClient(temp_bundle_dir)
+        client = ContainerMCPClient(temp_bundle_dir, container_image_available)
 
         try:
             await client.start_container()
@@ -228,7 +219,7 @@ class TestContainerBundleValidation:
         This is the key test that validates the production container can actually
         initialize bundles, which is the core functionality that users need.
         """
-        client = ContainerMCPClient(temp_bundle_dir)
+        client = ContainerMCPClient(temp_bundle_dir, container_image_available)
 
         try:
             await client.start_container()
@@ -277,7 +268,7 @@ class TestContainerBundleValidation:
         test_bundle_in_dir,
     ):
         """Test listing bundles in container."""
-        client = ContainerMCPClient(temp_bundle_dir)
+        client = ContainerMCPClient(temp_bundle_dir, container_image_available)
 
         try:
             await client.start_container()
@@ -323,7 +314,7 @@ class TestContainerBundleValidation:
 
         This validates the full user workflow works in the production container.
         """
-        client = ContainerMCPClient(temp_bundle_dir)
+        client = ContainerMCPClient(temp_bundle_dir, container_image_available)
 
         try:
             await client.start_container()
