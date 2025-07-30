@@ -255,8 +255,6 @@ jobs:
           
           cat >> coverage_comment.md << EOF
           \`\`\`
-          
-          **Quality Gate:** Coverage must be ≥60% for PR approval
           EOF
           
           # Post comment using GitHub CLI
