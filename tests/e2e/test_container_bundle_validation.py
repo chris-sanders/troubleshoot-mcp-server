@@ -125,6 +125,23 @@ class ContainerMCPClient:
                 f"Timeout waiting for response from container. Stderr: {stderr_data.decode()}"
             )
 
+    async def send_notification(self, method: str, params: Optional[dict] = None) -> None:
+        """Send JSON-RPC notification to container."""
+        if not self.process or not self.process.stdin:
+            raise RuntimeError("Container not started")
+
+        self.request_id += 1
+        notification = {"jsonrpc": "2.0", "method": method}
+        if params:
+            notification["params"] = params
+
+        # Send notification (no response expected)
+        notification_json = json.dumps(notification)
+        logger.debug(f"Sending notification: {notification_json}")
+
+        self.process.stdin.write((notification_json + "\n").encode())
+        await self.process.stdin.drain()
+
     async def call_tool(self, tool_name: str, arguments: dict) -> dict:
         """Call an MCP tool in the container."""
         return await self.send_request("tools/call", {"name": tool_name, "arguments": arguments})
@@ -230,7 +247,7 @@ class TestContainerBundleValidation:
             await client.start_container()
 
             # Initialize the MCP protocol first
-            await client.send_request(
+            init_response = await client.send_request(
                 "initialize",
                 {
                     "protocolVersion": "2024-11-05",
@@ -238,6 +255,12 @@ class TestContainerBundleValidation:
                     "clientInfo": {"name": "pytest-container-test", "version": "1.0.0"},
                 },
             )
+            
+            # Wait for initialization to complete and send initialized notification
+            assert "result" in init_response, f"Initialization failed: {init_response}"
+            
+            # Send initialized notification to complete MCP handshake
+            await client.send_notification("notifications/initialized", {})
 
             # Now test bundle initialization - this should work in container
             bundle_path_in_container = f"/data/bundles/{test_bundle_in_dir.name}"
@@ -279,7 +302,7 @@ class TestContainerBundleValidation:
             await client.start_container()
 
             # Initialize protocol
-            await client.send_request(
+            init_response = await client.send_request(
                 "initialize",
                 {
                     "protocolVersion": "2024-11-05",
@@ -287,6 +310,10 @@ class TestContainerBundleValidation:
                     "clientInfo": {"name": "pytest-container-test", "version": "1.0.0"},
                 },
             )
+            assert "result" in init_response, f"Initialization failed: {init_response}"
+            
+            # Send initialized notification to complete MCP handshake
+            await client.send_notification("notifications/initialized", {})
 
             # List available bundles
             response = await client.call_tool("list_available_bundles", {})
@@ -325,7 +352,7 @@ class TestContainerBundleValidation:
             await client.start_container()
 
             # Initialize protocol
-            await client.send_request(
+            init_response = await client.send_request(
                 "initialize",
                 {
                     "protocolVersion": "2024-11-05",
@@ -333,6 +360,10 @@ class TestContainerBundleValidation:
                     "clientInfo": {"name": "pytest-container-test", "version": "1.0.0"},
                 },
             )
+            assert "result" in init_response, f"Initialization failed: {init_response}"
+            
+            # Send initialized notification to complete MCP handshake
+            await client.send_notification("notifications/initialized", {})
 
             # Step 1: Initialize bundle
             bundle_path = f"/data/bundles/{test_bundle_in_dir.name}"
