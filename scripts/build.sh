@@ -11,26 +11,26 @@ set -x
 
 echo "Building with melange/apko..."
 
-# Build melange package (single arch for local development, multi-arch for CI)
-ARCH_FLAGS="--arch=amd64"
-if [[ "${CI:-false}" == "true" ]]; then
-    ARCH_FLAGS="--arch=amd64,arm64"
-fi
-
+# Determine build configuration based on environment
 echo "Building melange package..."
 
-# Determine which signing key to use based on context
+# Default: single-arch production build
+ARCH_FLAGS="--arch=amd64"
 SIGNING_KEY=""
 MELANGE_FLAGS=""
+APKO_IGNORE_SIGNATURES=""
 
-if [[ "${MELANGE_UNSIGNED_BUILD:-false}" == "true" ]]; then
-    echo "Building unsigned packages for testing..."
-    # Try to build without signing - melange might support this
-    MELANGE_FLAGS="--ignore-signatures"
-    SIGNING_KEY=""
-elif [[ "${MELANGE_TEST_BUILD:-false}" == "true" ]]; then
-    echo "Using test signing key for testing..."
+# Configure based on build type
+if [[ "${MELANGE_TEST_BUILD:-false}" == "true" ]]; then
+    echo "🧪 Test build mode: using test keys and ignoring signatures"
     SIGNING_KEY="melange-test.rsa"
+    APKO_IGNORE_SIGNATURES="--ignore-signatures"
+    
+    # Multi-arch only in true CI environment (not when CI=false is forced)
+    if [[ "${CI:-false}" == "true" ]]; then
+        echo "🏗️  CI detected: building multi-architecture"
+        ARCH_FLAGS="--arch=amd64,arm64"
+    fi
     
     # Generate test keys if they don't exist
     if [ ! -f "$SIGNING_KEY" ]; then
@@ -38,17 +38,17 @@ elif [[ "${MELANGE_TEST_BUILD:-false}" == "true" ]]; then
         ./scripts/generate_test_keys.sh
     fi
 elif [ -f melange.rsa ]; then
-    echo "Using production signing key..."
+    echo "🔐 Production build: using production signing key"
     SIGNING_KEY="melange.rsa"
+    # Multi-arch for production builds in CI
+    if [[ "${CI:-false}" == "true" ]]; then
+        ARCH_FLAGS="--arch=amd64,arm64"
+    fi
 else
-    echo "ERROR: No signing key available!"
+    echo "❌ ERROR: No signing configuration available!"
     echo ""
     echo "For testing/development:"
     echo "  export MELANGE_TEST_BUILD=true"
-    echo "  ./scripts/build.sh"
-    echo ""
-    echo "For unsigned testing:"
-    echo "  export MELANGE_UNSIGNED_BUILD=true"
     echo "  ./scripts/build.sh"
     echo ""
     echo "For production builds:"
@@ -73,11 +73,7 @@ else
 fi
 
 echo "Building apko image..."
-APKO_FLAGS="${ARCH_FLAGS}"
-if [[ "${MELANGE_TEST_BUILD:-false}" == "true" ]] || [[ "${MELANGE_UNSIGNED_BUILD:-false}" == "true" ]]; then
-    echo "Ignoring signatures for test/unsigned build..."
-    APKO_FLAGS="${APKO_FLAGS} --ignore-signatures"
-fi
+APKO_FLAGS="${ARCH_FLAGS} ${APKO_IGNORE_SIGNATURES}"
 
 if ! podman run --rm --privileged --cap-add=SYS_ADMIN -v "$PWD":/work cgr.dev/chainguard/apko build apko.yaml "${IMAGE_NAME}:${IMAGE_TAG}" "${IMAGE_NAME}.tar" ${APKO_FLAGS}; then
     echo "Apko build failed!"

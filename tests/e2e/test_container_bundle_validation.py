@@ -388,15 +388,12 @@ class TestContainerBuildValidation:
         if not build_script.exists():
             pytest.skip("Build script not found")
 
-        # Run the build script with test keys
+        # Run the build script in test mode
         env = os.environ.copy()
         env["MELANGE_TEST_BUILD"] = "true"
         env["IMAGE_TAG"] = "test-build"
-        # Force single-arch build for testing to avoid CI multi-arch complexity
+        # Force single-arch build for testing to avoid multi-arch complexity
         env["CI"] = "false"
-        # Use unsigned builds for CI testing to avoid key format issues
-        if os.environ.get("CI") == "true":
-            env["MELANGE_UNSIGNED_BUILD"] = "true"
 
         try:
             result = subprocess.run(
