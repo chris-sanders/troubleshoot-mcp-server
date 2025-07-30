@@ -91,13 +91,20 @@ if ! podman load < "${IMAGE_NAME}.tar"; then
 fi
 
 # Retag the loaded image to the expected tag (apko adds architecture suffix)
-if [[ "${CI:-false}" == "false" ]]; then
-    # For local builds, retag from latest-amd64 to latest
-    echo "Retagging image for local use..."
-    if ! podman tag "${IMAGE_NAME}:latest-amd64" "${IMAGE_NAME}:${IMAGE_TAG}"; then
-        echo "Failed to retag image!"
+echo "Retagging image for local use..."
+LOADED_TAG="${IMAGE_NAME}:${IMAGE_TAG}-amd64"
+TARGET_TAG="${IMAGE_NAME}:${IMAGE_TAG}"
+
+# Check if the loaded image exists and retag it
+if podman image exists "$LOADED_TAG"; then
+    if ! podman tag "$LOADED_TAG" "$TARGET_TAG"; then
+        echo "Failed to retag image from $LOADED_TAG to $TARGET_TAG!"
         exit 1
     fi
+    echo "Successfully retagged $LOADED_TAG to $TARGET_TAG"
+else
+    echo "Warning: Expected loaded image $LOADED_TAG not found, checking available images:"
+    podman images | grep "$IMAGE_NAME" || echo "No images found with name $IMAGE_NAME"
 fi
 
 echo "✅ Melange/apko build completed successfully!"
