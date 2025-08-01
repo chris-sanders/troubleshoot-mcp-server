@@ -1045,7 +1045,9 @@ async def test_bundle_manager_download_replicated_403_retry_exhausted():
                     await manager._get_replicated_signed_url(REPLICATED_URL)
 
                 # Verify error message mentions retries
-                assert "Failed to get signed URL from Replicated API after retries" in str(excinfo.value)
+                assert "Failed to get signed URL from Replicated API after retries" in str(
+                    excinfo.value
+                )
                 assert "status 403" in str(excinfo.value)
 
                 # Verify maximum attempts were made (1 original + 3 retries)
