@@ -91,5 +91,6 @@ disallow_incomplete_defs = true
 
 [dependency-groups]
 dev = [
+    "ruff>=0.12.5",
     "types-psutil>=7.0.0.20250601",
 ]

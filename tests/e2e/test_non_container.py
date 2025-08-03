@@ -16,7 +16,7 @@ def test_package_installation():
     try:
         import troubleshoot_mcp_server
 
-        assert hasattr(mcp_server_troubleshoot, "__version__")
+        assert hasattr(troubleshoot_mcp_server, "__version__")
     except ImportError:
         pytest.fail("Failed to import troubleshoot_mcp_server package")
 
