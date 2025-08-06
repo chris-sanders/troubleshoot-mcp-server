@@ -1,9 +1,9 @@
 # Task: GitHub Attachment Download Support
 
-**Status:** backlog  
+**Status:** active  
 **Priority:** high  
 **Estimated:** 4 hours  
-**Started:** -  
+**Started:** 2025-08-06  
 **Completed:** -  
 **PR:** -  
 
