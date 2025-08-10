@@ -1,5 +1,9 @@
 # Task: Improve Tool Descriptions to Address LLM Failure Modes
 
+**Status**: Active  
+**Started**: 2025-08-10  
+**Progress**: Task moved to active, ready to begin implementation
+
 ## Objective
 Fix three identified failure modes where LLMs misuse the troubleshoot MCP server tools:
 1. Unnecessary bundle re-initialization due to confusing "initialize first" language
