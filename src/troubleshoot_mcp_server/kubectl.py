@@ -43,7 +43,7 @@ class KubectlCommandArgs(BaseModel):
     """
 
     command: str = Field(description="The kubectl command to execute")
-    timeout: int = Field(30, description="Timeout in seconds for the command")
+    timeout: int = Field(5, description="Timeout in seconds for the command")
     json_output: bool = Field(False, description="Whether to format the output as JSON")
     verbosity: Optional[str] = Field(
         None,
@@ -136,7 +136,7 @@ class KubectlExecutor:
         self.bundle_manager = bundle_manager
 
     async def execute(
-        self, command: str, timeout: int = 30, json_output: bool = False
+        self, command: str, timeout: int = 5, json_output: bool = False
     ) -> KubectlResult:
         """
         Execute a kubectl command.

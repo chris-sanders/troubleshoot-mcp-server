@@ -261,7 +261,7 @@ async def list_available_bundles(
 
 @mcp.tool()
 async def kubectl(
-    command: str, timeout: int = 30, json_output: bool = False, verbosity: Optional[str] = None
+    command: str, timeout: int = 5, json_output: bool = False, verbosity: Optional[str] = None
 ) -> List[TextContent]:
     """
     Execute kubectl commands against the initialized bundle's API server. Allows
@@ -278,7 +278,7 @@ async def kubectl(
     Args:
         command: (string, required) The kubectl command to execute (e.g., "get pods",
             "get nodes -o wide", "describe deployment nginx")
-        timeout: (integer, optional) Timeout in seconds for the command. Defaults to 30.
+        timeout: (integer, optional) Timeout in seconds for the command. Defaults to 5.
         json_output: (boolean, optional) Whether to format the output as JSON.
             Defaults to False. Set to True for JSON output.
         verbosity: (string, optional) Verbosity level for response formatting
