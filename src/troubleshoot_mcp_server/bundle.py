@@ -410,6 +410,9 @@ class BundleManager:
             )
             self.active_bundle = metadata
 
+            # Start stderr monitoring now that initialization is complete
+            self._start_stderr_monitoring()
+
             logger.info(f"Bundle initialized: {bundle_id}")
             return metadata
 
@@ -875,8 +878,8 @@ class BundleManager:
             # Kill any existing sbctl process
             await self._terminate_sbctl_process()
 
-            # Start sbctl in serve mode with the bundle
-            await self._start_sbctl_process(bundle_path)
+            # Start sbctl in serve mode with the bundle in the output directory
+            await self._start_sbctl_process(bundle_path, output_dir)
 
             # First, wait a brief moment to see if sbctl exits quickly with "No cluster resources"
             try:
@@ -1496,6 +1499,9 @@ class BundleManager:
             bundle_path = self.active_bundle.path
             await self._start_sbctl_process(bundle_path)
 
+            # Start stderr monitoring after successful restart
+            self._start_stderr_monitoring()
+
             logger.info("sbctl process restarted successfully")
             return True
 
@@ -1513,16 +1519,21 @@ class BundleManager:
         self._crash_recovery_info = None  # Clear after retrieval
         return recovery_info
 
-    async def _start_sbctl_process(self, bundle_path: Path) -> None:
+    async def _start_sbctl_process(
+        self, bundle_path: Path, working_dir: Optional[Path] = None
+    ) -> None:
         """
         Start the sbctl process with the given bundle.
 
         Args:
             bundle_path: Path to the bundle to serve
+            working_dir: Directory to run sbctl in (defaults to bundle path parent)
         """
-        # Determine output directory - use active bundle if available, otherwise use bundle path parent
-        if self.active_bundle:
-            output_dir = self.active_bundle.path.parent
+        # Determine output directory - use working_dir if provided, active bundle if available, otherwise use bundle path parent
+        if working_dir:
+            output_dir = working_dir
+        elif self.active_bundle:
+            output_dir = self.active_bundle.path
         else:
             output_dir = bundle_path.parent
 
@@ -1543,10 +1554,15 @@ class BundleManager:
         )
         self._termination_requested = False
 
-        # Start stderr monitoring task
+        # Don't start stderr monitoring immediately - it will be started after initialization
         if self._stderr_monitor_task:
             self._stderr_monitor_task.cancel()
-        self._stderr_monitor_task = asyncio.create_task(self._monitor_sbctl_stderr())
+            self._stderr_monitor_task = None
+
+    def _start_stderr_monitoring(self) -> None:
+        """Start stderr monitoring after initialization is complete."""
+        if self.sbctl_process and not self._stderr_monitor_task:
+            self._stderr_monitor_task = asyncio.create_task(self._monitor_sbctl_stderr())
 
     async def _terminate_sbctl_process(self) -> None:
         """
@@ -1907,7 +1923,8 @@ class BundleManager:
                     restart_successful = await self._restart_sbctl_process()
                     if restart_successful:
                         logger.info("sbctl process restarted successfully after crash")
-                        return True  # Process restarted, API should be available
+                        # Don't return True immediately - fall through to API server check
+                        # The restarted process needs time to initialize
                     else:
                         logger.error("Failed to restart sbctl process after crash")
                         return False
