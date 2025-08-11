@@ -1,5 +1,9 @@
 # Improve kubectl Robustness Against sbctl Crashes
 
+**Status**: active
+**Started**: 2025-08-11
+**Progress**: Task initialized and moved to active
+
 ## Summary
 Implement kubectl timeout reduction, automatic sbctl restart with crash diagnostics, and comprehensive error reporting to provide seamless recovery when sbctl crashes.
 
