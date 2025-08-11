@@ -108,6 +108,31 @@ def get_file_explorer() -> FileExplorer:
     return _file_explorer
 
 
+def _format_crash_recovery_message(crash_info: dict) -> str:
+    """Format crash recovery information for display to the LLM."""
+    lines = ["⚠️ SBCTL PROCESS RECOVERY:"]
+
+    exit_code = crash_info.get("exit_code", "unknown")
+    lines.append(f"The API server crashed (exit code {exit_code}) but was automatically restarted.")
+
+    last_command = crash_info.get("last_timeout_command")
+    if last_command:
+        lines.append(f"Last command before crash: {last_command}")
+
+    stderr_lines = crash_info.get("stderr_lines", [])
+    if stderr_lines:
+        lines.append("Error output:")
+        # Show last few lines of stderr
+        for line in stderr_lines[-5:]:  # Last 5 lines
+            lines.append(f"  {line}")
+
+    timestamp = crash_info.get("timestamp", "")
+    if timestamp:
+        lines.append(f"Recovery timestamp: {timestamp}")
+
+    return "\n".join(lines)
+
+
 def check_response_size(
     content: str, tool_name: str, formatter: ResponseFormatter
 ) -> List[TextContent]:
@@ -331,8 +356,17 @@ async def kubectl(
         # Execute the kubectl command
         result = await get_kubectl_executor().execute(command, timeout, json_output)
 
+        # Check for crash recovery information
+        crash_recovery_info = bundle_manager.get_crash_recovery_info()
+
         # Format response using the formatter
         response = formatter.format_kubectl_result(result)
+
+        # Append crash recovery information if available
+        if crash_recovery_info:
+            recovery_message = _format_crash_recovery_message(crash_recovery_info)
+            response += f"\n\n{recovery_message}"
+
         return check_response_size(response, "kubectl", formatter)
 
     except KubectlError as e:

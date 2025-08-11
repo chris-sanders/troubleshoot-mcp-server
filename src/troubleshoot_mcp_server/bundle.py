@@ -7,6 +7,8 @@ extraction, initialization, and cleanup.
 """
 
 import asyncio
+from collections import deque
+import datetime
 import json
 import logging
 import os
@@ -248,6 +250,12 @@ class BundleManager:
         self.sbctl_process: Optional[asyncio.subprocess.Process] = None
         self._host_only_bundle: bool = False
         self._termination_requested: bool = False
+
+        # Stderr monitoring and crash recovery infrastructure
+        self._stderr_buffer: deque = deque(maxlen=100)  # Rolling buffer for last 100 lines
+        self._stderr_monitor_task: Optional[asyncio.Task] = None
+        self._last_timeout_command: Optional[str] = None
+        self._crash_recovery_info: Optional[dict] = None
 
     async def initialize_bundle(self, source: str, force: bool = False) -> BundleMetadata:
         """
@@ -867,32 +875,15 @@ class BundleManager:
             # Kill any existing sbctl process
             await self._terminate_sbctl_process()
 
-            # First, check if this bundle contains cluster resources by running sbctl briefly
             # Start sbctl in serve mode with the bundle
-            # Since sbctl may create files in the current directory, we'll start it from our output directory
-            os.chdir(output_dir)
-
-            # Use the serve command to start the API server
-            cmd = [
-                "sbctl",
-                "serve",
-                "--support-bundle-location",
-                str(bundle_path),
-            ]
-
-            # sbctl will write a kubeconfig file in the current working directory
-            # The default name is 'kubeconfig'
-
-            logger.debug(f"Running command: {' '.join(cmd)}")
-
-            # Start the process
-            self.sbctl_process = await asyncio.create_subprocess_exec(
-                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-            )
-            self._termination_requested = False
+            await self._start_sbctl_process(bundle_path)
 
             # First, wait a brief moment to see if sbctl exits quickly with "No cluster resources"
             try:
+                # Ensure process was started successfully
+                if not self.sbctl_process:
+                    raise BundleInitializationError("Failed to start sbctl process")
+                    
                 # Wait for either process completion or a short timeout
                 await asyncio.wait_for(self.sbctl_process.wait(), timeout=5.0)
 
@@ -1430,12 +1421,148 @@ class BundleManager:
             f"Diagnostic information:\n{diagnostics_str}"
         )
 
+    async def _monitor_sbctl_stderr(self) -> None:
+        """
+        Monitor sbctl process stderr output and maintain a rolling buffer.
+
+        This task runs continuously while the sbctl process is active,
+        capturing stderr output for crash diagnostics.
+        """
+        if not self.sbctl_process or not self.sbctl_process.stderr:
+            return
+
+        try:
+            while self.sbctl_process.returncode is None:
+                try:
+                    # Read line from stderr with timeout
+                    line = await asyncio.wait_for(self.sbctl_process.stderr.readline(), timeout=1.0)
+
+                    if not line:
+                        break
+
+                    # Decode and store in rolling buffer
+                    decoded_line = line.decode("utf-8", errors="replace").strip()
+                    if decoded_line:
+                        timestamp = datetime.datetime.now().isoformat()
+                        self._stderr_buffer.append(f"[{timestamp}] {decoded_line}")
+                        logger.debug(f"sbctl stderr: {decoded_line}")
+
+                except asyncio.TimeoutError:
+                    # Continue monitoring - timeouts are expected
+                    continue
+                except Exception as e:
+                    logger.debug(f"Error monitoring sbctl stderr: {e}")
+                    break
+
+        except Exception as e:
+            logger.debug(f"Stderr monitoring task stopped: {e}")
+
+    async def _restart_sbctl_process(self) -> bool:
+        """
+        Restart the sbctl process after a crash.
+
+        Returns:
+            True if restart was successful, False otherwise
+        """
+        if not self.active_bundle:
+            logger.error("Cannot restart sbctl: no active bundle")
+            return False
+
+        try:
+            # Capture crash information
+            exit_code = None
+            if self.sbctl_process:
+                exit_code = self.sbctl_process.returncode
+
+            stderr_lines = list(self._stderr_buffer)[-20:]  # Last 20 lines
+
+            # Store crash recovery info
+            self._crash_recovery_info = {
+                "timestamp": datetime.datetime.now().isoformat(),
+                "exit_code": exit_code,
+                "last_timeout_command": self._last_timeout_command,
+                "stderr_lines": stderr_lines,
+            }
+
+            logger.warning(f"Restarting sbctl after crash (exit code: {exit_code})")
+
+            # Clean up current process
+            await self._terminate_sbctl_process()
+
+            # Clear stderr buffer for fresh start
+            self._stderr_buffer.clear()
+
+            # Restart sbctl with the same bundle
+            bundle_path = self.active_bundle.path
+            await self._start_sbctl_process(bundle_path)
+
+            logger.info("sbctl process restarted successfully")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to restart sbctl process: {e}")
+            return False
+
+    def record_timeout_command(self, command: str) -> None:
+        """Record a command that timed out (potential crash trigger)."""
+        self._last_timeout_command = command
+
+    def get_crash_recovery_info(self) -> Optional[dict]:
+        """Get crash recovery information if available."""
+        recovery_info = self._crash_recovery_info
+        self._crash_recovery_info = None  # Clear after retrieval
+        return recovery_info
+
+    async def _start_sbctl_process(self, bundle_path: Path) -> None:
+        """
+        Start the sbctl process with the given bundle.
+
+        Args:
+            bundle_path: Path to the bundle to serve
+        """
+        # Determine output directory - use active bundle if available, otherwise use bundle path parent
+        if self.active_bundle:
+            output_dir = self.active_bundle.path.parent
+        else:
+            output_dir = bundle_path.parent
+
+        os.chdir(output_dir)
+
+        cmd = [
+            "sbctl",
+            "serve",
+            "--support-bundle-location",
+            str(bundle_path),
+        ]
+
+        logger.debug(f"Starting sbctl process: {' '.join(cmd)}")
+
+        # Start the process
+        self.sbctl_process = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        self._termination_requested = False
+
+        # Start stderr monitoring task
+        if self._stderr_monitor_task:
+            self._stderr_monitor_task.cancel()
+        self._stderr_monitor_task = asyncio.create_task(self._monitor_sbctl_stderr())
+
     async def _terminate_sbctl_process(self) -> None:
         """
         Terminate the sbctl process if it's running.
 
         This helper method centralizes process termination logic to avoid duplication.
         """
+        # Cancel stderr monitoring task first
+        if self._stderr_monitor_task:
+            self._stderr_monitor_task.cancel()
+            try:
+                await self._stderr_monitor_task
+            except asyncio.CancelledError:
+                pass
+            self._stderr_monitor_task = None
+
         if self.sbctl_process:
             self._termination_requested = True
             try:
@@ -1764,8 +1891,32 @@ class BundleManager:
         """
         # First check if sbctl process is running
         if not self.sbctl_process or self.sbctl_process.returncode is not None:
-            logger.warning("sbctl process is not running")
-            return False
+            # Detect if this is a crash that we should recover from
+            if (
+                self.active_bundle
+                and self.sbctl_process
+                and self.sbctl_process.returncode is not None
+            ):
+                # sbctl process has crashed - attempt automatic restart
+                exit_code = self.sbctl_process.returncode
+                logger.warning(
+                    f"sbctl process crashed with exit code {exit_code}, attempting automatic restart"
+                )
+
+                try:
+                    restart_successful = await self._restart_sbctl_process()
+                    if restart_successful:
+                        logger.info("sbctl process restarted successfully after crash")
+                        return True  # Process restarted, API should be available
+                    else:
+                        logger.error("Failed to restart sbctl process after crash")
+                        return False
+                except Exception as e:
+                    logger.error(f"Exception during sbctl restart: {e}")
+                    return False
+            else:
+                logger.warning("sbctl process is not running")
+                return False
 
         # Check if we have a kubeconfig to extract the port from
         port = 8080  # Default port used by many K8s implementations

@@ -222,6 +222,8 @@ class KubectlExecutor:
                     *cmd, timeout=timeout, env=env
                 )
             except asyncio.TimeoutError:
+                # Record this timeout command as a potential crash trigger
+                self.bundle_manager.record_timeout_command(command)
                 raise KubectlError(
                     f"kubectl command timed out after {timeout} seconds",
                     124,
