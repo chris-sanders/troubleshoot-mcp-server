@@ -1,8 +1,50 @@
 # Improve kubectl Robustness Against sbctl Crashes
 
-**Status**: active
+**Status**: completed  
 **Started**: 2025-08-11
-**Progress**: Task initialized and moved to active
+**Completed**: 2025-08-11
+**Progress**: 
+- ✅ Phase 1: kubectl timeout reduction (30s → 5s) - COMPLETED
+- ✅ Phase 2A: stderr monitoring infrastructure - COMPLETED  
+- ✅ Phase 2B: automatic sbctl restart with crash detection - COMPLETED
+- ✅ Phase 2C: crash diagnostics integration - COMPLETED
+- ✅ All tests passing, code quality checks passed - COMPLETED
+
+**Implementation Summary**:
+Successfully implemented comprehensive kubectl robustness improvements:
+
+1. **Timeout Reduction**: Changed default kubectl timeout from 30s to 5s
+   - Updated KubectlCommandArgs, execute methods, and tool descriptions
+   - Updated all related tests to reflect new 5s default
+   - Most kubectl commands against local API server complete in 1-2s
+
+2. **Stderr Monitoring Infrastructure**: Added continuous stderr monitoring  
+   - Rolling buffer (100 lines) captures crash diagnostics
+   - Timestamped stderr entries for crash correlation
+   - Monitoring task lifecycle integrated with process management
+
+3. **Automatic Crash Recovery**: Seamless sbctl restart on crashes
+   - check_api_server_available() detects crashes and restarts automatically
+   - Captures exit codes, stderr output, and triggering commands
+   - Preserves bundle state across restarts
+
+4. **Comprehensive Error Reporting**: LLM receives crash diagnostics 
+   - Successful kubectl responses include recovery information when available
+   - Formatted for LLM readability with exit codes and error context
+   - Clear correlation between timeout commands and crashes
+
+**Files Modified**:
+- src/troubleshoot_mcp_server/kubectl.py: timeout defaults and timeout tracking
+- src/troubleshoot_mcp_server/bundle.py: stderr monitoring and restart infrastructure  
+- src/troubleshoot_mcp_server/server.py: crash diagnostics integration
+- tests/unit/test_kubectl.py: updated for 5s timeout defaults
+
+**Success Criteria Met**:
+- ✅ kubectl commands timeout after 5s instead of 30s
+- ✅ sbctl automatically restarts on crash with transparent kubectl continuation
+- ✅ crash diagnostics captured and reported to LLM  
+- ✅ bundle reinitialization requests eliminated for crash scenarios
+- ✅ LLM receives both successful output AND recovery information
 
 ## Summary
 Implement kubectl timeout reduction, automatic sbctl restart with crash diagnostics, and comprehensive error reporting to provide seamless recovery when sbctl crashes.
