@@ -883,7 +883,7 @@ class BundleManager:
                 # Ensure process was started successfully
                 if not self.sbctl_process:
                     raise BundleInitializationError("Failed to start sbctl process")
-                    
+
                 # Wait for either process completion or a short timeout
                 await asyncio.wait_for(self.sbctl_process.wait(), timeout=5.0)
 
