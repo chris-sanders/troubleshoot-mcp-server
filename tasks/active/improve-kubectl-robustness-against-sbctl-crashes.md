@@ -9,6 +9,7 @@
 - ✅ Phase 2B: automatic sbctl restart with crash detection - COMPLETED
 - ✅ Phase 2C: crash diagnostics integration - COMPLETED
 - ✅ All tests passing, code quality checks passed - COMPLETED
+- ✅ CI container build failure fixed (PKCS1 key format) - COMPLETED
 
 **Implementation Summary**:
 Successfully implemented comprehensive kubectl robustness improvements:
@@ -38,6 +39,7 @@ Successfully implemented comprehensive kubectl robustness improvements:
 - src/troubleshoot_mcp_server/bundle.py: stderr monitoring and restart infrastructure  
 - src/troubleshoot_mcp_server/server.py: crash diagnostics integration
 - tests/unit/test_kubectl.py: updated for 5s timeout defaults
+- scripts/generate_test_keys.sh: fixed PKCS1 key format for melange compatibility
 
 **Success Criteria Met**:
 - ✅ kubectl commands timeout after 5s instead of 30s
