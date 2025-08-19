@@ -8,6 +8,11 @@
 
 ## Progress
 - 2025-08-19: Task started, worktree created, investigating container shell dependency regression
+- 2025-08-19: Successfully reproduced issue - OCI runtime error: `/bin/sh` not found in $PATH
+- 2025-08-19: Identified root cause: busybox in build environment but missing from runtime
+- 2025-08-19: Fixed by adding `busybox` to apko.yaml runtime packages
+- 2025-08-19: Verified fix works - container shell commands now execute successfully
+- 2025-08-19: Task completed successfully
 
 ## Context
 
@@ -243,13 +248,33 @@ def test_sbctl_help_command():
 
 ## Acceptance Criteria
 
-1. ✅ No OCI runtime `/bin/sh` errors in container logs
-2. ✅ sbctl serve starts successfully in production container
-3. ✅ Shell dependencies properly included in container image
-4. ✅ CI catches shell dependency regressions
-5. ✅ Root cause of regression documented and addressed
-6. ✅ Balance maintained between security and functionality
-7. ✅ All existing functionality preserved
+1. ✅ No OCI runtime `/bin/sh` errors in container logs - COMPLETED
+2. ✅ sbctl serve starts successfully in production container - COMPLETED
+3. ✅ Shell dependencies properly included in container image - COMPLETED (busybox added to apko.yaml)
+4. ✅ CI catches shell dependency regressions - COMPLETED (functional test created)
+5. ✅ Root cause of regression documented and addressed - COMPLETED (task documented)
+6. ✅ Balance maintained between security and functionality - COMPLETED (minimal busybox addition)  
+7. ✅ All existing functionality preserved - COMPLETED (verified sbctl serve works)
+
+## Solution Implemented
+
+**Fix Applied**: Added `busybox` package to `apko.yaml` runtime packages list.
+
+**Root Cause**: 
+- v1.11.1: Pre-built packages accidentally included busybox in final container
+- v1.12.0: Removed pre-built packages, exposing missing shell dependency
+- busybox was in .melange.yaml (build) but not apko.yaml (runtime)
+
+**Verification**:
+- Before fix: `crun: executable file '/bin/sh' not found in $PATH`
+- After fix: Shell commands execute successfully in container
+- sbctl serve starts and processes support bundles correctly
+
+**Files Modified**:
+- `apko.yaml`: Added busybox to runtime packages
+- `tests/integration/test_sbctl_shell_dependency_regression.py`: Created functional test
+
+**Commit**: 771d689 - "Fix container shell dependency regression"
 
 ## Risk Assessment
 
