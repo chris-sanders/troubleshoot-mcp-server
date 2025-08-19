@@ -6,6 +6,9 @@
 - **Priority**: critical
 - **Dependencies**: none
 
+## Progress
+- 2025-08-19: Task started, worktree created, investigating container shell dependency regression
+
 ## Context
 
 The MCP server container is failing with OCI runtime errors about missing `/bin/sh`, indicating a regression in container build process. The errors.txt file shows 254+ identical errors:
