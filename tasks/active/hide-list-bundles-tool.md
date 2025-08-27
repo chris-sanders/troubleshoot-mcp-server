@@ -131,3 +131,8 @@ If issues arise:
 
 ## Progress Log
 - 2025-08-27: Started task, created worktree, moved to active
+- 2025-08-27: Implemented conditional tool registration with ENABLE_LIST_BUNDLES_TOOL environment variable
+- 2025-08-27: Updated error messages to remove tool reference when disabled
+- 2025-08-27: Updated test configuration to enable tool for testing
+- 2025-08-27: All unit tests passing, feature working as specified
+- 2025-08-27: Task completed successfully
