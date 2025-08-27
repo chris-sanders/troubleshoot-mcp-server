@@ -120,13 +120,14 @@ If issues arise:
 - Internal functionality is preserved, only MCP exposure is conditional
 
 ## Task Metadata
-- **Status**: backlog
+- **Status**: active
 - **Priority**: high
 - **Type**: enhancement
 - **Component**: mcp-server
 - **Labels**: ai-experience, tool-management
 - **Estimated**: 2-3 hours
 - **Created**: 2025-01-27
+- **Started**: 2025-08-27
 
 ## Progress Log
-<!-- Update this section as work progresses -->
+- 2025-08-27: Started task, created worktree, moved to active
