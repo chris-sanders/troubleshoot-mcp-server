@@ -18,7 +18,7 @@ class TestGitHubTokenFallbackRegression:
     @pytest.mark.asyncio
     async def test_sbctl_token_not_used_for_github(self):
         """Test that SBCTL_TOKEN is NOT used even when it's the only token set."""
-        github_url = "https://github.com/user-attachments/files/21621591/support-bundle-2025-08-06T14_34_47.tar.gz"
+        github_url = "https://github.com/user-attachments/files/12345/fake-bundle.tar.gz"
 
         # Only set SBCTL_TOKEN, no GitHub tokens
         with patch.dict(os.environ, {"SBCTL_TOKEN": "some-replicated-token"}, clear=True):
@@ -33,21 +33,21 @@ class TestGitHubTokenFallbackRegression:
     @pytest.mark.asyncio
     async def test_clear_error_message_when_no_github_tokens(self):
         """Test clear error message when no GitHub tokens are available."""
-        github_url = "https://github.com/user-attachments/files/21621591/support-bundle-2025-08-06T14_34_47.tar.gz"
+        github_url = "https://github.com/user-attachments/files/12345/fake-bundle.tar.gz"
 
         # Only set SBCTL_TOKEN, no GitHub tokens
         with patch.dict(os.environ, {"SBCTL_TOKEN": "some-replicated-token"}, clear=True):
             bundle = BundleManager()
 
             with pytest.raises(
-                BundleDownloadError, match=r"Set GITHUB_TOKEN or GH_TOKEN environment variable\."
+                BundleDownloadError, match=r"Set GITHUB_TOKEN environment variable\."
             ):
                 await bundle.initialize_bundle(github_url)
 
     @pytest.mark.asyncio
     async def test_error_message_explains_sbctl_token_limitation(self):
         """Test that error message explains SBCTL_TOKEN cannot be used for GitHub."""
-        github_url = "https://github.com/user-attachments/files/21621591/support-bundle-2025-08-06T14_34_47.tar.gz"
+        github_url = "https://github.com/user-attachments/files/12345/fake-bundle.tar.gz"
 
         # Only set SBCTL_TOKEN, no GitHub tokens
         with patch.dict(os.environ, {"SBCTL_TOKEN": "some-replicated-token"}, clear=True):
@@ -60,25 +60,23 @@ class TestGitHubTokenFallbackRegression:
                 await bundle.initialize_bundle(github_url)
 
     @pytest.mark.asyncio
-    async def test_github_token_priority_without_sbctl(self):
-        """Test token priority works correctly: GITHUB_TOKEN > GH_TOKEN (no SBCTL_TOKEN)."""
-        # Test GITHUB_TOKEN takes priority over GH_TOKEN
+    async def test_github_token_selection_logic(self):
+        """Test that only GITHUB_TOKEN is used (no SBCTL_TOKEN)."""
+        # Test GITHUB_TOKEN is used
         with patch.dict(
             os.environ,
-            {"GITHUB_TOKEN": "github-token", "GH_TOKEN": "gh-token", "SBCTL_TOKEN": "sbctl-token"},
+            {"GITHUB_TOKEN": "github-token", "SBCTL_TOKEN": "sbctl-token"},
             clear=True,
         ):
             # We can't actually test the download without mocking the HTTP client,
             # but we can verify the token selection logic by checking the method directly
-            token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-            assert token == "github-token", "GITHUB_TOKEN should have priority over GH_TOKEN"
+            token = os.environ.get("GITHUB_TOKEN")
+            assert token == "github-token", "GITHUB_TOKEN should be used"
 
-        # Test GH_TOKEN is used when GITHUB_TOKEN not available
-        with patch.dict(
-            os.environ, {"GH_TOKEN": "gh-token", "SBCTL_TOKEN": "sbctl-token"}, clear=True
-        ):
-            token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-            assert token == "gh-token", "GH_TOKEN should be used when GITHUB_TOKEN not set"
+        # Test SBCTL_TOKEN is ignored (should be None)
+        with patch.dict(os.environ, {"SBCTL_TOKEN": "sbctl-token"}, clear=True):
+            token = os.environ.get("GITHUB_TOKEN")
+            assert token is None, "SBCTL_TOKEN should be ignored for GitHub authentication"
 
     @pytest.mark.asyncio
     async def test_different_github_url_patterns(self):
@@ -103,7 +101,7 @@ class TestGitHubTokenFallbackRegression:
     @pytest.mark.asyncio
     async def test_no_tokens_available_for_github(self):
         """Test error when no tokens are available at all for GitHub URLs."""
-        github_url = "https://github.com/user-attachments/files/21621591/support-bundle-2025-08-06T14_34_47.tar.gz"
+        github_url = "https://github.com/user-attachments/files/12345/fake-bundle.tar.gz"
 
         # Clear all environment variables
         with patch.dict(os.environ, {}, clear=True):

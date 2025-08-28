@@ -600,13 +600,13 @@ class BundleManager:
         Raises:
             BundleDownloadError: If the bundle could not be downloaded
         """
-        # Token priority: GITHUB_TOKEN > GH_TOKEN (SBCTL_TOKEN not valid for GitHub)
-        github_token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+        # Only GITHUB_TOKEN is valid for GitHub URLs (SBCTL_TOKEN is for Replicated only)
+        github_token = os.environ.get("GITHUB_TOKEN")
 
         if not github_token:
             raise BundleDownloadError(
                 "Cannot download from GitHub: No authentication token found. "
-                "Set GITHUB_TOKEN or GH_TOKEN environment variable. "
+                "Set GITHUB_TOKEN environment variable. "
                 "Note: SBCTL_TOKEN is only for Replicated URLs, not GitHub."
             )
 

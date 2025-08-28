@@ -376,31 +376,24 @@ class TestGitHubUrlPatternMatching:
 class TestGitHubTokenPriority:
     """Test GitHub token priority logic in isolation."""
 
-    def test_github_token_priority_logic(self):
-        """Test that GitHub tokens are prioritized correctly: GITHUB_TOKEN > GH_TOKEN (SBCTL_TOKEN not used)."""
+    def test_github_token_logic(self):
+        """Test that only GITHUB_TOKEN is used for GitHub URLs (SBCTL_TOKEN not used)."""
 
-        # Test GITHUB_TOKEN has highest priority
+        # Test GITHUB_TOKEN is used
         with patch.dict(
             os.environ,
-            {"GITHUB_TOKEN": "github-token", "GH_TOKEN": "gh-token", "SBCTL_TOKEN": "sbctl-token"},
+            {"GITHUB_TOKEN": "github-token", "SBCTL_TOKEN": "sbctl-token"},
         ):
             # This mirrors the logic in _download_github_attachment
-            token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-            assert token == "github-token", "GITHUB_TOKEN should have highest priority"
-
-        # Test GH_TOKEN when GITHUB_TOKEN not available
-        with patch.dict(
-            os.environ, {"GH_TOKEN": "gh-token", "SBCTL_TOKEN": "sbctl-token"}, clear=True
-        ):
-            token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-            assert token == "gh-token", "GH_TOKEN should be used when GITHUB_TOKEN is not set"
+            token = os.environ.get("GITHUB_TOKEN")
+            assert token == "github-token", "GITHUB_TOKEN should be used"
 
         # Test SBCTL_TOKEN is NOT used for GitHub (should be None)
         with patch.dict(os.environ, {"SBCTL_TOKEN": "sbctl-token"}, clear=True):
-            token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+            token = os.environ.get("GITHUB_TOKEN")
             assert token is None, "SBCTL_TOKEN should NOT be used for GitHub authentication"
 
         # Test when no tokens are available
         with patch.dict(os.environ, {}, clear=True):
-            token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+            token = os.environ.get("GITHUB_TOKEN")
             assert token is None, "Token should be None when no GitHub env vars are set"
