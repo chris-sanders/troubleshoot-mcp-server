@@ -1,8 +1,12 @@
 # Task: Fix GitHub Authentication SBCTL_TOKEN Fallback Issue
 
-**Status:** backlog
+**Status:** active
 **Priority:** high
 **Estimated:** 2 hours
+**Started:** 2025-08-28
+
+## Progress Log
+- 2025-08-28: Started task - created worktree and moved to active
 
 ## Problem Statement
 
