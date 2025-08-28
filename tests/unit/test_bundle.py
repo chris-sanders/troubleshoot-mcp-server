@@ -1249,13 +1249,10 @@ class TestGitHubAuthentication:
                     call_args = mock_aio_session.get.call_args
                     assert call_args[1]["headers"]["Authorization"] == "token gh_token"
 
-                # Test SBCTL_TOKEN when neither GITHUB_TOKEN nor GH_TOKEN available
+                # Test SBCTL_TOKEN when neither GITHUB_TOKEN nor GH_TOKEN available (should fail)
                 with patch.dict(os.environ, {"SBCTL_TOKEN": "sbctl_token"}, clear=True):
-                    await manager._download_github_attachment(test_url)
-
-                    # Verify the call was made with SBCTL_TOKEN
-                    call_args = mock_aio_session.get.call_args
-                    assert call_args[1]["headers"]["Authorization"] == "token sbctl_token"
+                    with pytest.raises(BundleDownloadError, match="No authentication token found"):
+                        await manager._download_github_attachment(test_url)
 
     @pytest.mark.asyncio
     async def test_missing_token_error(self):
