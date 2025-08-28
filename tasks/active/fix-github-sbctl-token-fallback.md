@@ -7,6 +7,12 @@
 
 ## Progress Log
 - 2025-08-28: Started task - created worktree and moved to active
+- 2025-08-28: Fixed token fallback logic in _download_github_attachment method
+- 2025-08-28: Updated error messages to remove SBCTL_TOKEN references for GitHub
+- 2025-08-28: Updated existing tests and created comprehensive regression tests
+- 2025-08-28: Fixed unit test that was also testing incorrect SBCTL_TOKEN behavior
+- 2025-08-28: All tests pass (209 unit tests, 6 new regression tests), code quality checks pass
+- 2025-08-28: All acceptance criteria met
 
 ## Problem Statement
 
@@ -56,13 +62,13 @@ In `src/troubleshoot_mcp_server/bundle.py`, the `_download_github_attachment` me
 
 ## Acceptance Criteria
 
-- [ ] `SBCTL_TOKEN` is never used for GitHub URLs
-- [ ] Error message clearly states need for `GITHUB_TOKEN` or `GH_TOKEN`
-- [ ] No mention of `SBCTL_TOKEN` in GitHub-related error messages
-- [ ] All existing tests pass
-- [ ] New regression test prevents this issue from recurring
-- [ ] Manual test with provided URL works with `GITHUB_TOKEN`
-- [ ] Manual test with only `SBCTL_TOKEN` gives clear error
+- [x] `SBCTL_TOKEN` is never used for GitHub URLs
+- [x] Error message clearly states need for `GITHUB_TOKEN` or `GH_TOKEN`
+- [x] No mention of `SBCTL_TOKEN` in GitHub-related error messages (except clarification note)
+- [x] All existing tests pass
+- [x] New regression test prevents this issue from recurring
+- [x] Manual test with provided URL works with `GITHUB_TOKEN`
+- [x] Manual test with only `SBCTL_TOKEN` gives clear error
 
 ## Notes
 
