@@ -61,9 +61,7 @@ async def mcp_protocol_client(functional_bundle_dir: Path) -> AsyncIterator[MCPT
         await client.start_server(timeout=15.0)
 
         # Initialize the MCP protocol
-        await client.initialize_mcp(
-            {"name": "functional-test-client", "version": "1.0.0"}
-        )
+        await client.initialize_mcp({"name": "functional-test-client", "version": "1.0.0"})
 
         # Send initialized notification to complete handshake
         await client.send_notification("notifications/initialized")
