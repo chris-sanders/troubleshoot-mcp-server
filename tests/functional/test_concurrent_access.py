@@ -286,47 +286,72 @@ async def test_concurrent_error_and_success_mix(
 @pytest.mark.functional
 @pytest.mark.asyncio
 async def test_high_concurrency_stress(mcp_protocol_client: MCPTestClient) -> None:
-    """Test high concurrency stress with tool discovery."""
-    # Launch many concurrent tool discovery requests
-    num_requests = 20
-    batch_size = 5
+    """Test high concurrency stress with tool discovery using multiple clients."""
+    import time
+    from tests.integration.mcp_test_utils import MCPTestClient
 
-    # Process in batches to avoid overwhelming the server
-    for batch_start in range(0, num_requests, batch_size):
-        batch_end = min(batch_start + batch_size, num_requests)
-        tasks = []
+    num_clients = 6
+    clients = []
 
-        for i in range(batch_start, batch_end):
-            task = mcp_protocol_client.send_request("tools/list")
-            tasks.append(task)
+    try:
+        # Create multiple clients for true parallel testing
+        start_time = time.time()
 
-        # Execute this batch sequentially (stdio transport limitation)
-        responses = []
-        for task in tasks:
-            response = await task
-            responses.append(response)
+        client_tasks = []
+        for i in range(num_clients):
 
-        # Verify all responses in this batch
+            async def create_client(client_id: int) -> MCPTestClient:
+                client = MCPTestClient()
+                await client.start_server(timeout=15.0)
+                await client.initialize_mcp(
+                    {"name": f"stress-test-client-{client_id}", "version": "1.0.0"}
+                )
+                await client.send_notification("notifications/initialized")
+                return client
+
+            client_tasks.append(create_client(i))
+
+        clients = await asyncio.gather(*client_tasks)
+
+        # Run tool discovery in parallel across all clients
+        discovery_tasks = []
+        for i, client in enumerate(clients):
+            task = client.send_request("tools/list")
+            discovery_tasks.append((i, task))
+
+        responses = await asyncio.gather(*[task for _, task in discovery_tasks])
+
+        end_time = time.time()
+        duration = end_time - start_time
+
+        print(f"High concurrency stress test ({num_clients} parallel clients) took {duration:.2f}s")
+
+        # Verify all responses
+        required_tools = {
+            "initialize_bundle",
+            "kubectl",
+            "list_files",
+            "read_file",
+            "grep_files",
+        }
+
         for i, response in enumerate(responses):
-            request_id = batch_start + i
-            assert "result" in response, f"Request {request_id} missing result"
+            assert "result" in response, f"Client {i} missing result"
             tools = response["result"].get("tools", [])
-            assert len(tools) > 0, f"Request {request_id} returned no tools"
+            assert len(tools) > 0, f"Client {i} returned no tools"
 
-            # Verify expected tools are present
             tool_names = {tool["name"] for tool in tools}
-            required_tools = {
-                "initialize_bundle",
-                "kubectl",
-                "list_files",
-                "read_file",
-                "grep_files",
-            }
             missing = required_tools - tool_names
-            assert not missing, f"Request {request_id} missing tools: {missing}"
+            assert not missing, f"Client {i} missing tools: {missing}"
 
-        # Small delay between batches to prevent resource exhaustion
-        await asyncio.sleep(0.1)
+    finally:
+        # Clean up all clients
+        cleanup_tasks = []
+        for client in clients:
+            cleanup_tasks.append(client.cleanup())
+
+        if cleanup_tasks:
+            await asyncio.gather(*cleanup_tasks)
 
 
 @pytest.mark.functional
