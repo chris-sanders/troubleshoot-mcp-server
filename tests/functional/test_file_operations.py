@@ -112,11 +112,14 @@ async def test_read_file_functionality(
 
     # Look for a text file or config file to read
     # This is bundle-dependent, so we'll try common file types
+    # Exclude directories and focus on actual files
     potential_files = [
         "version.txt",
         "VERSION",
         "kubeconfig",
-        "cluster-info",
+        "analysis.json",
+        "replicated.app-health-check.json",
+        "version.yaml",
         "pod-logs",
         "events.yaml",
         "pods.yaml",
@@ -124,20 +127,30 @@ async def test_read_file_functionality(
 
     test_file = None
     for file_name in potential_files:
-        if file_name in list_text:
+        if file_name in list_text and '"type":"file"' in list_text:
+            # Verify it's actually marked as a file in the JSON response
             test_file = file_name
             break
 
-    # If no known files found, try to extract any file from the listing
+    # If no known files found, try to extract actual files from the JSON listing
     if test_file is None:
-        lines = list_text.split("\n")
-        for line in lines:
-            if ".txt" in line or ".yaml" in line or ".json" in line or ".log" in line:
-                # Extract filename from line
-                parts = line.strip().split()
-                if parts:
-                    test_file = parts[-1]  # Assume filename is last part
-                    break
+        # Look for files that are explicitly marked as type "file" in JSON
+        if '"type":"file"' in list_text:
+            lines = list_text.split("\n")
+            for line in lines:
+                if '"type":"file"' in line and (
+                    ".txt" in line or ".yaml" in line or ".json" in line
+                ):
+                    # Extract filename from JSON entry
+                    if '"name":"' in line:
+                        start = line.find('"name":"') + 8
+                        end = line.find('"', start)
+                        if start < end:
+                            potential_file = line[start:end]
+                            # Double check this isn't a directory name
+                            if not potential_file.endswith("/") and "." in potential_file:
+                                test_file = potential_file
+                                break
 
     if test_file:
         # Try to read the file

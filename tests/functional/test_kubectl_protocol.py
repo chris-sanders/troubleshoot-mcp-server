@@ -330,7 +330,7 @@ async def test_kubectl_concurrent_execution(
     # Verify all completed successfully
     for i, result in enumerate(results):
         assert len(result) == 1, f"kubectl task {i} returned invalid result"
-        response_text = result[i]["text"]
+        response_text = result[0]["text"]
 
         assert (
             "kubectl command executed successfully" in response_text
