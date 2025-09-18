@@ -278,10 +278,9 @@ async def test_concurrent_error_and_success_mix(
             # Tool response - should succeed (bundle reinitialization)
             assert len(result) == 1, f"{operation} should return response"
             response_text = result[0]["text"]
-            assert ("Bundle initialized successfully" in response_text or
-                    ('"bundle_id":' in response_text and '"status": "ready"' in response_text)), (
-                f"{operation} should succeed: {response_text}"
-            )
+            assert "Bundle initialized successfully" in response_text or (
+                '"bundle_id":' in response_text and '"status": "ready"' in response_text
+            ), f"{operation} should succeed: {response_text}"
 
 
 @pytest.mark.functional
