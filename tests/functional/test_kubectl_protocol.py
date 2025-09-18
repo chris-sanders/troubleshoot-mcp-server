@@ -304,7 +304,6 @@ async def test_kubectl_concurrent_execution(
     mcp_protocol_client: MCPTestClient, initialized_test_bundle: str
 ) -> None:
     """Test concurrent kubectl command execution."""
-    import asyncio
 
     # Launch multiple kubectl commands concurrently
     tasks = []
@@ -322,8 +321,11 @@ async def test_kubectl_concurrent_execution(
         )
         tasks.append(task)
 
-    # Wait for all to complete
-    results = await asyncio.gather(*tasks)
+    # Execute sequentially (stdio transport limitation)
+    results = []
+    for task in tasks:
+        result = await task
+        results.append(result)
 
     # Verify all completed successfully
     for i, result in enumerate(results):

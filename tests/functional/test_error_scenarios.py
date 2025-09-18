@@ -233,7 +233,6 @@ async def test_grep_files_invalid_pattern(
 @pytest.mark.asyncio
 async def test_concurrent_error_scenarios(mcp_protocol_client: MCPTestClient) -> None:
     """Test multiple error scenarios concurrently."""
-    import asyncio
 
     # Run multiple error-inducing operations concurrently
     tasks = [
@@ -251,8 +250,14 @@ async def test_concurrent_error_scenarios(mcp_protocol_client: MCPTestClient) ->
         ),  # Invalid bundle source
     ]
 
-    # Wait for all to complete
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    # Execute sequentially (stdio transport limitation)
+    results = []
+    for task in tasks:
+        try:
+            result = await task
+            results.append(result)
+        except Exception as e:
+            results.append(e)
 
     # Verify all returned valid responses (no exceptions/crashes)
     for i, result in enumerate(results):

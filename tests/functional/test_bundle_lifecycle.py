@@ -45,9 +45,10 @@ async def test_bundle_initialization_success(
     assert content["type"] == "text", "Response should be text content"
 
     response_text = content["text"]
-    assert "Bundle initialized successfully" in response_text, (
-        f"Expected success message, got: {response_text}"
-    )
+    # Check for either new JSON format or old text format
+    assert "Bundle initialized successfully" in response_text or (
+        '"bundle_id":' in response_text and '"status": "ready"' in response_text
+    ), f"Expected success message or JSON status, got: {response_text}"
 
     # Verify bundle information is included (may be in JSON format)
     assert (
@@ -70,7 +71,10 @@ async def test_bundle_initialization_force_reinit(
     )
 
     assert len(result1) == 1
-    assert "Bundle initialized successfully" in result1[0]["text"]
+    result1_text = result1[0]["text"]
+    assert "Bundle initialized successfully" in result1_text or (
+        '"bundle_id":' in result1_text and '"status": "ready"' in result1_text
+    )
 
     # Second initialization without force (should succeed but may skip work)
     result2 = await mcp_protocol_client.call_tool(
@@ -82,7 +86,9 @@ async def test_bundle_initialization_force_reinit(
     response2_text = result2[0]["text"]
     # Should either succeed with initialization or indicate already initialized
     assert (
-        "Bundle initialized successfully" in response2_text or "already" in response2_text.lower()
+        "Bundle initialized successfully" in response2_text
+        or "already" in response2_text.lower()
+        or ('"bundle_id":' in response2_text and '"status": "ready"' in response2_text)
     )
 
     # Third initialization with force (should definitely reinitialize)
@@ -92,7 +98,10 @@ async def test_bundle_initialization_force_reinit(
     )
 
     assert len(result3) == 1
-    assert "Bundle initialized successfully" in result3[0]["text"]
+    result3_text = result3[0]["text"]
+    assert "Bundle initialized successfully" in result3_text or (
+        '"bundle_id":' in result3_text and '"status": "ready"' in result3_text
+    )
 
 
 @pytest.mark.functional
@@ -107,7 +116,10 @@ async def test_bundle_state_persistence(
         {"source": str(test_bundle_source), "force": False, "verbosity": "minimal"},
     )
 
-    assert "Bundle initialized successfully" in init_result[0]["text"]
+    init_text = init_result[0]["text"]
+    assert "Bundle initialized successfully" in init_text or (
+        '"bundle_id":' in init_text and '"status": "ready"' in init_text
+    )
 
     # Try to use kubectl (should work with initialized bundle)
     kubectl_result = await mcp_protocol_client.call_tool(
@@ -216,9 +228,10 @@ async def test_multiple_bundle_lifecycle_cycles(
             },
         )
 
-        assert "Bundle initialized successfully" in init_result[0]["text"], (
-            f"Cycle {cycle}: Bundle initialization failed"
-        )
+        init_text = init_result[0]["text"]
+        assert "Bundle initialized successfully" in init_text or (
+            '"bundle_id":' in init_text and '"status": "ready"' in init_text
+        ), f"Cycle {cycle}: Bundle initialization failed: {init_text}"
 
         # Use the bundle (kubectl test)
         kubectl_result = await mcp_protocol_client.call_tool(

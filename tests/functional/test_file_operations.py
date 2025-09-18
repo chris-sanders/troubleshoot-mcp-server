@@ -54,7 +54,11 @@ async def test_list_files_basic_functionality(
     # Verbose mode should include additional information
     if "Listed files" in response_text:
         assert (
-            "files," in response_text or "Total:" in response_text or "directories" in response_text
+            "files," in response_text
+            or "Total:" in response_text
+            or "directories" in response_text
+            or "total_files" in response_text
+            or "total_dirs" in response_text
         ), f"Verbose mode should include summary info: {response_text}"
 
 
@@ -379,7 +383,7 @@ async def test_file_operations_concurrent_access(
         )
         tasks.append(("grep", task))
 
-    # Wait for all operations
+    # Execute operations sequentially (stdio transport limitation)
     results = []
     for operation, task in tasks:
         result = await task
