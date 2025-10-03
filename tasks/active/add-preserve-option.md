@@ -17,3 +17,6 @@ This should allow skipping the cleanup but default to off.
 
 ## Progress
 - 2025-10-03: Started task, created worktree
+- 2025-10-03: Implemented PRESERVE_BUNDLES environment variable in bundle.py cleanup()
+- 2025-10-03: All quality checks pass (ruff format, ruff check, mypy)
+- 2025-10-03: All unit tests pass (209 tests)
