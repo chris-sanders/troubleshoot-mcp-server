@@ -304,3 +304,59 @@ async def test_check_api_server_auto_restarts_sbctl_after_restore(
         # The result depends on whether the restart succeeded and API is available
         # In this mock scenario, restart returns True but API check may still fail
         assert isinstance(result, bool)
+
+
+@pytest.mark.asyncio
+async def test_sbctl_auto_restart_real_bundle(persistent_bundle_dir, test_support_bundle):
+    """
+    REAL integration test: Verify sbctl auto-restarts after server restart.
+
+    No mocks - uses real sbctl process to verify:
+    1. Bundle initialized with real sbctl running
+    2. Server restart simulated (sbctl terminated)
+    3. New manager instance auto-discovers bundle
+    4. check_api_server_available() auto-restarts sbctl
+    5. System fully recovers with sbctl running
+    """
+    # === PHASE 1: Initialize bundle with REAL sbctl ===
+    with patch.dict(os.environ, {"MCP_SINGLE_BUNDLE_MODE": "true", "PRESERVE_BUNDLES": "true"}):
+        manager1 = BundleManager(persistent_bundle_dir)
+
+        # Initialize with real bundle - starts real sbctl
+        bundle = await manager1.initialize_bundle(str(test_support_bundle))
+        assert bundle.initialized is True
+
+        # Verify sbctl process is actually running
+        assert manager1.sbctl_process is not None
+        assert manager1.sbctl_process.returncode is None, "sbctl should be running"
+
+        bundle_id = bundle.id
+
+        # Simulate server shutdown - terminate sbctl
+        await manager1._terminate_sbctl_process()
+        assert manager1.sbctl_process is None or manager1.sbctl_process.returncode is not None
+
+    # === PHASE 2: New server - simulate restart ===
+    with patch.dict(os.environ, {"MCP_SINGLE_BUNDLE_MODE": "true", "PRESERVE_BUNDLES": "true"}):
+        manager2 = BundleManager(persistent_bundle_dir)
+
+        # Auto-activate finds bundle on disk
+        await manager2._auto_activate_bundle_if_exists()
+
+        # Bundle should be restored
+        assert manager2.active_bundle is not None
+        assert manager2.active_bundle.id == bundle_id
+        assert manager2.active_bundle.initialized is True
+
+        # sbctl might not be running yet (depends on _auto_activate success)
+        # This is the scenario we're testing
+
+        # Call check_api_server_available - should auto-restart sbctl if needed
+        await manager2.check_api_server_available()
+
+        # KEY ASSERTION: sbctl should now be running
+        assert manager2.sbctl_process is not None, "sbctl should be running after check"
+        assert manager2.sbctl_process.returncode is None, "sbctl process should be alive"
+
+        # Cleanup
+        await manager2.cleanup()
