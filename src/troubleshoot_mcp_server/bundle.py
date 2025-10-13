@@ -2074,10 +2074,17 @@ class BundleManager:
             kubeconfig_path = self.active_bundle.kubeconfig_path
         else:
             # Try to find kubeconfig in current directory (where sbctl might create it)
-            current_dir_kubeconfig = Path.cwd() / "kubeconfig"
-            if current_dir_kubeconfig.exists():
-                logger.info(f"Found kubeconfig in current directory: {current_dir_kubeconfig}")
-                kubeconfig_path = current_dir_kubeconfig
+            try:
+                current_dir_kubeconfig = Path.cwd() / "kubeconfig"
+                if current_dir_kubeconfig.exists():
+                    logger.info(
+                        f"Found kubeconfig in current directory: {current_dir_kubeconfig}"
+                    )
+                    kubeconfig_path = current_dir_kubeconfig
+            except (FileNotFoundError, OSError):
+                # Current directory may not exist (e.g., in tests or after directory changes)
+                logger.debug("Could not access current directory for kubeconfig lookup")
+                pass
 
         # Try to parse kubeconfig if found
         if kubeconfig_path:
