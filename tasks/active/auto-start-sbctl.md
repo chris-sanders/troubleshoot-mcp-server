@@ -62,8 +62,22 @@ The fix checks if `self.active_bundle.initialized` is True but `self.sbctl_proce
 
 ## Testing
 
-Added `test_check_api_server_auto_restarts_sbctl_after_restore()` in `tests/integration/test_single_bundle_mode_stateless.py` to verify:
-- Bundle initialized with sbctl running
-- Server restart simulation (sbctl dies)
+### Mock-based Test
+`test_check_api_server_auto_restarts_sbctl_after_restore()` - Verifies restart logic is called
+
+### Real Integration Test (NO MOCKS)
+`test_sbctl_auto_restart_real_bundle()` - Uses real sbctl process to verify:
+- Bundle initialized with real sbctl running
+- Server restart simulation (sbctl terminated)
 - Bundle auto-activated from disk (initialized=True, sbctl_process=None)
-- check_api_server_available() automatically restarts sbctl
+- check_api_server_available() automatically restarts real sbctl
+- Validates sbctl process is actually running after restart
+- **This test proves the complete end-to-end flow works**
+
+## CI Status
+
+✅ All checks passing:
+- Lint and Type Check: SUCCESS
+- E2E Tests: SUCCESS
+- All Tests with Coverage: SUCCESS (379 tests)
+- Container Tests: SUCCESS
