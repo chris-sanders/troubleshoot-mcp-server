@@ -1,10 +1,14 @@
 # Task: Fix Stale Kubeconfig Port on sbctl Auto-Restart
 
-## Status: Backlog
+## Status: Active
 - **Created**: 2025-10-13
+- **Started**: 2025-10-13
 - **Priority**: High
 - **Complexity**: Medium
 - **Type**: Bug Fix
+
+## Progress Log
+- 2025-10-13: Started implementation - will first create integration test to reproduce bug, then fix
 
 ## Problem Statement
 
