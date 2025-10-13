@@ -262,9 +262,7 @@ async def test_check_api_server_auto_restarts_sbctl_after_restore(
     4. check_api_server_available is called and should auto-restart sbctl
     """
     # === PHASE 1: Initialize bundle with sbctl ===
-    with patch.dict(
-        os.environ, {"MCP_SINGLE_BUNDLE_MODE": "true", "PRESERVE_BUNDLES": "true"}
-    ):
+    with patch.dict(os.environ, {"MCP_SINGLE_BUNDLE_MODE": "true", "PRESERVE_BUNDLES": "true"}):
         manager1 = BundleManager(persistent_bundle_dir)
         manager1._initialize_with_sbctl = AsyncMock(
             return_value=persistent_bundle_dir / "fake_bundle" / "kubeconfig"
@@ -278,9 +276,7 @@ async def test_check_api_server_auto_restarts_sbctl_after_restore(
         await manager1._terminate_sbctl_process()
 
     # === PHASE 2: New server - bundle restored but sbctl not running ===
-    with patch.dict(
-        os.environ, {"MCP_SINGLE_BUNDLE_MODE": "true", "PRESERVE_BUNDLES": "true"}
-    ):
+    with patch.dict(os.environ, {"MCP_SINGLE_BUNDLE_MODE": "true", "PRESERVE_BUNDLES": "true"}):
         manager2 = BundleManager(persistent_bundle_dir)
 
         # Auto-activate finds the bundle but doesn't start sbctl (mocked to fail silently)
