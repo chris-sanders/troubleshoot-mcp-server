@@ -2077,9 +2077,7 @@ class BundleManager:
             try:
                 current_dir_kubeconfig = Path.cwd() / "kubeconfig"
                 if current_dir_kubeconfig.exists():
-                    logger.info(
-                        f"Found kubeconfig in current directory: {current_dir_kubeconfig}"
-                    )
+                    logger.info(f"Found kubeconfig in current directory: {current_dir_kubeconfig}")
                     kubeconfig_path = current_dir_kubeconfig
             except (FileNotFoundError, OSError):
                 # Current directory may not exist (e.g., in tests or after directory changes)
