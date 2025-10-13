@@ -50,6 +50,7 @@ The agent must call initialize_bundle with force=true to restart sbctl, but this
 - 2025-10-13: Implemented auto-restart logic in check_api_server_available()
 - 2025-10-13: Added integration test to verify sbctl auto-restart behavior
 - 2025-10-13: All quality checks and tests passing
+- 2025-10-13: PR created: https://github.com/chris-sanders/troubleshoot-mcp-server/pull/65
 
 ## Solution
 
