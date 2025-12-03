@@ -104,7 +104,8 @@ async def test_initialize_bundle_tool(tmp_path: Path) -> None:
 
         # Verify the bundle manager methods were called
         mock_sbctl.assert_awaited_once()
-        mock_init.assert_awaited_once_with(str(temp_source_file), False)
+        # For stdio mode, bundle_id is None (source-based ID)
+        mock_init.assert_awaited_once_with(str(temp_source_file), False, bundle_id=None)
         mock_api.assert_awaited_once()
 
         # Verify the response
@@ -158,6 +159,10 @@ async def test_kubectl_tool(tmp_path: Path) -> None:
         # Mock only external subprocess calls and API server checks
         with (
             patch.object(bundle_manager, "get_active_bundle", return_value=mock_bundle),
+            patch.object(bundle_manager, "get_bundle_for_session", return_value="test"),
+            patch.object(
+                bundle_manager, "_load_bundle_from_disk_if_needed", new_callable=AsyncMock
+            ) as mock_load_bundle,
             patch.object(
                 bundle_manager, "check_api_server_available", new_callable=AsyncMock
             ) as mock_api,
@@ -166,6 +171,7 @@ async def test_kubectl_tool(tmp_path: Path) -> None:
             patch("troubleshoot_mcp_server.server.get_kubectl_executor") as mock_get_executor,
         ):
             # Set up mocks for external dependencies only
+            mock_load_bundle.return_value = mock_bundle
             mock_api.return_value = True
             mock_execute.return_value = mock_result
             mock_get_manager.return_value = bundle_manager
@@ -223,8 +229,13 @@ async def test_kubectl_tool_host_only_bundle(tmp_path: Path) -> None:
 
         with (
             patch.object(bundle_manager, "get_active_bundle", return_value=mock_bundle),
+            patch.object(bundle_manager, "get_bundle_for_session", return_value="test"),
+            patch.object(
+                bundle_manager, "_load_bundle_from_disk_if_needed", new_callable=AsyncMock
+            ) as mock_load_bundle,
             patch("troubleshoot_mcp_server.server.get_bundle_manager") as mock_get_manager,
         ):
+            mock_load_bundle.return_value = mock_bundle
             mock_get_manager.return_value = bundle_manager
 
             # Call the tool function directly with parameters
@@ -285,8 +296,15 @@ async def test_file_operations(tmp_path: Path) -> None:
 
         with (
             patch.object(bundle_manager, "get_active_bundle", return_value=mock_bundle),
+            patch.object(bundle_manager, "get_bundle_for_session", return_value="test"),
+            patch.object(
+                bundle_manager, "_load_bundle_from_disk_if_needed", new_callable=AsyncMock
+            ) as mock_load_bundle,
+            patch("troubleshoot_mcp_server.server.get_bundle_manager") as mock_get_manager,
             patch("troubleshoot_mcp_server.server.get_file_explorer") as mock_get_explorer,
         ):
+            mock_load_bundle.return_value = mock_bundle
+            mock_get_manager.return_value = bundle_manager
             mock_get_explorer.return_value = file_explorer
 
             # 1. Test list_files with real files

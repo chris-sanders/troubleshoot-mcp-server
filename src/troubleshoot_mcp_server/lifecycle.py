@@ -168,7 +168,9 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
             session_count = len(bundle_manager.session_bundles)
             if session_count > 0:
                 if preserve_bundles:
-                    logger.info(f"PRESERVE_BUNDLES enabled, keeping {session_count} session mappings for reuse")
+                    logger.info(
+                        f"PRESERVE_BUNDLES enabled, keeping {session_count} session mappings for reuse"
+                    )
                 else:
                     logger.info(f"Cleaning up {session_count} session bundles")
                     # Copy session IDs to avoid mutation during iteration

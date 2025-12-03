@@ -52,6 +52,10 @@ ENABLE_LIST_BUNDLES_TOOL = os.environ.get("ENABLE_LIST_BUNDLES_TOOL", "false").l
 # Flag to track if we're shutting down
 _is_shutting_down = False
 
+# Constant for stdio fallback session - enables backward compatibility with stdio mode
+# where there's no HTTP context to provide a session ID
+STDIO_DEFAULT_SESSION = "stdio-default-session"
+
 # Global variables for singleton pattern (initialized as None)
 _bundle_manager: Optional[BundleManager] = None
 _kubectl_executor: Optional[KubectlExecutor] = None
@@ -181,17 +185,21 @@ def check_response_size(
         return [TextContent(type="text", text=overflow_msg)]
 
 
-def get_session_id() -> Optional[str]:
+def get_session_id() -> str:
     """
     Extract the MCP session_id from the current request context.
+
+    For SSE/HTTP: extracts from query params or headers
+    For stdio: returns STDIO_DEFAULT_SESSION for backward compatibility
 
     Prefer explicit query param (?session_id=...), but accept an
     `x-mcp-session-id` header as a tolerant fallback. This lets clients
     avoid URL rewriting when their SSE library supports headers.
 
     Returns:
-        Session ID string if available, None otherwise
+        Session ID string - always returns a valid session ID (never None)
     """
+    # Try HTTP/SSE context first
     try:
         ctx = mcp.get_context()
         if ctx and ctx.request_context and ctx.request_context.request:
@@ -201,14 +209,35 @@ def get_session_id() -> Optional[str]:
 
             # Debug: log what we found
             if from_query or from_header:
-                logger.info(f"Session ID - query: {from_query[:8] if from_query else 'None'}..., header: {from_header[:8] if from_header else 'None'}...")
+                logger.debug(
+                    f"Session ID - query: {from_query[:8] if from_query else 'None'}..., "
+                    f"header: {from_header[:8] if from_header else 'None'}..."
+                )
 
             # Prefer header (stable workflow_id) over query param (random from SSE client)
-            return from_header or from_query
+            if from_header:
+                return from_header
+            if from_query:
+                return from_query
     except Exception as e:
-        logger.debug(f"Could not extract session_id from context: {e}")
+        logger.debug(f"Could not extract session_id from HTTP context: {e}")
 
-    return None
+    # Fallback for stdio mode - use default session for backward compatibility
+    logger.debug("Using stdio default session (no HTTP context available)")
+    return STDIO_DEFAULT_SESSION
+
+
+def is_stdio_session(session_id: str) -> bool:
+    """
+    Check if this is the stdio default session.
+
+    Args:
+        session_id: The session ID to check
+
+    Returns:
+        True if this is the stdio default session, False otherwise
+    """
+    return session_id == STDIO_DEFAULT_SESSION
 
 
 @mcp.tool()
@@ -240,13 +269,8 @@ async def initialize_bundle(
     bundle_manager = get_bundle_manager()
     formatter = get_formatter(verbosity)
 
-    # Get session ID for this tool call
+    # Get session ID for this tool call (always returns a valid ID - stdio fallback if needed)
     session_id = get_session_id()
-    if not session_id:
-        error_message = "Could not determine session ID. This tool requires MCP session context."
-        logger.error(error_message)
-        formatted_error = formatter.format_error(error_message)
-        return [TextContent(type="text", text=formatted_error)]
 
     try:
         # Check if sbctl is available before attempting to initialize
@@ -257,12 +281,21 @@ async def initialize_bundle(
             formatted_error = formatter.format_error(error_message)
             return [TextContent(type="text", text=formatted_error)]
 
-        # Initialize the bundle using session_id as bundle_id for stateless operation
-        result = await bundle_manager.initialize_bundle(source, force, bundle_id=session_id)
+        # For stdio mode, use source-based ID (original single-bundle behavior)
+        # For SSE/HTTP, use session_id as bundle_id (concurrent multi-bundle support)
+        if is_stdio_session(session_id):
+            bundle_id = None  # Let bundle_manager generate from source hash
+            logger.debug("stdio mode: using source-based bundle_id")
+        else:
+            bundle_id = session_id
+            logger.debug(f"HTTP/SSE mode: using session_id as bundle_id: {session_id[:16]}...")
 
-        # Associate bundle with this session (now bundle_id == session_id)
+        # Initialize the bundle
+        result = await bundle_manager.initialize_bundle(source, force, bundle_id=bundle_id)
+
+        # Associate bundle with this session
         bundle_manager.set_bundle_for_session(session_id, result.id)
-        logger.info(f"Bundle {result.id} associated with session {session_id[:16]}... (session_id == bundle_id)")
+        logger.info(f"Bundle {result.id} associated with session {session_id[:16]}...")
 
         # Check if the API server is available
         api_server_available = await bundle_manager.check_api_server_available()
@@ -409,13 +442,8 @@ async def kubectl(
     bundle_manager = get_bundle_manager()
     formatter = get_formatter(verbosity)
 
-    # Get session ID and look up bundle
+    # Get session ID and look up bundle (always returns valid ID - stdio fallback if needed)
     session_id = get_session_id()
-    if not session_id:
-        error_message = "Could not determine session ID. This tool requires MCP session context."
-        logger.error(error_message)
-        formatted_error = formatter.format_error(error_message)
-        return [TextContent(type="text", text=formatted_error)]
 
     bundle_id = bundle_manager.get_bundle_for_session(session_id)
     if not bundle_id:
@@ -557,13 +585,8 @@ async def list_files(
     bundle_manager = get_bundle_manager()
     formatter = get_formatter(verbosity)
 
-    # Get session ID and look up bundle
+    # Get session ID and look up bundle (always returns valid ID - stdio fallback if needed)
     session_id = get_session_id()
-    if not session_id:
-        error_message = "Could not determine session ID. This tool requires MCP session context."
-        logger.error(error_message)
-        formatted_error = formatter.format_error(error_message)
-        return [TextContent(type="text", text=formatted_error)]
 
     bundle_id = bundle_manager.get_bundle_for_session(session_id)
     if not bundle_id:
@@ -638,13 +661,8 @@ async def read_file(
     bundle_manager = get_bundle_manager()
     formatter = get_formatter(verbosity)
 
-    # Get session ID and look up bundle
+    # Get session ID and look up bundle (always returns valid ID - stdio fallback if needed)
     session_id = get_session_id()
-    if not session_id:
-        error_message = "Could not determine session ID. This tool requires MCP session context."
-        logger.error(error_message)
-        formatted_error = formatter.format_error(error_message)
-        return [TextContent(type="text", text=formatted_error)]
 
     bundle_id = bundle_manager.get_bundle_for_session(session_id)
     if not bundle_id:
@@ -734,13 +752,8 @@ async def grep_files(
     bundle_manager = get_bundle_manager()
     formatter = get_formatter(verbosity)
 
-    # Get session ID and look up bundle
+    # Get session ID and look up bundle (always returns valid ID - stdio fallback if needed)
     session_id = get_session_id()
-    if not session_id:
-        error_message = "Could not determine session ID. This tool requires MCP session context."
-        logger.error(error_message)
-        formatted_error = formatter.format_error(error_message)
-        return [TextContent(type="text", text=formatted_error)]
 
     bundle_id = bundle_manager.get_bundle_for_session(session_id)
     if not bundle_id:

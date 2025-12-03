@@ -617,7 +617,11 @@ class BundleManager:
             logger.debug(f"No bundle associated with session {session_id[:8]}...")
 
     async def initialize_bundle(
-        self, source: str, force: bool = False, token: Optional[str] = None, bundle_id: Optional[str] = None
+        self,
+        source: str,
+        force: bool = False,
+        token: Optional[str] = None,
+        bundle_id: Optional[str] = None,
     ) -> BundleMetadata:
         """
         Initialize a support bundle from a source.

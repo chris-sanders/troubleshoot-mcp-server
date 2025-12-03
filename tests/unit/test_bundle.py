@@ -91,7 +91,10 @@ async def test_bundle_manager_initialize_bundle_url():
             assert result.initialized is True
 
             # Verify the mocks were called
-            manager._download_bundle.assert_awaited_once_with("https://example.com/bundle.tar.gz")
+            # _download_bundle now takes optional token argument
+            manager._download_bundle.assert_awaited_once_with(
+                "https://example.com/bundle.tar.gz", token=None
+            )
             manager._initialize_with_sbctl.assert_awaited_once()
 
 
@@ -663,7 +666,10 @@ async def test_bundle_manager_initialize_with_sbctl():
 
         with patch("asyncio.create_subprocess_exec", mock_create_subprocess):
             with patch.object(manager, "_wait_for_initialization", mock_wait):
-                result = await manager._initialize_with_sbctl(bundle_path, bundle_dir)
+                # _initialize_with_sbctl now requires bundle_id argument
+                result = await manager._initialize_with_sbctl(
+                    bundle_path, bundle_dir, bundle_id="test-bundle-id"
+                )
 
                 # Verify the result points to the kubeconfig
                 assert result == kubeconfig_path
