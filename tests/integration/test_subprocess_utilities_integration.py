@@ -47,9 +47,10 @@ async def test_subprocess_shell_with_cleanup_basic_command():
 
     assert returncode == 0, "shell command should succeed"
     assert stdout == b"shell test\n", "Should get expected output"
-    # Allow for environment-specific shell warnings (e.g., getcwd() issues in CI)
+    # Allow for environment-specific shell warnings (e.g., getcwd issues in CI)
     # The important thing is that the command succeeded and produced the right output
-    if stderr and b"getcwd()" not in stderr:
+    # Note: The error message may contain "getcwd:" (colon) or "getcwd()" depending on shell
+    if stderr and b"getcwd" not in stderr:
         assert stderr == b"", f"Unexpected stderr (non-getcwd related): {stderr}"
 
 

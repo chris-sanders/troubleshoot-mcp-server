@@ -560,9 +560,13 @@ async def test_bundle_manager_download_bundle(
             # Check that the bundle path inside the metadata points to the downloaded file's dir
             expected_bundle_dir_name_part = "bundle_"  # From filename generation
             assert expected_bundle_dir_name_part in result.path.name
-            # Check the generated filename used for download path
-            expected_filename = "bundle.tar.gz"  # Based on URL parsing
-            assert (manager.bundle_dir / expected_filename).exists()
+            # Check the bundle tarball exists in the final location
+            # Note: initialize_bundle moves the tarball from bundle_dir to result.path
+            expected_filename = "bundle.tar.gz"
+            assert result.path.exists(), "Bundle output directory should exist"
+            assert (result.path / expected_filename).exists(), (
+                f"Bundle tarball should be moved to {result.path / expected_filename}"
+            )
 
 
 @pytest.mark.asyncio
@@ -616,63 +620,78 @@ async def test_bundle_manager_download_bundle_error():
 @pytest.mark.asyncio
 async def test_bundle_manager_initialize_with_sbctl():
     """Test that the bundle manager can initialize a bundle with sbctl."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        bundle_dir = Path(temp_dir)
-        manager = BundleManager(bundle_dir)
+    original_cwd = os.getcwd()
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir)
+            manager = BundleManager(bundle_dir)
 
-        # Create a mock process that properly implements async methods
-        class MockProcess:
-            def __init__(self):
-                self.stdout = MockStreamReader()
-                self.stderr = MockStreamReader()
-                self.returncode = None
-                self.terminated = False
-                self.killed = False
+            # Create a mock process that properly implements async methods
+            class MockProcess:
+                def __init__(self):
+                    self.stdout = MockStreamReader()
+                    self.stderr = MockStreamReader()
+                    self.returncode = None
+                    self.terminated = False
+                    self.killed = False
 
-            def terminate(self):
-                self.terminated = True
+                def terminate(self):
+                    self.terminated = True
 
-            def kill(self):
-                self.killed = True
+                def kill(self):
+                    self.killed = True
 
-            async def wait(self):
-                self.returncode = 0
-                return 0
+                async def wait(self):
+                    self.returncode = 0
+                    return 0
 
-        class MockStreamReader:
-            async def read(self, n):
-                return b"mock output"
+            class MockStreamReader:
+                async def read(self, n=-1):
+                    return b"mock output"
 
-        # Create a real kubeconfig file in the expected location
-        os.chdir(bundle_dir)  # Change dir to match the implementation
-        kubeconfig_path = bundle_dir / "kubeconfig"
-        with open(kubeconfig_path, "w") as f:
-            f.write("mock kubeconfig content")
+            # Create a real kubeconfig file in the expected location
+            kubeconfig_path = bundle_dir / "kubeconfig"
+            with open(kubeconfig_path, "w") as f:
+                f.write("mock kubeconfig content")
 
-        # Create a mock bundle file
-        bundle_path = bundle_dir / "test_bundle.tar.gz"
-        with open(bundle_path, "w") as f:
-            f.write("mock bundle content")
+            # Create a mock bundle file
+            bundle_path = bundle_dir / "test_bundle.tar.gz"
+            with open(bundle_path, "w") as f:
+                f.write("mock bundle content")
 
-        # Mock the create_subprocess_exec function
-        mock_process = MockProcess()
+            # Create mock process
+            mock_process = MockProcess()
 
-        async def mock_create_subprocess(*args, **kwargs):
-            return mock_process
+            # Set up the bundle_id - required for sbctl_process property to work
+            # (sbctl_process is a property backed by sbctl_processes dict keyed by active_bundle_id)
+            manager.active_bundle_id = "test-bundle-id"
 
-        # Mock wait_for_initialization to avoid actual waiting
-        async def mock_wait(*args, **kwargs):
-            pass
+            # Mock _start_sbctl_process to set the sbctl_process attribute
+            async def mock_start_sbctl(bp, od):
+                manager.sbctl_process = mock_process
+                manager._termination_requested = False
 
-        with patch("asyncio.create_subprocess_exec", mock_create_subprocess):
-            with patch.object(manager, "_wait_for_initialization", mock_wait):
-                # _initialize_with_sbctl now requires bundle_id argument
-                result = await manager._initialize_with_sbctl(
-                    bundle_path, bundle_dir, bundle_id="test-bundle-id"
-                )
+            # Mock wait_for_initialization to avoid actual waiting
+            async def mock_wait(*args, **kwargs):
+                pass
 
-                # Verify the result points to the kubeconfig
-                assert result == kubeconfig_path
+            # Mock _terminate_sbctl_process to avoid cleanup issues
+            async def mock_terminate(*args, **kwargs):
+                pass
+
+            with patch.object(manager, "_start_sbctl_process", mock_start_sbctl):
+                with patch.object(manager, "_wait_for_initialization", mock_wait):
+                    with patch.object(manager, "_terminate_sbctl_process", mock_terminate):
+                        # _initialize_with_sbctl now requires bundle_id argument
+                        result = await manager._initialize_with_sbctl(
+                            bundle_path, bundle_dir, bundle_id="test-bundle-id"
+                        )
+
+                        # Verify the result points to the kubeconfig
+                        assert result == kubeconfig_path
+    finally:
+        # Restore original working directory
+        os.chdir(original_cwd)
 
 
 @pytest.mark.asyncio

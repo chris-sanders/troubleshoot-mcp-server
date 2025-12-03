@@ -425,7 +425,13 @@ class TestContainerBuildValidation:
 
         # Run the build script using natural CI detection
         env = os.environ.copy()
-        env["IMAGE_TAG"] = "test-build"
+        # Use consistent image name and tag for testing
+        # Note: build.sh defaults IMAGE_NAME to troubleshoot-mcp-server-dev
+        test_image_name = "troubleshoot-mcp-server-dev"
+        test_image_tag = "test-build"
+        env["IMAGE_NAME"] = test_image_name
+        env["IMAGE_TAG"] = test_image_tag
+        expected_image = f"{test_image_name}:{test_image_tag}"
         # In CI: uses unsigned multi-arch builds
         # Locally: would use MELANGE_TEST_BUILD=true for test keys
 
@@ -452,13 +458,13 @@ class TestContainerBuildValidation:
                     CONTAINER_RUNTIME,
                     "image",
                     "exists",
-                    "troubleshoot-mcp-server:test-build",
+                    expected_image,
                 ],
                 capture_output=True,
                 timeout=10,
             )
 
-            assert check_result.returncode == 0, "Built image should exist"
+            assert check_result.returncode == 0, f"Built image {expected_image} should exist"
 
         except subprocess.TimeoutExpired:
             pytest.fail("Build script timed out after 5 minutes")
@@ -468,7 +474,7 @@ class TestContainerBuildValidation:
         # Clean up test image
         try:
             subprocess.run(
-                [CONTAINER_RUNTIME, "rmi", "troubleshoot-mcp-server:test-build"],
+                [CONTAINER_RUNTIME, "rmi", expected_image],
                 capture_output=True,
                 timeout=30,
             )

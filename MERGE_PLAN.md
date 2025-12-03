@@ -184,8 +184,8 @@ async def initialize_bundle(...):
 ---
 
 ### Task 2: Add Unit Tests for Session Handling
-**Status:** NOT STARTED
-**Agent:** (to be assigned)
+**Status:** COMPLETE
+**Agent:** Claude Opus 4.5
 **Estimated Effort:** 2-3 hours
 
 **Depends On:** Task 1 complete
@@ -251,20 +251,23 @@ class TestStdioModeCompatibility:
 - All tests pass: `uv run pytest tests/ -v`
 
 **Completion Checklist:**
-- [ ] `test_session_handling.py` created with all tests above
-- [ ] All new tests pass
-- [ ] All existing tests still pass
-- [ ] Code formatted and linted
-- [ ] Changes committed
+- [x] `test_session_handling.py` created with all tests above
+- [x] All new tests pass (16 tests)
+- [x] All existing tests still pass
+- [x] Code formatted and linted
+- [x] Changes committed
 
-**Completed:** (date/time when done)
-**Notes:** (any issues or deviations)
+**Completed:** 2025-12-03
+**Notes:** Created comprehensive test suite with 16 tests covering:
+- TestGetSessionId (8 tests): Various MCP context scenarios
+- TestIsStdioSession (4 tests): Boolean checks including edge cases
+- TestStdioModeCompatibility (4 tests): Backward compatibility verification
 
 ---
 
 ### Task 3: Integration Testing and Bug Fixes
-**Status:** NOT STARTED
-**Agent:** (to be assigned)
+**Status:** COMPLETE
+**Agent:** Claude Opus 4.5
 **Estimated Effort:** 2-3 hours
 
 **Depends On:** Tasks 1 and 2 complete
@@ -296,15 +299,21 @@ uv run mypy src
 - If a test seems invalid, document WHY and ask user before removing
 
 **Completion Checklist:**
-- [ ] `uv run pytest tests/ -v` passes (ALL tests)
-- [ ] `uv run ruff format .` produces no changes
-- [ ] `uv run ruff check .` passes
-- [ ] `uv run mypy src` passes
-- [ ] Any fixes committed with clear messages
-- [ ] This document updated with any issues found
+- [x] `uv run pytest tests/ -v` passes (ALL tests) - 441 passed
+- [x] `uv run ruff format .` produces no changes
+- [x] `uv run ruff check .` passes
+- [x] `uv run mypy src` passes
+- [x] Any fixes committed with clear messages
+- [x] This document updated with any issues found
 
-**Completed:** (date/time when done)
-**Notes:** (any issues or deviations)
+**Completed:** 2025-12-03
+**Notes:** Fixed 5 test failures from Task 1:
+1. `test_bundle_manager_download_bundle` - Fixed assertion path (tarball moved to subdirectory)
+2. `test_bundle_manager_initialize_with_sbctl` - Set `active_bundle_id` before mock (required for sbctl_process property)
+3. `test_subprocess_shell_with_cleanup_basic_command` - Fixed getcwd error string check
+4. `test_bundle_initialization_workflow` - Fixed path resolution and tarball fallback in bundle.py
+5. `test_build_script_produces_working_image` - Fixed image name to match build script default
+Also fixed mypy errors by adding `cleanup_bundle` method and `bundle_id` argument to auto-activation code.
 
 ---
 
@@ -366,6 +375,8 @@ uv run mypy src
 |------|-------|------|--------|-------|
 | 2025-12-03 | Setup Agent | Document created | Complete | Initial setup |
 | 2025-12-03 | Claude Opus 4.5 | Task 1: Fix stdio Session Handling | Complete | Commit 3825452. 420 passed, 5 pre-existing infra failures. |
+| 2025-12-03 | Claude Opus 4.5 | Task 2: Add Unit Tests for Session Handling | Complete | Created test_session_handling.py with 16 tests |
+| 2025-12-03 | Claude Opus 4.5 | Task 3: Integration Testing and Bug Fixes | Complete | Fixed 5 failing tests. All 441 tests pass. |
 
 ---
 
@@ -376,13 +387,16 @@ This section tracks all files modified during this merge work:
 ### Source Files
 - `src/troubleshoot_mcp_server/server.py` - Session handling fix (Task 1)
 - `src/troubleshoot_mcp_server/http_server.py` - Removed unused import (Task 1)
+- `src/troubleshoot_mcp_server/bundle.py` - Fixed path resolution, tarball fallback, added cleanup_bundle method, fixed auto-activation bundle_id arg (Task 3)
 
 ### Test Files
 - `tests/unit/test_server.py` - Updated mocks for session handling (Task 1)
 - `tests/unit/test_server_parametrized.py` - Updated mocks for session handling (Task 1)
-- `tests/unit/test_bundle.py` - Updated mock assertions for bundle_id (Task 1)
+- `tests/unit/test_bundle.py` - Updated mock assertions for bundle_id (Task 1), fixed assertion paths (Task 3)
 - `tests/unit/test_list_bundles.py` - Fixed side_effect functions for bundle_id (Task 1)
-- `tests/unit/test_session_handling.py` - New tests for session handling (Task 2 - pending)
+- `tests/unit/test_session_handling.py` - New tests for session handling (Task 2)
+- `tests/integration/test_subprocess_utilities_integration.py` - Fixed getcwd error string check (Task 3)
+- `tests/e2e/test_container_bundle_validation.py` - Fixed image name to match build script (Task 3)
 
 ### Documentation
 - `MERGE_PLAN.md` - This document

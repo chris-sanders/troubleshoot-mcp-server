@@ -503,7 +503,9 @@ class BundleManager:
                 file_count = sum(1 for _ in extract_dir.rglob("*") if _.is_file())
                 logger.info(f"Auto-activation: extracted {file_count} files")
 
-            await self._initialize_with_sbctl(bundle_tarball, bundle_dir)
+            # Set active_bundle_id before initializing (required for sbctl_process property)
+            self.active_bundle_id = bundle_id
+            await self._initialize_with_sbctl(bundle_tarball, bundle_dir, bundle_id)
         except Exception as e:
             logger.warning(
                 f"Could not restart sbctl for restored bundle (bundle may still be usable): {e}"
@@ -598,6 +600,36 @@ class BundleManager:
             return session_id
 
         return None
+
+    async def cleanup_bundle(self, bundle_id: str) -> None:
+        """
+        Clean up a specific bundle by ID.
+
+        Args:
+            bundle_id: The bundle ID to clean up
+        """
+        logger.info(f"Cleaning up bundle: {bundle_id}")
+
+        # Terminate the sbctl process for this bundle
+        await self._terminate_sbctl_process(bundle_id)
+
+        # Remove the bundle from the bundles dict
+        bundle = self.bundles.pop(bundle_id, None)
+        if bundle:
+            # Clean up bundle directory if it exists
+            try:
+                if bundle.path and bundle.path.exists():
+                    import shutil
+
+                    shutil.rmtree(bundle.path, ignore_errors=True)
+                    logger.info(f"Removed bundle directory: {bundle.path}")
+            except Exception as e:
+                logger.warning(f"Failed to remove bundle directory: {e}")
+
+        # If this was the active bundle, clear it
+        if self.active_bundle and self.active_bundle.id == bundle_id:
+            self.active_bundle = None
+            self.active_bundle_id = None
 
     async def cleanup_session(self, session_id: str) -> None:
         """
@@ -720,8 +752,8 @@ class BundleManager:
                 # Use the moved tarball for initialization
                 bundle_path_for_init = bundle_tarball_dest
             else:
-                # Local file - use as-is
-                bundle_path_for_init = bundle_path
+                # Local file - resolve to absolute path since _initialize_with_sbctl changes directory
+                bundle_path_for_init = bundle_path.resolve()
 
             # Initialize the bundle with sbctl (pass bundle_id to prevent race condition)
             kubeconfig_path = await self._initialize_with_sbctl(
@@ -761,7 +793,11 @@ class BundleManager:
 
                     # Extract the bundle if it's a tarfile - ensure support bundle extraction succeeds
                     # Support bundles often have complex structures, so we need to handle them properly
+                    # For downloaded bundles, use bundle_output_dir / "bundle.tar.gz"
+                    # For local bundles, use the original bundle_path_for_init
                     tarball_path = bundle_output_dir / "bundle.tar.gz"
+                    if not tarball_path.exists():
+                        tarball_path = bundle_path_for_init
                     if tarball_path.exists() and str(tarball_path).endswith((".tar.gz", ".tgz")):
                         import tarfile
 
