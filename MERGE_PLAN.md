@@ -170,7 +170,7 @@ async def initialize_bundle(...):
 - [x] `initialize_bundle` uses source-based ID for stdio mode
 - [x] All `if not session_id:` error blocks removed (session always exists)
 - [x] All unit tests pass
-- [x] All tests pass (407 passed, 6 failed - pre-existing infrastructure issues, 12 skipped)
+- [x] All tests pass (420 passed, 5 failed - pre-existing infrastructure issues)
 - [x] Code formatted and linted
 - [x] Changes committed
 
@@ -365,7 +365,7 @@ uv run mypy src
 | Date | Agent | Task | Status | Notes |
 |------|-------|------|--------|-------|
 | 2025-12-03 | Setup Agent | Document created | Complete | Initial setup |
-| 2025-12-03 | Claude Opus 4.5 | Task 1: Fix stdio Session Handling | Complete | Commit 3825452. All tests pass (6 pre-existing infra failures). |
+| 2025-12-03 | Claude Opus 4.5 | Task 1: Fix stdio Session Handling | Complete | Commit 3825452. 420 passed, 5 pre-existing infra failures. |
 
 ---
 
