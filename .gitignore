@@ -65,7 +65,9 @@ coverage-*.xml
 .pytest_cache/
 .ruff_cache/
 
-# Temporary planning/merge documents
-MERGE_PLAN.md
-OPTION2_SSE_MIGRATION.md
-test_mock_audit_results.md
+# Ignore root-level .md files except specific ones
+/*.md
+!README.md
+!CLAUDE.md
+!PODMAN.md
+!RELEASE.md
