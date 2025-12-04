@@ -318,8 +318,8 @@ Also fixed mypy errors by adding `cleanup_bundle` method and `bundle_id` argumen
 ---
 
 ### Task 4: Merge Main and Final Verification
-**Status:** NOT STARTED
-**Agent:** (to be assigned)
+**Status:** COMPLETE
+**Agent:** Claude Opus 4.5
 **Estimated Effort:** 1-2 hours
 
 **Depends On:** Tasks 1, 2, and 3 complete
@@ -358,14 +358,18 @@ uv run mypy src
 6. Commit merge resolution if needed
 
 **Completion Checklist:**
-- [ ] Main merged successfully
-- [ ] Any conflicts resolved and documented
-- [ ] All tests pass after merge
-- [ ] Code quality checks pass
-- [ ] Final commit made
+- [x] Main merged successfully
+- [x] Any conflicts resolved and documented
+- [x] All tests pass after merge
+- [x] Code quality checks pass
+- [x] Final commit made
 
-**Completed:** (date/time when done)
-**Notes:** (any issues or deviations)
+**Completed:** 2025-12-04
+**Notes:**
+- Branch was already up-to-date with main (no merge needed)
+- Fixed 8 mypy errors in http_server.py (missing return type annotations and exit_code type mismatch)
+- All 441 tests pass
+- Code formatting and linting checks pass
 
 ---
 
@@ -377,6 +381,7 @@ uv run mypy src
 | 2025-12-03 | Claude Opus 4.5 | Task 1: Fix stdio Session Handling | Complete | Commit 3825452. 420 passed, 5 pre-existing infra failures. |
 | 2025-12-03 | Claude Opus 4.5 | Task 2: Add Unit Tests for Session Handling | Complete | Created test_session_handling.py with 16 tests |
 | 2025-12-03 | Claude Opus 4.5 | Task 3: Integration Testing and Bug Fixes | Complete | Fixed 5 failing tests. All 441 tests pass. |
+| 2025-12-04 | Claude Opus 4.5 | Task 4: Merge Main and Final Verification | Complete | Branch already up-to-date. Fixed mypy errors. All 441 tests pass. |
 
 ---
 
@@ -386,7 +391,7 @@ This section tracks all files modified during this merge work:
 
 ### Source Files
 - `src/troubleshoot_mcp_server/server.py` - Session handling fix (Task 1)
-- `src/troubleshoot_mcp_server/http_server.py` - Removed unused import (Task 1)
+- `src/troubleshoot_mcp_server/http_server.py` - Removed unused import (Task 1), added return type annotations and fixed exit_code type (Task 4)
 - `src/troubleshoot_mcp_server/bundle.py` - Fixed path resolution, tarball fallback, added cleanup_bundle method, fixed auto-activation bundle_id arg (Task 3)
 
 ### Test Files

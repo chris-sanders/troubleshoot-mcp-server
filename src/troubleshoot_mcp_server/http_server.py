@@ -163,7 +163,7 @@ def create_app(bundle_dir: Path) -> FastAPI:
     bundle_store = BundleStore(base_dir=bundle_dir)
 
     @app.get("/health", response_model=HealthResponse)
-    async def health_check():
+    async def health_check() -> HealthResponse:
         """Health check endpoint."""
         return HealthResponse(
             status="healthy",
@@ -173,7 +173,7 @@ def create_app(bundle_dir: Path) -> FastAPI:
         )
 
     @app.post("/bundles/initialize", response_model=InitializeResponse, status_code=201)
-    async def initialize_bundle(req: InitializeRequest):
+    async def initialize_bundle(req: InitializeRequest) -> InitializeResponse:
         """
         Initialize a new support bundle from URL.
 
@@ -193,7 +193,7 @@ def create_app(bundle_dir: Path) -> FastAPI:
             raise HTTPException(status_code=500, detail=f"Failed to initialize bundle: {str(e)}")
 
     @app.post("/bundles/{bundle_id}/kubectl", response_model=KubectlResponse)
-    async def kubectl_execute(bundle_id: str, req: KubectlRequest):
+    async def kubectl_execute(bundle_id: str, req: KubectlRequest) -> KubectlResponse:
         """
         Execute kubectl command in the specified bundle.
 
@@ -245,7 +245,7 @@ def create_app(bundle_dir: Path) -> FastAPI:
 
             return KubectlResponse(
                 output=output,
-                exit_code=result.exit_code,
+                exit_code=result.exit_code if result.exit_code is not None else 0,
             )
         except KubectlError as e:
             logger.error(f"kubectl error in bundle {bundle_id}: {e}")
@@ -258,7 +258,7 @@ def create_app(bundle_dir: Path) -> FastAPI:
     async def list_files(
         bundle_id: str,
         path: str = Query(default="", description="Path within bundle (defaults to bundle root)"),
-    ):
+    ) -> FilesResponse:
         """
         List files in the specified bundle path.
 
@@ -301,7 +301,7 @@ def create_app(bundle_dir: Path) -> FastAPI:
     @app.get("/bundles/{bundle_id}/files/content", response_model=FileContentResponse)
     async def read_file(
         bundle_id: str, path: str = Query(..., description="Path to file within bundle")
-    ):
+    ) -> FileContentResponse:
         """
         Read file content from the specified bundle.
 
@@ -370,7 +370,7 @@ def create_app(bundle_dir: Path) -> FastAPI:
             raise HTTPException(status_code=500, detail=f"Failed to read file: {str(e)}")
 
     @app.delete("/bundles/{bundle_id}", response_model=CleanupResponse)
-    async def cleanup_bundle(bundle_id: str):
+    async def cleanup_bundle(bundle_id: str) -> CleanupResponse:
         """
         Cleanup bundle resources and remove bundle.
 
@@ -391,7 +391,7 @@ def create_app(bundle_dir: Path) -> FastAPI:
 
 async def run_http_server(
     host: str = "0.0.0.0", port: int = 9000, bundle_dir: Path = Path("/tmp/bundles")
-):
+) -> None:
     """
     Run the HTTP server.
 
